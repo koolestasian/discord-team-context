@@ -19,11 +19,7 @@
 //! input never leaves a half-loaded database behind. Errors name the section and the
 //! record's array index, never its content.
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    error::Error,
-    fmt,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 use teamctx_core::{
@@ -38,6 +34,7 @@ use teamctx_core::{
     source::{Channel, Member, Message, MessageRef, SourceEvent, SourceKind},
     time::UnixMillis,
 };
+use thiserror::Error;
 
 /// The dataset schema this importer reads.
 const SCHEMA_VERSION: i64 = 1;
@@ -45,13 +42,16 @@ const SCHEMA_VERSION: i64 = 1;
 const PAGE: u32 = 500;
 
 /// Why the demo could not be imported.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum DemoError {
     /// The text is not JSON of the expected top-level shape.
+    #[error("demo dataset is not valid JSON of the expected shape")]
     NotJson,
     /// The dataset is not schema version 1, or is not marked fictional.
+    #[error("demo dataset is not a fictional schema version 1 dataset")]
     UnsupportedDataset,
     /// A field is missing, has the wrong type or is not valid for its type.
+    #[error("demo {section} record {index}: field `{field}` is missing or invalid")]
     Malformed {
         /// Dataset section, such as `"entries"`.
         section: &'static str,
@@ -62,6 +62,7 @@ pub enum DemoError {
     },
     /// A reference points at a record that is not in the dataset (or comes later where
     /// the loading order needs it earlier).
+    #[error("demo {section} record {index}: `{field}` refers to a record that is not available")]
     Dangling {
         /// Dataset section holding the reference.
         section: &'static str,
@@ -71,16 +72,19 @@ pub enum DemoError {
         field: &'static str,
     },
     /// The store rejected a record.
+    #[error("demo {section} record {index} was rejected by the store: {source}")]
     Rejected {
         /// Dataset section, such as `"messages"`.
         section: &'static str,
         /// Zero-based position in that section's array.
         index: usize,
         /// The store's error.
+        #[source]
         source: RepoError,
     },
     /// The store accepted a record but did not keep it: an unknown channel or an
     /// excluded one, or no row found after the write.
+    #[error("demo {section} record {index} was not stored")]
     NotStored {
         /// Dataset section, such as `"messages"`.
         section: &'static str,
@@ -88,61 +92,11 @@ pub enum DemoError {
         index: usize,
     },
     /// After loading, an entry's stored status differs from the dataset's snapshot.
+    #[error("demo entries record {index}: stored status differs from the dataset")]
     StatusMismatch {
         /// Zero-based position in the `entries` array.
         index: usize,
     },
-}
-
-impl fmt::Display for DemoError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NotJson => f.write_str("demo dataset is not valid JSON of the expected shape"),
-            Self::UnsupportedDataset => {
-                f.write_str("demo dataset is not a fictional schema version 1 dataset")
-            }
-            Self::Malformed {
-                section,
-                index,
-                field,
-            } => write!(
-                f,
-                "demo {section} record {index}: field `{field}` is missing or invalid"
-            ),
-            Self::Dangling {
-                section,
-                index,
-                field,
-            } => write!(
-                f,
-                "demo {section} record {index}: `{field}` refers to a record that is not available"
-            ),
-            Self::Rejected {
-                section,
-                index,
-                source,
-            } => write!(
-                f,
-                "demo {section} record {index} was rejected by the store: {source}"
-            ),
-            Self::NotStored { section, index } => {
-                write!(f, "demo {section} record {index} was not stored")
-            }
-            Self::StatusMismatch { index } => write!(
-                f,
-                "demo entries record {index}: stored status differs from the dataset"
-            ),
-        }
-    }
-}
-
-impl Error for DemoError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::Rejected { source, .. } => Some(source),
-            _ => None,
-        }
-    }
 }
 
 /// Maps the dataset's ids to the ids the store assigned, and back.
