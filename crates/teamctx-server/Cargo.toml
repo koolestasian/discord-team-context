@@ -12,7 +12,12 @@ publish = false
 workspace = true
 
 [dependencies]
+teamctx-core.workspace = true
 teamctx-store.workspace = true
+thiserror.workspace = true
+sha2.workspace = true
+getrandom.workspace = true
+tracing.workspace = true
 rmcp.workspace = true
 axum.workspace = true
 tokio.workspace = true
@@ -21,3 +26,5 @@ tokio-util.workspace = true
 [dev-dependencies]
 serde_json.workspace = true
 reqwest.workspace = true
+serde.workspace = true
+tempfile.workspace = true

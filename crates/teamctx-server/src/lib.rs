@@ -16,13 +16,15 @@ use rmcp::transport::streamable_http_server::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::{auth::BearerAuth, mcp::PingServer, secret::Secret};
+use crate::{
+    auth::{Auth, TokenBackend},
+    mcp::PingServer,
+};
 
 /// Settings for [`router`].
-#[derive(Debug)]
 pub struct HttpConfig {
-    /// The one accepted bearer token (spike scope; the M4 token store replaces it).
-    pub token: Secret<String>,
+    /// Where access tokens are looked up (normally [`auth::StoreTokens`]).
+    pub tokens: Arc<dyn TokenBackend>,
     /// `Host` values the MCP endpoint accepts, as `host` or `host:port`. rmcp rejects any
     /// other `Host` with 403 to stop DNS-rebinding attacks. The default list is loopback
     /// names only, so a deployment behind a real hostname must set this.
@@ -31,9 +33,21 @@ pub struct HttpConfig {
     pub shutdown: CancellationToken,
 }
 
+impl std::fmt::Debug for HttpConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HttpConfig")
+            .field("allowed_hosts", &self.allowed_hosts)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Builds the application router: `/mcp` behind bearer auth.
+///
+/// Serve it with `into_make_service_with_connect_info::<SocketAddr>()` so the auth
+/// failure limit counts per client address; without connection info every client shares
+/// one bucket.
 pub fn router(config: HttpConfig) -> Router {
-    let auth = BearerAuth::new(config.token);
+    let auth = Auth::new(config.tokens);
     let mcp_config = StreamableHttpServerConfig::default()
         // 2026-07-28 removed protocol-level sessions. With this off, an `initialize` from an
         // older client is still served, but no `Mcp-Session-Id` is minted, so a server
