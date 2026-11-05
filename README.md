@@ -6,18 +6,90 @@ a team record of decisions, tasks and open questions. Each entry links to the me
 came from. The record is served through Discord slash commands, an MCP server for AI
 coding agents, and a minimal web view. Everything except `/ask` works without an LLM.
 
-**Status: pre-alpha.** Offline configuration (`init`, `doctor`), core query rules,
-fictional fixtures, SQLite repositories and the MCP spike are implemented. Live Discord sync,
-the demo/search commands and the complete agent/web interfaces are still pending.
-Start with the [test bot setup guide](docs/guides/discord-bot.md); offline checks do
-not establish that a bot can access Discord.
+> **Status: pre-alpha, not usable yet.** The foundations are built and tested, but
+> teamctx cannot connect to Discord yet. Follow the milestones below; v0.1.0 is the
+> first release meant for real teams.
 
-## Documents
+## Design principles
 
-- [Implementation plan](docs/design/implementation-plan.md): the spec and source of truth.
-- [Architecture decisions](docs/adr/): decisions and their reasons.
-- [Contributing](CONTRIBUTING.md), [security policy](SECURITY.md) and
-  [code of conduct](CODE_OF_CONDUCT.md).
+- **Self-hosted, one binary, one SQLite file.** Your chat copy stays on a machine you
+  control. No cloud service.
+- **Read-only towards Discord.** The bot never posts, edits, deletes or reacts, apart
+  from replying to the slash commands people run. It asks for 66560 permissions (view
+  channels and read message history), nothing more.
+- **People decide what goes in the record.** Entries are captured on purpose (context
+  menu, slash command or an opt-in reaction), never guessed by a model.
+- **Chat is untrusted data.** Every surface that returns chat text frames it as data,
+  so an agent reading it is told not to follow instructions inside it.
+- **The LLM is optional.** Only `/ask` uses one, with your own key or a local model.
+
+## Progress
+
+| Milestone | Scope | State |
+|---|---|---|
+| M0 Foundation | Workspace, CI on Linux/macOS/Windows, security workflows, ADRs | Done |
+| M1 Spikes | S3 MCP over HTTP with bearer auth, S4 bundled SQLite FTS5 | Done |
+| | S1 gateway messages, S2 interaction replies | Needs a Discord test server |
+| M2 Store + search | SQLite schema and repositories, query parser, ranking, demo data, eval questions | Done |
+| | Retrieval eval runner, `teamctx demo` and `teamctx search` | Next |
+| M3 Discord sync | Offline `init`/`doctor`, permission checks, bot setup guide | Done |
+| | Live sync, backfill, live events | Planned |
+| M4-M8 | MCP tools and tokens, record commands, `/ask`, web view, v0.1.0 release | Planned |
+
+The [implementation plan](docs/design/implementation-plan.md) defines each milestone and
+its "done when" criteria. [CHANGELOG.md](CHANGELOG.md) lists what has landed.
+
+## Try what exists today
+
+You need Rust 1.89 or newer ([rustup](https://rustup.rs)).
+
+```sh
+git clone https://github.com/koolestasian/discord-team-context.git
+cd discord-team-context
+cargo test --workspace          # unit, integration and fixture tests
+
+# Print a config template and a guild-locked bot invite. Writes no files.
+cargo run -p teamctx -- init --guild-id <server id> --application-id <app id>
+
+# Check a config offline. Makes no network calls and never prints the token.
+cargo run -p teamctx -- doctor --config teamctx.toml
+```
+
+To prepare a throwaway test server and bot, follow the
+[Discord test bot guide](docs/guides/discord-bot.md). The fictional dataset that the
+tests and the future `teamctx demo` use is described in
+[fixtures/demo/README.md](fixtures/demo/README.md).
+
+## Repository layout
+
+```text
+crates/
+  teamctx-core/      domain types, record rules, query parsing, ranking, framing (no I/O)
+  teamctx-store/     SQLite migrations, repositories and full-text search
+  teamctx-discord/   Discord connector: permissions today, sync next
+  teamctx-server/    MCP server, JSON API and web view (HTTP)
+  teamctx-llm/       optional /ask pipeline
+  teamctx/           the binary: CLI and configuration
+xtask/               developer tasks (`cargo xtask`)
+fixtures/demo/       fictional team chat and retrieval eval questions
+docs/
+  design/            implementation plan and core contracts
+  adr/               architecture decision records
+  guides/            setup guides
+  research/          prior-art research and spike results
+.github/             CI workflows, contributing guide, security policy, code of conduct
+```
+
+Dependencies point one way: `teamctx` -> {`discord`, `server`, `llm`} -> `store` ->
+`core`. A test enforces it.
+
+## Contributing and security
+
+- [Contributing guide](.github/CONTRIBUTING.md): checks to run, commit style, rules.
+- [Security policy](.github/SECURITY.md): report vulnerabilities privately, never in an
+  issue.
+- [Code of conduct](.github/CODE_OF_CONDUCT.md).
+- [AGENTS.md](AGENTS.md): instructions for AI coding agents working in this repository.
 
 ## Licence
 
