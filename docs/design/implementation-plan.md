@@ -673,7 +673,7 @@ The full threat model goes in `docs/design/threat-model.md` in M8. Summary:
 | Data to LLM providers | Off by default; README and `init` state exactly what is sent; bot messages and excluded channels never sent |
 | Platform rules | No training on message content (Discord Developer Policy); self-hosted per team (Slack terms, for v0.2) |
 | Deletion | Delete events honoured within the minute; recheck window catches misses; copied titles purged |
-| Supply chain | Few dependencies; `cargo-deny` + `cargo-audit`; lockfile committed; Actions pinned by SHA; releases with attestations |
+| Supply chain | Few dependencies; `cargo-deny` (licences, bans, sources, RustSec advisories on every change and daily); lockfile committed; Actions pinned by SHA; releases with attestations |
 
 **Privacy notice for teams** (`docs/guides/privacy.md`): what is stored, where, for how
 long, who can read it, what goes to the LLM, how to delete everything
@@ -723,14 +723,18 @@ gating) elsewhere. Every bug fix gets a regression test.
 - **Branches:** `main` is protected by a ruleset (PRs, CI green, linear history, no
   force push). Work happens on short branches in separate worktrees.
   Conventional Commits.
-- **CI** (`.github/workflows/ci.yml`, actions pinned by SHA, `permissions: read-all`):
+- **CI** (`.github/workflows/ci.yml`, actions pinned by SHA, top-level
+  `permissions: {}` with per-job grants such as `contents: read`):
   - `fmt --check`
   - `clippy --all-targets -D warnings`
   - `test` on ubuntu/macos/windows
   - MSRV build
-  - `cargo-deny check`
-  - `cargo-audit`
-  - coverage upload
+  - `cargo-deny check`, plus a scheduled daily `cargo deny check advisories`.
+    `cargo-audit` is not run: it reads the same RustSec database
+    (`docs/research/M0.md` §3).
+  - coverage: `cargo llvm-cov` lcov as a workflow artifact and a job-summary table; no
+    third-party coverage service
+  - workflow linting with zizmor
 - **Security workflows:** CodeQL (Rust), OpenSSF Scorecard, Dependabot (cargo +
   github-actions), secret scanning with push protection, private vulnerability
   reporting.
