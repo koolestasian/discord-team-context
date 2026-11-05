@@ -156,11 +156,39 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # Spike S4 / ADR 0003: the bundled SQLite (a C library built by cc) must build and pass
+  # its FTS5 tests for the static Linux target we ship. The tests run natively: a musl
+  # binary is static, so it runs on the glibc runner.
+  musl:
+    name: musl (x86_64-unknown-linux-musl)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CC_x86_64_unknown_linux_musl: musl-gcc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the toolchain from rust-toolchain.toml
+        run: rustup toolchain install
+      - name: Add the musl target and its C toolchain
+        run: |
+          rustup target add x86_64-unknown-linux-musl
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends musl-tools
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo build --workspace --locked --target x86_64-unknown-linux-musl
+      - run: cargo test --workspace --locked --target x86_64-unknown-linux-musl
+
   # The one status check to require in the main branch ruleset.
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [fmt, clippy, test, msrv, deny, coverage]
+    needs: [fmt, clippy, test, msrv, deny, coverage, musl]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
