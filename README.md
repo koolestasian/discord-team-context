@@ -6,7 +6,11 @@ a team record of decisions, tasks and open questions. Each entry links to the me
 came from. The record is served through Discord slash commands, an MCP server for AI
 coding agents, and a minimal web view. Everything except `/ask` works without an LLM.
 
-**Status: pre-alpha — nothing is usable yet.**
+**Status: pre-alpha.** Offline configuration (`init`, `doctor`), core query rules,
+fictional fixtures, SQLite repositories and the MCP spike are implemented. Live Discord sync,
+the demo/search commands and the complete agent/web interfaces are still pending.
+Start with the [test bot setup guide](docs/guides/discord-bot.md); offline checks do
+not establish that a bot can access Discord.
 
 ## Documents
 

@@ -12,6 +12,12 @@ release.
 
 ### Added
 
+- SQLite migration, repository implementations, FTS triggers, mention storage and a
+  dedicated writer thread; deletion, exclusion and retention redact copied titles
+  and update the audit log transactionally. Date queries require host timezone wiring.
+- Offline `init`/`doctor`, typed TOML configuration with CLI/environment precedence,
+  Discord permission calculations and a test bot setup guide. Live validation is
+  explicitly deferred.
 - Query parsing and literal FTS5 expression compilation, deterministic ranking,
   citation formatting and escaped untrusted-chat framing in core.
 - Fictional demo data (300 messages) and 50 grounded retrieval evaluation questions,
