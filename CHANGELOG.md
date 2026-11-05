@@ -29,3 +29,8 @@ release.
   monthly with a 7-day cooldown.
 - `AGENTS.md` with build commands, the architecture map and project rules; `CLAUDE.md`
   imports it.
+
+### Changed
+
+- Docs: work runs as parallel tasks that stop at maintainer steps; the Rust go/no-go bar,
+  the eval acceptance threshold and the v0.1 token-file decision are recorded in the plan.

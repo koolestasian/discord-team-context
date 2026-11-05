@@ -9,10 +9,13 @@ Spec and source of truth: [docs/design/implementation-plan.md](docs/design/imple
 Decisions: [docs/adr/](docs/adr/). Assumed decisions D1 to D13 are in plan section 3;
 changing one needs the maintainer's OK and an ADR.
 
-## Work one milestone per session
+## Work in tasks and waves
 
-Milestones are in plan section 18. Do the one you are asked for, meet its "Done when"
-criteria, and write suggestions instead of building ahead.
+Milestones are in plan section 18. Work is split into tasks with explicit owned paths.
+Independent tasks may run in parallel, each in its own worktree, and a run stops at
+the next step that needs the maintainer (accounts, a live Discord server, a release
+decision). Meet each task's "Done when" criteria and write suggestions instead of
+building ahead.
 
 ## Commands
 
@@ -69,6 +72,6 @@ the root `Cargo.toml` denies them. Dependencies are added when first used, never
 - Every behaviour has a test at the right layer (plan section 14). Don't claim something
   works without running it.
 - Commits are small, follow Conventional Commits, and each builds and passes the checks.
-  Work on a branch named `m<N>-<slug>`, never on `main`.
+  Work on a short branch (`m<N>-<slug>` or `build/run-<N>`), never on `main`.
 - Ask before pushing, opening PRs, tagging releases, changing repo settings, or anything
   visible to other people.
