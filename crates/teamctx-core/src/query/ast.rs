@@ -1,9 +1,9 @@
 //! Syntax tree for the plan section 9 query syntax:
 //! plain words, `"phrase"`, `from:name`, `in:#channel`, `before:/after:YYYY-MM-DD`.
 //!
-//! The tree records what the user wrote, in order, and nothing more. How clauses
-//! combine (for example two `from:` filters) is decided by the parser and the query
-//! compiler, not here; see `docs/design/contracts.md`, open questions.
+//! The tree records what the user wrote, in order. All clauses combine with AND,
+//! including repeated filters. Date boundaries are midnight in `server.timezone`,
+//! converted outside core (`after` inclusive, `before` exclusive).
 //!
 //! All strings are user input: untrusted, and never SQL or FTS syntax. The store escapes
 //! them.
@@ -33,7 +33,7 @@ pub enum Clause {
     In(String),
     /// `before:YYYY-MM-DD`: messages created before this date.
     Before(CalendarDate),
-    /// `after:YYYY-MM-DD`: messages created after this date.
+    /// `after:YYYY-MM-DD`: messages created at or after the start of this date.
     After(CalendarDate),
 }
 
