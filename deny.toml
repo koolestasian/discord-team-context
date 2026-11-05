@@ -11,7 +11,8 @@ all-features = false
 
 [advisories]
 yanked = "deny"
-# Unmaintained crates deeper in the tree are flagged for review, not blocked.
+# Unmaintained advisories fail the check only for direct dependencies of workspace
+# crates; transitive ones are not reported.
 unmaintained = "workspace"
 # Every entry needs { id = "RUSTSEC-...", reason = "..." } and a review date in the PR.
 ignore = []
