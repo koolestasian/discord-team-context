@@ -158,6 +158,8 @@ pub struct StoredMessage {
     pub author: Option<MemberId>,
     /// Normalised content (untrusted).
     pub content: String,
+    /// Mentioned external user ids, independent of normalized display text.
+    pub mentions: Vec<Snowflake>,
     /// External id of the message it replies to.
     pub reply_to: Option<Snowflake>,
     /// Attachment names only (untrusted); empty means none.
@@ -446,6 +448,17 @@ pub trait DirectoryRead {
 /// Message reads for search, `context_for`, `read` and `whats_new` (plan sections 9,
 /// 10.1). Never returns messages from excluded channels.
 pub trait MessageRead {
+    /// Visible messages mentioning `member`, created at or after `since`, newest
+    /// creation time first (ties by external message id descending), up to `limit`.
+    ///
+    /// # Errors
+    /// [`RepoError::NotFound`] for an unknown member; [`RepoError::Backend`].
+    fn mentions_since(
+        &self,
+        member: MemberId,
+        since: UnixMillis,
+        limit: u32,
+    ) -> RepoResult<Vec<StoredMessage>>;
     /// The message with this id, if any.
     ///
     /// # Errors

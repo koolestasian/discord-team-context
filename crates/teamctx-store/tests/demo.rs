@@ -93,6 +93,7 @@ fn demo_loads_into_core_types_with_valid_cross_references() {
             },
             author: Some(members[&id(value, "author_id")].clone()),
             content: text(value, "content").to_owned(),
+            mentions: Vec::new(),
             reply_to: value["reply_to"]
                 .as_str()
                 .map(|s| s.parse().expect("reply ID")),
