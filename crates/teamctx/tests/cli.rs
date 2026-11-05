@@ -31,14 +31,15 @@ fn version_flags_print_name_and_version() -> TestResult {
 }
 
 #[test]
-fn help_flags_describe_a_pre_alpha_build_with_no_commands() -> TestResult {
+fn help_flags_describe_the_offline_pre_alpha_commands() -> TestResult {
     for flag in ["--help", "-h"] {
         let output = teamctx(&[flag])?;
         assert!(output.status.success(), "{flag}: {:?}", output.status);
         let text = stdout(&output)?;
         assert!(text.contains("pre-alpha"), "{flag}: {text}");
         assert!(text.contains("Usage: teamctx"), "{flag}: {text}");
-        assert!(!text.contains("Commands:"), "{flag}: {text}");
+        assert!(text.contains("Offline commands:"), "{flag}: {text}");
+        assert!(text.contains("makes no network calls"), "{flag}: {text}");
         assert!(output.stderr.is_empty(), "{flag}");
     }
     Ok(())
@@ -54,5 +55,59 @@ fn unknown_argument_is_a_usage_error() -> TestResult {
         assert!(message.starts_with("error: "), "{args:?}: {message}");
         assert!(message.contains("teamctx --help"), "{args:?}: {message}");
     }
+    Ok(())
+}
+
+#[test]
+fn offline_init_and_doctor_never_echo_tokens_or_claim_live_checks() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let run = |args: &[&str], token: Option<&str>| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_teamctx"));
+        command.current_dir(dir.path()).env_clear().args(args);
+        if let Some(token) = token {
+            command.env("TEAMCTX_DISCORD_TOKEN", token);
+        }
+        command.output()
+    };
+    let init = run(
+        &["init", "--guild-id", "123", "--application-id", "456"],
+        Some("fictional-test-secret"),
+    )?;
+    assert!(init.status.success(), "{}", stderr(&init)?);
+    let template = stdout(&init)?;
+    assert!(template.contains("permissions=66560"));
+    assert!(!template.contains("fictional-test-secret"));
+    let config: toml::Value = toml::from_str(&template)?;
+    assert_eq!(config["discord"]["guild_id"].as_str(), Some("123"));
+    assert!(!dir.path().join("teamctx.toml").exists());
+
+    for (token, expected) in [(None, 1), (Some("fictional-test-secret"), 0)] {
+        let doctor = run(&["doctor", "--guild-id", "123"], token)?;
+        assert_eq!(doctor.status.code(), Some(expected));
+        let output = stdout(&doctor)?;
+        assert!(output.contains("Offline configuration checks passed"));
+        assert!(output.contains("Not checked: live token validity"));
+        assert!(!output.contains("fictional-test-secret"));
+    }
+    Ok(())
+}
+
+#[test]
+fn invalid_config_points_to_field_without_echoing_its_value() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let output = Command::new(env!("CARGO_BIN_EXE_teamctx"))
+        .current_dir(dir.path())
+        .env_clear()
+        .args([
+            "doctor",
+            "--guild-id",
+            "123",
+            "--bind",
+            "fictional-test-secret",
+        ])
+        .output()?;
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stderr(&output)?.contains("server.bind"));
+    assert!(!stderr(&output)?.contains("fictional-test-secret"));
     Ok(())
 }

@@ -4,3 +4,5 @@
 //! Boundary: read-only towards Discord. The only calls that write are replies to
 //! interactions. Everything it learns goes through `teamctx-store`; it never talks to the
 //! server or LLM crates.
+
+pub mod permissions;
