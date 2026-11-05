@@ -3,7 +3,7 @@
 # query is the actual natural-language input, not a hand-tuned keyword expansion.
 # expected_messages: external snowflake IDs; expected_entries: fixture short IDs.
 # Score messages and entries against the collection the tool can return; do not
-# penalize message-only search for not returning entries. T09 defines baselines.
+# penalize message-only search for not returning entries. The M2 eval runner stores the baselines.
 # answer_contains is an evidence fragment checked by the fixture validator, not model grading.
 # expected_status applies to the cited entries in the dataset snapshot.
 # Categories: paraphrase (no content word of the query appears in answer_contains),

@@ -1,6 +1,6 @@
 //! A minimal wrapper that keeps secrets out of logs and panic messages.
 //!
-//! Spike S3 only needs this much. The token store (T11) owns the real type.
+//! Spike S3 only needs this much. The M4 token store owns the real type.
 
 use std::fmt;
 

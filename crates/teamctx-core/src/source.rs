@@ -111,7 +111,7 @@ pub struct Member {
     /// The user's external id.
     pub id: Snowflake,
     /// Name to show (untrusted text). For Discord: the server nickname if set, else the
-    /// global display name, else the username; decided by the mapping (T15).
+    /// global display name, else the username; decided by the Discord event mapping (M3).
     pub display_name: String,
     /// Whether the account is a bot. Bot messages are stored but excluded from `/ask`
     /// context by default (plan section 6.1).
