@@ -13,3 +13,11 @@ workspace = true
 
 [dependencies]
 teamctx-store.workspace = true
+rmcp.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+reqwest.workspace = true
