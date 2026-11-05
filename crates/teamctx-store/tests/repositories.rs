@@ -134,14 +134,14 @@ fn migrations_reopen_readonly_and_reject_newer_schema() {
     assert_eq!(
         conn.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
             .unwrap(),
-        1
+        2
     );
     assert_eq!(
         conn.pragma_query_value(None, "journal_mode", |r| r.get::<_, String>(0))
             .unwrap(),
         "wal"
     );
-    conn.pragma_update(None, "user_version", 2).unwrap();
+    conn.pragma_update(None, "user_version", 3).unwrap();
     drop(conn);
     assert!(Store::open(file.path()).is_err());
     assert!(Store::open_read_only(file.path()).is_err());
@@ -750,4 +750,154 @@ fn cursor_and_neighbour_windows_use_numeric_external_ids_and_stay_in_thread() {
         db.last_catchup(anchor.author.unwrap()).unwrap(),
         Some(at(300))
     );
+}
+
+#[test]
+fn parent_reinclusion_restores_only_requested_descendants() {
+    let (mut db, source) = setup();
+    for (id, parent) in [(11, 10), (12, 11), (13, 10), (14, 13)] {
+        let mut c = channel(id, Some(parent));
+        c.included = id != 13;
+        db.apply_event(source, &SourceEvent::ChannelUpsert(c), at(1))
+            .unwrap();
+    }
+    let mut root = channel(10, None);
+    root.included = false;
+    db.apply_event(source, &SourceEvent::ChannelUpsert(root.clone()), at(2))
+        .unwrap();
+    assert!(db.channels(source).unwrap().iter().all(|c| !c.included));
+    // A child may be discovered while an ancestor is excluded. Its requested
+    // inclusion must survive even though its effective visibility remains false.
+    db.apply_event(
+        source,
+        &SourceEvent::ChannelUpsert(channel(15, Some(11))),
+        at(3),
+    )
+    .unwrap();
+    root.included = true;
+    db.apply_event(source, &SourceEvent::ChannelUpsert(root), at(4))
+        .unwrap();
+    for c in db.channels(source).unwrap() {
+        assert_eq!(
+            c.included,
+            !matches!(c.external_id.get(), 13 | 14),
+            "channel {}",
+            c.external_id
+        );
+    }
+    assert_eq!(
+        db.apply_event(
+            source,
+            &SourceEvent::MessageUpsert(message(20, 12, "included again")),
+            at(5)
+        )
+        .unwrap(),
+        ApplyOutcome::Applied
+    );
+    assert_eq!(
+        db.apply_event(
+            source,
+            &SourceEvent::MessageUpsert(message(21, 14, "still excluded")),
+            at(5)
+        )
+        .unwrap(),
+        ApplyOutcome::Excluded
+    );
+}
+
+#[test]
+fn version_one_migration_preserves_exclusions_until_connector_rediscovery() {
+    let file = tempfile::NamedTempFile::new().unwrap();
+    let conn = rusqlite::Connection::open(file.path()).unwrap();
+    conn.execute_batch(include_str!("../migrations/0001_init.sql"))
+        .unwrap();
+    conn.execute_batch("INSERT INTO sources(id,kind,external_id,name) VALUES(1,'discord','1','Fiction'); INSERT INTO channels(id,source_id,external_id,kind,name,is_included,archived) VALUES(1,1,'10','text','room-10',0,0); INSERT INTO channels(id,source_id,external_id,parent_id,kind,name,is_included,archived) VALUES(2,1,'11',1,'thread','room-11',0,0);").unwrap();
+    conn.pragma_update(None, "user_version", 1).unwrap();
+    drop(conn);
+    assert!(Store::open_read_only(file.path()).is_err());
+    let mut db = Store::open(file.path()).unwrap();
+    let source = SourceId::new(1).unwrap();
+    db.apply_event(
+        source,
+        &SourceEvent::ChannelUpsert(channel(10, None)),
+        at(2),
+    )
+    .unwrap();
+    let child = db
+        .channels(source)
+        .unwrap()
+        .into_iter()
+        .find(|c| c.external_id == sf(11))
+        .unwrap();
+    assert!(!child.included);
+    assert_eq!(child.parent, ChannelId::new(1));
+    assert_eq!(child.name, "room-11");
+    // v1's lossy exclusion cannot be inferred safely. Connector intent restores it.
+    db.apply_event(
+        source,
+        &SourceEvent::ChannelUpsert(channel(11, Some(10))),
+        at(3),
+    )
+    .unwrap();
+    assert!(db.channels(source).unwrap().iter().all(|c| c.included));
+    drop(db);
+    let reader = Store::open_read_only(file.path()).unwrap();
+    assert_eq!(reader.channels(source).unwrap().len(), 2);
+}
+
+#[test]
+fn deleting_a_distinct_answer_updates_since_without_marking_the_source_deleted() {
+    let (mut db, source) = setup();
+    let question_message = message(20, 10, "Question retained source");
+    let answer_message = message(21, 10, "Answer to remove");
+    for msg in [&question_message, &answer_message] {
+        db.apply_event(source, &SourceEvent::MessageUpsert(msg.clone()), at(20))
+            .unwrap();
+    }
+    let question = captured(
+        &mut db,
+        source,
+        &question_message,
+        EntryKind::Question,
+        true,
+    );
+    let answer = db
+        .message_by_ref(source, answer_message.id)
+        .unwrap()
+        .unwrap();
+    db.change_status(
+        question.short_id(),
+        StatusChange::Answer { message: answer.id },
+        question.created_by,
+        at(400),
+    )
+    .unwrap();
+    db.apply_event(
+        source,
+        &SourceEvent::MessageDelete {
+            message: answer_message.id,
+        },
+        at(500),
+    )
+    .unwrap();
+    let updated = db.entry(question.short_id()).unwrap().unwrap();
+    assert_eq!(updated.answered_by_message, None);
+    assert_eq!(updated.updated_at, at(500));
+    assert!(!updated.source_deleted);
+    assert_eq!(updated.source_message, question.source_message);
+    assert_eq!(updated.title, question.title);
+    let changes = db
+        .list_entries(
+            &EntryFilter {
+                updated_since: Some(at(450)),
+                ..EntryFilter::default()
+            },
+            PageRequest {
+                offset: 0,
+                limit: 10,
+            },
+        )
+        .unwrap();
+    assert_eq!(changes, [updated]);
+    assert_eq!(db.entry_events(question.id).unwrap().len(), 2);
 }

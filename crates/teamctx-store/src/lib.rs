@@ -61,16 +61,24 @@ impl Store {
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(backend)?;
-        match version {
-            0 => {
-                let tx = conn.transaction().map_err(backend)?;
-                tx.execute_batch(include_str!("../migrations/0001_init.sql"))
-                    .map_err(backend)?;
-                tx.pragma_update(None, "user_version", 1).map_err(backend)?;
-                tx.commit().map_err(backend)?;
-            }
-            1 => {}
-            _ => return Err(invalid("database schema is newer than this binary")),
+        if version > 2 {
+            return Err(invalid("database schema is newer than this binary"));
+        }
+        if version < 1 {
+            let tx = conn.transaction().map_err(backend)?;
+            tx.execute_batch(include_str!("../migrations/0001_init.sql"))
+                .map_err(backend)?;
+            tx.pragma_update(None, "user_version", 1).map_err(backend)?;
+            tx.commit().map_err(backend)?;
+        }
+        if version < 2 {
+            let tx = conn.transaction().map_err(backend)?;
+            tx.execute_batch(include_str!(
+                "../migrations/0002_requested_channel_inclusion.sql"
+            ))
+            .map_err(backend)?;
+            tx.pragma_update(None, "user_version", 2).map_err(backend)?;
+            tx.commit().map_err(backend)?;
         }
         Ok(Self {
             conn,
@@ -87,7 +95,7 @@ impl Store {
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(backend)?;
-        if version != 1 {
+        if version != 2 {
             return Err(invalid("database requires migration by the writer"));
         }
         Ok(Self {
