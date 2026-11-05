@@ -12,6 +12,8 @@ release.
 
 ### Added
 
+- Core domain types, record lifecycle rules, query AST and repository contracts,
+  with invariant tests and a contract map in `docs/design/contracts.md`.
 - Spike S4: `teamctx-store` links the bundled SQLite (`rusqlite`) and tests an FTS5
   external-content index on in-memory and file databases; CI builds and tests for
   `x86_64-unknown-linux-musl`. Result in `docs/research/S4.md`.
