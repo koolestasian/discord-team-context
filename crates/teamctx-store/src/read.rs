@@ -1,6 +1,8 @@
 use std::str::FromStr;
 
-use rusqlite::{Connection, OptionalExtension, Row, params, params_from_iter, types::Value};
+use rusqlite::{
+    Connection, OptionalExtension, Params, Row, params, params_from_iter, types::Value,
+};
 use teamctx_core::{
     id::*,
     query::{Clause, Query, fts_expression},
@@ -12,182 +14,300 @@ use teamctx_core::{
 
 use crate::{Store, backend};
 
+// Column lists for the row mappers below. Each list assumes the table alias in its
+// comment, and each mapper reads columns by name, so adding or reordering a table
+// column cannot shift the fields a mapper reads.
+
+/// Table alias `s`.
+pub(crate) const SOURCE_COLUMNS: &str = "s.id, s.kind, s.external_id, s.name";
+
+/// Table alias `c`.
+pub(crate) const CHANNEL_COLUMNS: &str = "\
+    c.id, c.source_id, c.external_id, c.parent_id, c.kind,
+    c.name, c.topic, c.is_included, c.archived";
+
+/// Table alias `mb`.
+pub(crate) const MEMBER_COLUMNS: &str = "\
+    mb.id, mb.source_id, mb.external_id, mb.display_name, mb.is_bot";
+
+/// Table alias `m`.
+pub(crate) const MESSAGE_COLUMNS: &str = "\
+    m.id, m.channel_id, m.external_id, m.author_id, m.content, m.reply_to_ext,
+    m.attachment_names, m.created_at, m.edited_at";
+
+/// Table alias `e`.
+pub(crate) const ENTRY_COLUMNS: &str = "\
+    e.id, e.kind, e.status, e.title, e.title_is_copied, e.owner_member_id, e.due_at,
+    e.source_message_id, e.source_deleted, e.superseded_by, e.answered_by_message_id,
+    e.created_by_member_id, e.created_via, e.tags, e.created_at, e.updated_at";
+
+/// Table alias `t`. The token hash is deliberately not selected.
+pub(crate) const TOKEN_COLUMNS: &str = "\
+    t.id, t.name, t.scopes, t.created_at, t.last_used_at, t.revoked_at";
+
+/// Messages whose channel is included, with the optional author. Aliases `m`, `c`, `a`.
+const VISIBLE_MESSAGES: &str = "\
+FROM messages m
+JOIN channels c ON c.id = m.channel_id
+LEFT JOIN members a ON a.id = m.author_id
+WHERE c.is_included = 1";
+
+/// Joins that decide whether a record entry is visible. Aliases `m`, `c`, `a`.
+const ENTRY_JOINS: &str = "\
+LEFT JOIN messages m ON m.id = e.source_message_id
+LEFT JOIN channels c ON c.id = m.channel_id
+JOIN members a ON a.id = e.created_by_member_id";
+
+// Messages sort by time, then by numeric snowflake: length first, then text.
+const NEWEST_MESSAGE_FIRST: &str =
+    "m.created_at DESC, length(m.external_id) DESC, m.external_id DESC";
+const OLDEST_MESSAGE_FIRST: &str = "m.created_at, length(m.external_id), m.external_id";
+
 fn bad_row() -> rusqlite::Error {
     rusqlite::Error::InvalidQuery
 }
-pub(crate) fn parse<T: FromStr>(text: &str) -> rusqlite::Result<T> {
-    text.parse().map_err(|_| bad_row())
+fn parse<T: FromStr>(r: &Row<'_>, column: &str) -> rusqlite::Result<T> {
+    r.get::<_, String>(column)?.parse().map_err(|_| bad_row())
+}
+fn parse_optional<T: FromStr>(r: &Row<'_>, column: &str) -> rusqlite::Result<Option<T>> {
+    r.get::<_, Option<String>>(column)?
+        .map(|text| text.parse().map_err(|_| bad_row()))
+        .transpose()
+}
+fn millis(r: &Row<'_>, column: &str) -> rusqlite::Result<UnixMillis> {
+    Ok(UnixMillis::from_millis(r.get(column)?))
+}
+fn millis_optional(r: &Row<'_>, column: &str) -> rusqlite::Result<Option<UnixMillis>> {
+    Ok(r.get::<_, Option<i64>>(column)?
+        .map(UnixMillis::from_millis))
 }
 macro_rules! row_id {
-    ($r:expr,$n:expr,$t:ident) => {
-        $t::new($r.get($n)?).ok_or_else(bad_row)?
+    ($r:expr, $column:expr, $t:ident) => {
+        $t::new($r.get($column)?).ok_or_else(bad_row)?
     };
 }
 macro_rules! optional_id {
-    ($r:expr,$n:expr,$t:ident) => {
-        $r.get::<_, Option<i64>>($n)?
+    ($r:expr, $column:expr, $t:ident) => {
+        $r.get::<_, Option<i64>>($column)?
             .map(|v| $t::new(v).ok_or_else(bad_row))
             .transpose()?
     };
 }
 
+/// Runs `sql` and maps every row.
+pub(crate) fn query_all<T>(
+    conn: &Connection,
+    sql: &str,
+    params: impl Params,
+    map: impl FnMut(&Row<'_>) -> rusqlite::Result<T>,
+) -> RepoResult<Vec<T>> {
+    let mut statement = conn.prepare(sql).map_err(backend)?;
+    let rows = statement.query_map(params, map).map_err(backend)?;
+    rows.collect::<rusqlite::Result<Vec<_>>>().map_err(backend)
+}
+
+/// Runs `sql` and maps the first row, if any.
+pub(crate) fn query_optional<T>(
+    conn: &Connection,
+    sql: &str,
+    params: impl Params,
+    map: impl FnOnce(&Row<'_>) -> rusqlite::Result<T>,
+) -> RepoResult<Option<T>> {
+    conn.query_row(sql, params, map).optional().map_err(backend)
+}
+
 pub(crate) fn source_row(r: &Row<'_>) -> rusqlite::Result<SourceInfo> {
     Ok(SourceInfo {
-        id: row_id!(r, 0, SourceId),
-        kind: parse(&r.get::<_, String>(1)?)?,
-        external_id: parse(&r.get::<_, String>(2)?)?,
-        name: r.get(3)?,
+        id: row_id!(r, "id", SourceId),
+        kind: parse(r, "kind")?,
+        external_id: parse(r, "external_id")?,
+        name: r.get("name")?,
     })
 }
 pub(crate) fn channel_row(r: &Row<'_>) -> rusqlite::Result<ChannelInfo> {
     Ok(ChannelInfo {
-        id: row_id!(r, 0, ChannelId),
-        source: row_id!(r, 1, SourceId),
-        external_id: parse(&r.get::<_, String>(2)?)?,
-        parent: optional_id!(r, 3, ChannelId),
-        kind: parse(&r.get::<_, String>(4)?)?,
-        name: r.get(5)?,
-        topic: r.get(6)?,
-        included: r.get(7)?,
-        archived: r.get(8)?,
+        id: row_id!(r, "id", ChannelId),
+        source: row_id!(r, "source_id", SourceId),
+        external_id: parse(r, "external_id")?,
+        parent: optional_id!(r, "parent_id", ChannelId),
+        kind: parse(r, "kind")?,
+        name: r.get("name")?,
+        topic: r.get("topic")?,
+        included: r.get("is_included")?,
+        archived: r.get("archived")?,
     })
 }
 pub(crate) fn member_row(r: &Row<'_>) -> rusqlite::Result<MemberInfo> {
     Ok(MemberInfo {
-        id: row_id!(r, 0, MemberId),
-        source: row_id!(r, 1, SourceId),
-        external_id: parse(&r.get::<_, String>(2)?)?,
-        display_name: r.get(3)?,
-        is_bot: r.get(4)?,
+        id: row_id!(r, "id", MemberId),
+        source: row_id!(r, "source_id", SourceId),
+        external_id: parse(r, "external_id")?,
+        display_name: r.get("display_name")?,
+        is_bot: r.get("is_bot")?,
     })
 }
 pub(crate) fn message_row(conn: &Connection, r: &Row<'_>) -> rusqlite::Result<StoredMessage> {
-    let id = row_id!(r, 0, MessageId);
-    let mut stmt=conn.prepare("SELECT external_user_id FROM message_mentions WHERE message_id=? ORDER BY length(external_user_id),external_user_id")?;
-    let mentions = stmt
-        .query_map([id.get()], |r| parse(&r.get::<_, String>(0)?))?
+    let id = row_id!(r, "id", MessageId);
+    let mut statement = conn.prepare(
+        "SELECT external_user_id
+         FROM message_mentions
+         WHERE message_id = ?
+         ORDER BY length(external_user_id), external_user_id",
+    )?;
+    let mentions = statement
+        .query_map([id.get()], |mention| parse(mention, "external_user_id"))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(StoredMessage {
         id,
-        channel: row_id!(r, 1, ChannelId),
-        external_id: parse(&r.get::<_, String>(2)?)?,
-        author: optional_id!(r, 3, MemberId),
-        content: r.get(4)?,
-        reply_to: r
-            .get::<_, Option<String>>(5)?
-            .map(|v| parse(&v))
-            .transpose()?,
-        attachment_names: serde_json::from_str(&r.get::<_, String>(7)?).map_err(|_| bad_row())?,
-        created_at: UnixMillis::from_millis(r.get(8)?),
-        edited_at: r.get::<_, Option<i64>>(9)?.map(UnixMillis::from_millis),
+        channel: row_id!(r, "channel_id", ChannelId),
+        external_id: parse(r, "external_id")?,
+        author: optional_id!(r, "author_id", MemberId),
+        content: r.get("content")?,
+        reply_to: parse_optional(r, "reply_to_ext")?,
+        attachment_names: serde_json::from_str(&r.get::<_, String>("attachment_names")?)
+            .map_err(|_| bad_row())?,
+        created_at: millis(r, "created_at")?,
+        edited_at: millis_optional(r, "edited_at")?,
         mentions,
     })
 }
 pub(crate) fn entry_row(r: &Row<'_>) -> rusqlite::Result<RecordEntry> {
+    let tags = r
+        .get::<_, String>("tags")?
+        .split_whitespace()
+        .map(|tag| Tag::new(tag).map_err(|_| bad_row()))
+        .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(RecordEntry {
-        id: row_id!(r, 0, EntryId),
-        kind: parse(&r.get::<_, String>(1)?)?,
-        status: parse(&r.get::<_, String>(2)?)?,
-        title: EntryTitle::new(r.get::<_, String>(3)?).map_err(|_| bad_row())?,
-        title_is_copied: r.get(4)?,
-        owner: optional_id!(r, 5, MemberId),
-        due_at: r.get::<_, Option<i64>>(6)?.map(UnixMillis::from_millis),
-        source_message: optional_id!(r, 7, MessageId),
-        source_deleted: r.get(8)?,
-        superseded_by: optional_id!(r, 9, EntryId),
-        answered_by_message: optional_id!(r, 10, MessageId),
-        created_by: row_id!(r, 11, MemberId),
-        created_via: parse(&r.get::<_, String>(12)?)?,
-        tags: r
-            .get::<_, String>(13)?
-            .split_whitespace()
-            .map(|s| Tag::new(s).map_err(|_| bad_row()))
-            .collect::<rusqlite::Result<Vec<_>>>()?,
-        created_at: UnixMillis::from_millis(r.get(14)?),
-        updated_at: UnixMillis::from_millis(r.get(15)?),
+        id: row_id!(r, "id", EntryId),
+        kind: parse(r, "kind")?,
+        status: parse(r, "status")?,
+        title: EntryTitle::new(r.get::<_, String>("title")?).map_err(|_| bad_row())?,
+        title_is_copied: r.get("title_is_copied")?,
+        owner: optional_id!(r, "owner_member_id", MemberId),
+        due_at: millis_optional(r, "due_at")?,
+        source_message: optional_id!(r, "source_message_id", MessageId),
+        source_deleted: r.get("source_deleted")?,
+        superseded_by: optional_id!(r, "superseded_by", EntryId),
+        answered_by_message: optional_id!(r, "answered_by_message_id", MessageId),
+        created_by: row_id!(r, "created_by_member_id", MemberId),
+        created_via: parse(r, "created_via")?,
+        tags,
+        created_at: millis(r, "created_at")?,
+        updated_at: millis(r, "updated_at")?,
     })
 }
 pub(crate) fn token_row(r: &Row<'_>) -> rusqlite::Result<AccessToken> {
     Ok(AccessToken {
-        id: row_id!(r, 0, TokenId),
-        name: r.get(1)?,
-        scopes: r.get(3)?,
-        created_at: UnixMillis::from_millis(r.get(4)?),
-        last_used_at: r.get::<_, Option<i64>>(5)?.map(UnixMillis::from_millis),
-        revoked_at: r.get::<_, Option<i64>>(6)?.map(UnixMillis::from_millis),
+        id: row_id!(r, "id", TokenId),
+        name: r.get("name")?,
+        scopes: r.get("scopes")?,
+        created_at: millis(r, "created_at")?,
+        last_used_at: millis_optional(r, "last_used_at")?,
+        revoked_at: millis_optional(r, "revoked_at")?,
+    })
+}
+fn cursor_row(r: &Row<'_>) -> rusqlite::Result<SyncCursor> {
+    Ok(SyncCursor {
+        newest_seen: parse_optional(r, "newest_seen_ext")?,
+        oldest_backfilled: parse_optional(r, "oldest_backfilled_ext")?,
+        backfill_done: r.get("backfill_done")?,
+        updated_at: millis(r, "updated_at")?,
+    })
+}
+fn activity_row(r: &Row<'_>) -> rusqlite::Result<ChannelActivity> {
+    Ok(ChannelActivity {
+        channel: row_id!(r, "channel_id", ChannelId),
+        messages: u64::try_from(r.get::<_, i64>("message_count")?).map_err(|_| bad_row())?,
+    })
+}
+fn event_row(r: &Row<'_>) -> rusqlite::Result<RecordEvent> {
+    let action: String = r.get("action")?;
+    let detail: Option<String> = r.get("detail")?;
+    Ok(RecordEvent {
+        entry: row_id!(r, "entry_id", EntryId),
+        actor: optional_id!(r, "actor_member_id", MemberId),
+        action: RecordAction::decode(&action, detail.as_deref()).map_err(|_| bad_row())?,
+        at: millis(r, "at")?,
     })
 }
 
 impl DirectoryRead for Store {
     fn source(&self, id: SourceId) -> RepoResult<Option<SourceInfo>> {
-        self.conn
-            .query_row("SELECT * FROM sources WHERE id=?", [id.get()], source_row)
-            .optional()
-            .map_err(backend)
+        let sql = format!(
+            "SELECT {SOURCE_COLUMNS}
+             FROM sources s
+             WHERE s.id = ?"
+        );
+        query_optional(&self.conn, &sql, [id.get()], source_row)
     }
     fn channel(&self, id: ChannelId) -> RepoResult<Option<ChannelInfo>> {
-        self.conn
-            .query_row("SELECT * FROM channels WHERE id=?", [id.get()], channel_row)
-            .optional()
-            .map_err(backend)
+        let sql = format!(
+            "SELECT {CHANNEL_COLUMNS}
+             FROM channels c
+             WHERE c.id = ?"
+        );
+        query_optional(&self.conn, &sql, [id.get()], channel_row)
     }
     fn channels(&self, source: SourceId) -> RepoResult<Vec<ChannelInfo>> {
-        self.conn
-            .prepare("SELECT * FROM channels WHERE source_id=? ORDER BY id")
-            .map_err(backend)?
-            .query_map([source.get()], channel_row)
-            .map_err(backend)?
-            .collect::<rusqlite::Result<_>>()
-            .map_err(backend)
+        let sql = format!(
+            "SELECT {CHANNEL_COLUMNS}
+             FROM channels c
+             WHERE c.source_id = ?
+             ORDER BY c.id"
+        );
+        query_all(&self.conn, &sql, [source.get()], channel_row)
     }
     fn member(&self, id: MemberId) -> RepoResult<Option<MemberInfo>> {
-        self.conn
-            .query_row("SELECT * FROM members WHERE id=?", [id.get()], member_row)
-            .optional()
-            .map_err(backend)
+        let sql = format!(
+            "SELECT {MEMBER_COLUMNS}
+             FROM members mb
+             WHERE mb.id = ?"
+        );
+        query_optional(&self.conn, &sql, [id.get()], member_row)
     }
     fn member_by_external(
         &self,
         source: SourceId,
         external_id: Snowflake,
     ) -> RepoResult<Option<MemberInfo>> {
-        self.conn
-            .query_row(
-                "SELECT * FROM members WHERE source_id=? AND external_id=?",
-                params![source.get(), external_id.to_string()],
-                member_row,
-            )
-            .optional()
-            .map_err(backend)
+        let sql = format!(
+            "SELECT {MEMBER_COLUMNS}
+             FROM members mb
+             WHERE mb.source_id = ?
+               AND mb.external_id = ?"
+        );
+        let params = params![source.get(), external_id.to_string()];
+        query_optional(&self.conn, &sql, params, member_row)
     }
     fn cursor(&self, source: SourceId, channel: Snowflake) -> RepoResult<Option<SyncCursor>> {
-        self.conn.query_row("SELECT s.newest_seen_ext,s.oldest_backfilled_ext,s.backfill_done,s.updated_at FROM sync_cursors s JOIN channels c ON c.id=s.channel_id WHERE c.source_id=? AND c.external_id=?",params![source.get(),channel.to_string()],|r|Ok(SyncCursor{newest_seen:r.get::<_,Option<String>>(0)?.map(|v|parse(&v)).transpose()?,oldest_backfilled:r.get::<_,Option<String>>(1)?.map(|v|parse(&v)).transpose()?,backfill_done:r.get(2)?,updated_at:UnixMillis::from_millis(r.get(3)?)})).optional().map_err(backend)
+        let sql = "SELECT s.newest_seen_ext, s.oldest_backfilled_ext, s.backfill_done,
+                          s.updated_at
+                   FROM sync_cursors s
+                   JOIN channels c ON c.id = s.channel_id
+                   WHERE c.source_id = ?
+                     AND c.external_id = ?";
+        let params = params![source.get(), channel.to_string()];
+        query_optional(&self.conn, sql, params, cursor_row)
     }
     fn last_catchup(&self, member: MemberId) -> RepoResult<Option<UnixMillis>> {
-        self.conn
-            .query_row(
-                "SELECT last_catchup_at FROM user_state WHERE member_id=?",
-                [member.get()],
-                |r| r.get(0),
-            )
-            .optional()
-            .map(|v| v.map(UnixMillis::from_millis))
-            .map_err(backend)
+        let sql = "SELECT last_catchup_at
+                   FROM user_state
+                   WHERE member_id = ?";
+        let at = query_optional(&self.conn, sql, [member.get()], |r| {
+            r.get("last_catchup_at")
+        })?;
+        Ok(at.map(UnixMillis::from_millis))
     }
 }
 
-pub(crate) const VISIBLE: &str = " FROM messages m JOIN channels c ON c.id=m.channel_id LEFT JOIN members a ON a.id=m.author_id WHERE c.is_included=1";
-
 impl Store {
     fn messages_sql(&self, sql: &str, values: Vec<Value>) -> RepoResult<Vec<StoredMessage>> {
-        self.conn
-            .prepare(sql)
-            .map_err(backend)?
-            .query_map(params_from_iter(values), |r| message_row(&self.conn, r))
-            .map_err(backend)?
-            .collect::<rusqlite::Result<_>>()
-            .map_err(backend)
+        query_all(&self.conn, sql, params_from_iter(values), |r| {
+            message_row(&self.conn, r)
+        })
     }
+    /// Appends the `from:`, `in:`, `before:` and `after:` clauses of `query` to a statement
+    /// that already has a WHERE clause. `entry` selects the record-entry date column.
     fn filters(
         &self,
         query: &Query,
@@ -195,30 +315,27 @@ impl Store {
         sql: &mut String,
         values: &mut Vec<Value>,
     ) -> RepoResult<()> {
+        let created_at = if entry {
+            "e.created_at"
+        } else {
+            "m.created_at"
+        };
         for clause in &query.clauses {
             match clause {
                 Clause::From(name) => {
-                    sql.push_str(" AND a.display_name=? COLLATE NOCASE");
+                    sql.push_str("\n  AND a.display_name = ? COLLATE NOCASE");
                     values.push(name.clone().into());
                 }
                 Clause::In(name) => {
-                    sql.push_str(" AND c.name=? COLLATE NOCASE");
+                    sql.push_str("\n  AND c.name = ? COLLATE NOCASE");
                     values.push(name.clone().into());
                 }
-                Clause::Before(date) | Clause::After(date) => {
-                    let column = if entry {
-                        "e.created_at"
-                    } else {
-                        "m.created_at"
-                    };
-                    sql.push_str(&format!(
-                        " AND {column} {} ?",
-                        if matches!(clause, Clause::Before(_)) {
-                            "<"
-                        } else {
-                            ">="
-                        }
-                    ));
+                Clause::Before(date) => {
+                    sql.push_str(&format!("\n  AND {created_at} < ?"));
+                    values.push(self.date(*date)?.as_millis().into());
+                }
+                Clause::After(date) => {
+                    sql.push_str(&format!("\n  AND {created_at} >= ?"));
                     values.push(self.date(*date)?.as_millis().into());
                 }
                 _ => {}
@@ -230,32 +347,33 @@ impl Store {
 
 impl MessageRead for Store {
     fn message(&self, id: MessageId) -> RepoResult<Option<StoredMessage>> {
-        Ok(self
-            .messages_sql(
-                &format!("SELECT m.*{VISIBLE} AND m.id=?"),
-                vec![id.get().into()],
-            )?
-            .into_iter()
-            .next())
+        let sql = format!(
+            "SELECT {MESSAGE_COLUMNS}
+             {VISIBLE_MESSAGES}
+               AND m.id = ?"
+        );
+        let found = self.messages_sql(&sql, vec![id.get().into()])?;
+        Ok(found.into_iter().next())
     }
     fn message_by_ref(
         &self,
         source: SourceId,
         id: MessageRef,
     ) -> RepoResult<Option<StoredMessage>> {
-        Ok(self
-            .messages_sql(
-                &format!(
-                    "SELECT m.*{VISIBLE} AND c.source_id=? AND c.external_id=? AND m.external_id=?"
-                ),
-                vec![
-                    source.get().into(),
-                    id.channel.to_string().into(),
-                    id.message.to_string().into(),
-                ],
-            )?
-            .into_iter()
-            .next())
+        let sql = format!(
+            "SELECT {MESSAGE_COLUMNS}
+             {VISIBLE_MESSAGES}
+               AND c.source_id = ?
+               AND c.external_id = ?
+               AND m.external_id = ?"
+        );
+        let values = vec![
+            source.get().into(),
+            id.channel.to_string().into(),
+            id.message.to_string().into(),
+        ];
+        let found = self.messages_sql(&sql, values)?;
+        Ok(found.into_iter().next())
     }
     fn neighbours(&self, id: MessageId, before: u32, after: u32) -> RepoResult<Vec<StoredMessage>> {
         let message = self
@@ -270,55 +388,78 @@ impl MessageRead for Store {
                 i64::from(limit).into(),
             ]
         };
-        let mut neighbours=self.messages_sql(
-            &format!("SELECT m.*{VISIBLE} AND m.channel_id=? AND (m.created_at,length(m.external_id),m.external_id)<(?,length(?),?) ORDER BY m.created_at DESC,length(m.external_id) DESC,m.external_id DESC LIMIT ?"),
-            bounds(before),
-        )?;
-        neighbours.reverse();
-        let following=self.messages_sql(
-            &format!("SELECT m.*{VISIBLE} AND m.channel_id=? AND (m.created_at,length(m.external_id),m.external_id)>(?,length(?),?) ORDER BY m.created_at,length(m.external_id),m.external_id LIMIT ?"),
-            bounds(after),
-        )?;
-        neighbours.push(message);
-        neighbours.extend(following);
-        Ok(neighbours)
+        let before_sql = format!(
+            "SELECT {MESSAGE_COLUMNS}
+             {VISIBLE_MESSAGES}
+               AND m.channel_id = ?
+               AND (m.created_at, length(m.external_id), m.external_id) < (?, length(?), ?)
+             ORDER BY {NEWEST_MESSAGE_FIRST}
+             LIMIT ?"
+        );
+        let after_sql = format!(
+            "SELECT {MESSAGE_COLUMNS}
+             {VISIBLE_MESSAGES}
+               AND m.channel_id = ?
+               AND (m.created_at, length(m.external_id), m.external_id) > (?, length(?), ?)
+             ORDER BY {OLDEST_MESSAGE_FIRST}
+             LIMIT ?"
+        );
+        let mut preceding = self.messages_sql(&before_sql, bounds(before))?;
+        preceding.reverse();
+        let following = self.messages_sql(&after_sql, bounds(after))?;
+        preceding.push(message);
+        preceding.extend(following);
+        Ok(preceding)
     }
     fn search_messages(&self, query: &Query, limit: u32) -> RepoResult<Vec<MessageHit>> {
         if query.clauses.is_empty() || limit == 0 {
             return Ok(Vec::new());
         }
-        let expression = fts_expression(query);
         let mut values = Vec::new();
-        let mut sql = if let Some(expression) = expression {
+        let mut sql = if let Some(expression) = fts_expression(query) {
             values.push(expression.into());
-            "SELECT m.*,bm25(messages_fts) FROM messages_fts JOIN messages m ON m.id=messages_fts.rowid JOIN channels c ON c.id=m.channel_id LEFT JOIN members a ON a.id=m.author_id WHERE c.is_included=1 AND messages_fts MATCH ?".to_owned()
+            format!(
+                "SELECT {MESSAGE_COLUMNS}, bm25(messages_fts) AS score
+                 FROM messages_fts
+                 JOIN messages m ON m.id = messages_fts.rowid
+                 JOIN channels c ON c.id = m.channel_id
+                 LEFT JOIN members a ON a.id = m.author_id
+                 WHERE c.is_included = 1
+                   AND messages_fts MATCH ?"
+            )
         } else {
-            format!("SELECT m.*,0.0{VISIBLE}")
+            format!(
+                "SELECT {MESSAGE_COLUMNS}, 0.0 AS score
+                 {VISIBLE_MESSAGES}"
+            )
         };
         self.filters(query, false, &mut sql, &mut values)?;
-        sql.push_str(
-            " ORDER BY 11,m.created_at DESC,length(m.external_id) DESC,m.external_id DESC LIMIT ?",
-        );
+        sql.push_str(&format!(
+            "\nORDER BY score, {NEWEST_MESSAGE_FIRST}\nLIMIT ?"
+        ));
         values.push(i64::from(limit).into());
-        self.conn
-            .prepare(&sql)
-            .map_err(backend)?
-            .query_map(params_from_iter(values), |r| {
-                Ok(MessageHit {
-                    message: message_row(&self.conn, r)?,
-                    bm25: r.get(10)?,
-                })
+        query_all(&self.conn, &sql, params_from_iter(values), |r| {
+            Ok(MessageHit {
+                message: message_row(&self.conn, r)?,
+                bm25: r.get("score")?,
             })
-            .map_err(backend)?
-            .collect::<rusqlite::Result<_>>()
-            .map_err(backend)
+        })
     }
     fn channel_activity_since(
         &self,
         since: UnixMillis,
         limit: u32,
     ) -> RepoResult<Vec<ChannelActivity>> {
-        self.conn.prepare("SELECT m.channel_id,count(*) FROM messages m JOIN channels c ON c.id=m.channel_id WHERE c.is_included=1 AND m.created_at>=? GROUP BY m.channel_id ORDER BY count(*) DESC,m.channel_id LIMIT ?").map_err(backend)?.query_map(params![since.as_millis(),i64::from(limit)],|r|Ok(ChannelActivity{channel:row_id!(r,0,ChannelId),messages:u64::try_from(r.get::<_,i64>(1)?).map_err(|_|bad_row())?})).map_err(backend)?.collect::<rusqlite::Result<_>>().map_err(backend)
+        let sql = "SELECT m.channel_id, count(*) AS message_count
+                   FROM messages m
+                   JOIN channels c ON c.id = m.channel_id
+                   WHERE c.is_included = 1
+                     AND m.created_at >= ?
+                   GROUP BY m.channel_id
+                   ORDER BY count(*) DESC, m.channel_id
+                   LIMIT ?";
+        let params = params![since.as_millis(), i64::from(limit)];
+        query_all(&self.conn, sql, params, activity_row)
     }
     fn mentions_since(
         &self,
@@ -329,135 +470,161 @@ impl MessageRead for Store {
         let member = self
             .member(member)?
             .ok_or(RepoError::NotFound { what: "member" })?;
-        self.messages_sql(&format!("SELECT m.*{VISIBLE} AND c.source_id=? AND m.created_at>=? AND EXISTS(SELECT 1 FROM message_mentions mm WHERE mm.message_id=m.id AND mm.external_user_id=?) ORDER BY m.created_at DESC,length(m.external_id) DESC,m.external_id DESC LIMIT ?"),vec![member.source.get().into(),since.as_millis().into(),member.external_id.to_string().into(),i64::from(limit).into()])
+        let sql = format!(
+            "SELECT {MESSAGE_COLUMNS}
+             {VISIBLE_MESSAGES}
+               AND c.source_id = ?
+               AND m.created_at >= ?
+               AND EXISTS (
+                   SELECT 1
+                   FROM message_mentions mm
+                   WHERE mm.message_id = m.id
+                     AND mm.external_user_id = ?
+               )
+             ORDER BY {NEWEST_MESSAGE_FIRST}
+             LIMIT ?"
+        );
+        let values = vec![
+            member.source.get().into(),
+            since.as_millis().into(),
+            member.external_id.to_string().into(),
+            i64::from(limit).into(),
+        ];
+        self.messages_sql(&sql, values)
     }
 }
 
 impl RecordRead for Store {
     fn entry(&self, id: ShortId) -> RepoResult<Option<RecordEntry>> {
-        self.conn
-            .query_row(
-                "SELECT * FROM record_entries WHERE id=? AND kind=?",
-                params![id.id.get(), id.kind.as_str()],
-                entry_row,
-            )
-            .optional()
-            .map_err(backend)
+        let sql = format!(
+            "SELECT {ENTRY_COLUMNS}
+             FROM record_entries e
+             WHERE e.id = ?
+               AND e.kind = ?"
+        );
+        let params = params![id.id.get(), id.kind.as_str()];
+        query_optional(&self.conn, &sql, params, entry_row)
     }
     fn list_entries(
         &self,
         filter: &EntryFilter,
         page: PageRequest,
     ) -> RepoResult<Vec<RecordEntry>> {
-        let mut sql = "SELECT e.* FROM record_entries e WHERE 1=1".to_owned();
+        let mut conditions = Vec::new();
         let mut values = Vec::<Value>::new();
         if let Some(kind) = filter.kind {
-            sql.push_str(" AND e.kind=?");
+            conditions.push("e.kind = ?");
             values.push(kind.as_str().to_owned().into());
         }
         if let Some(status) = filter.status {
-            sql.push_str(" AND e.status=?");
+            conditions.push("e.status = ?");
             values.push(status.as_str().to_owned().into());
         }
         if let Some(owner) = filter.owner {
-            sql.push_str(" AND e.owner_member_id=?");
+            conditions.push("e.owner_member_id = ?");
             values.push(owner.get().into());
         }
         if let Some(at) = filter.updated_since {
-            sql.push_str(" AND e.updated_at>=?");
+            conditions.push("e.updated_at >= ?");
             values.push(at.as_millis().into());
         }
         if let Some(topic) = &filter.topic {
-            let query = Query {
-                clauses: topic
-                    .split_whitespace()
-                    .map(|s| Clause::Word(s.to_owned()))
-                    .collect(),
-            };
-            if let Some(expression) = fts_expression(&query) {
-                sql.push_str(
-                    " AND e.id IN (SELECT rowid FROM record_fts WHERE record_fts MATCH ?)",
-                );
+            let words = topic
+                .split_whitespace()
+                .map(|word| Clause::Word(word.to_owned()))
+                .collect();
+            if let Some(expression) = fts_expression(&Query { clauses: words }) {
+                conditions.push("e.id IN (SELECT rowid FROM record_fts WHERE record_fts MATCH ?)");
                 values.push(expression.into());
             }
         }
-        sql.push_str(" ORDER BY e.updated_at DESC,e.id DESC LIMIT ? OFFSET ?");
+        let conditions = if conditions.is_empty() {
+            "1 = 1".to_owned()
+        } else {
+            conditions.join("\n  AND ")
+        };
+        let sql = format!(
+            "SELECT {ENTRY_COLUMNS}
+             FROM record_entries e
+             WHERE {conditions}
+             ORDER BY e.updated_at DESC, e.id DESC
+             LIMIT ? OFFSET ?"
+        );
         values.push(i64::from(page.limit).into());
         values.push(i64::from(page.offset).into());
-        self.conn
-            .prepare(&sql)
-            .map_err(backend)?
-            .query_map(params_from_iter(values), entry_row)
-            .map_err(backend)?
-            .collect::<rusqlite::Result<_>>()
-            .map_err(backend)
+        query_all(&self.conn, &sql, params_from_iter(values), entry_row)
     }
     fn search_entries(&self, query: &Query, limit: u32) -> RepoResult<Vec<EntryHit>> {
         if query.clauses.is_empty() || limit == 0 {
             return Ok(Vec::new());
         }
         let mut values = Vec::new();
-        let expression = fts_expression(query);
-        let mut sql = if let Some(expression) = expression {
+        let mut sql = if let Some(expression) = fts_expression(query) {
             values.push(expression.into());
-            "SELECT e.*,bm25(record_fts) FROM record_fts JOIN record_entries e ON e.id=record_fts.rowid".to_owned()
+            format!(
+                "SELECT {ENTRY_COLUMNS}, bm25(record_fts) AS score
+                 FROM record_fts
+                 JOIN record_entries e ON e.id = record_fts.rowid
+                 {ENTRY_JOINS}
+                 WHERE (c.id IS NULL OR c.is_included = 1)
+                   AND record_fts MATCH ?"
+            )
         } else {
-            "SELECT e.*,0.0 FROM record_entries e".to_owned()
+            format!(
+                "SELECT {ENTRY_COLUMNS}, 0.0 AS score
+                 FROM record_entries e
+                 {ENTRY_JOINS}
+                 WHERE (c.id IS NULL OR c.is_included = 1)"
+            )
         };
-        sql.push_str(" LEFT JOIN messages m ON m.id=e.source_message_id LEFT JOIN channels c ON c.id=m.channel_id JOIN members a ON a.id=e.created_by_member_id WHERE (c.id IS NULL OR c.is_included=1)");
-        if !values.is_empty() {
-            sql.push_str(" AND record_fts MATCH ?");
-        }
         self.filters(query, true, &mut sql, &mut values)?;
-        sql.push_str(" ORDER BY 17,e.created_at DESC,e.id DESC LIMIT ?");
+        sql.push_str("\nORDER BY score, e.created_at DESC, e.id DESC\nLIMIT ?");
         values.push(i64::from(limit).into());
-        self.conn
-            .prepare(&sql)
-            .map_err(backend)?
-            .query_map(params_from_iter(values), |r| {
-                Ok(EntryHit {
-                    entry: entry_row(r)?,
-                    bm25: r.get(16)?,
-                })
+        query_all(&self.conn, &sql, params_from_iter(values), |r| {
+            Ok(EntryHit {
+                entry: entry_row(r)?,
+                bm25: r.get("score")?,
             })
-            .map_err(backend)?
-            .collect::<rusqlite::Result<_>>()
-            .map_err(backend)
+        })
     }
     fn entry_events(&self, id: EntryId) -> RepoResult<Vec<RecordEvent>> {
-        if !self
-            .conn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM record_entries WHERE id=?)",
-                [id.get()],
-                |r| r.get::<_, bool>(0),
-            )
-            .map_err(backend)?
-        {
+        let exists = query_optional(
+            &self.conn,
+            "SELECT EXISTS (
+                 SELECT 1
+                 FROM record_entries
+                 WHERE id = ?
+             )",
+            [id.get()],
+            |r| r.get::<_, bool>(0),
+        )?;
+        if exists != Some(true) {
             return Err(RepoError::NotFound { what: "entry" });
         }
-        self.conn.prepare("SELECT entry_id,actor_member_id,action,detail,at FROM record_events WHERE entry_id=? ORDER BY at,id").map_err(backend)?.query_map([id.get()],|r|{let action:String=r.get(2)?;let detail:Option<String>=r.get(3)?;Ok(RecordEvent{entry:row_id!(r,0,EntryId),actor:optional_id!(r,1,MemberId),action:RecordAction::decode(&action,detail.as_deref()).map_err(|_|bad_row())?,at:UnixMillis::from_millis(r.get(4)?)})}).map_err(backend)?.collect::<rusqlite::Result<_>>().map_err(backend)
+        let sql = "SELECT entry_id, actor_member_id, action, detail, at
+                   FROM record_events
+                   WHERE entry_id = ?
+                   ORDER BY at, id";
+        query_all(&self.conn, sql, [id.get()], event_row)
     }
 }
 
 impl TokenRead for Store {
     fn active_token(&self, hash: &TokenHash) -> RepoResult<Option<AccessToken>> {
-        self.conn
-            .query_row(
-                "SELECT * FROM access_tokens WHERE token_sha256=? AND revoked_at IS NULL",
-                [hash.0.as_slice()],
-                token_row,
-            )
-            .optional()
-            .map_err(backend)
+        let sql = format!(
+            "SELECT {TOKEN_COLUMNS}
+             FROM access_tokens t
+             WHERE t.token_sha256 = ?
+               AND t.revoked_at IS NULL"
+        );
+        query_optional(&self.conn, &sql, [hash.0.as_slice()], token_row)
     }
     fn tokens(&self) -> RepoResult<Vec<AccessToken>> {
-        self.conn
-            .prepare("SELECT * FROM access_tokens ORDER BY name")
-            .map_err(backend)?
-            .query_map([], token_row)
-            .map_err(backend)?
-            .collect::<rusqlite::Result<_>>()
-            .map_err(backend)
+        let sql = format!(
+            "SELECT {TOKEN_COLUMNS}
+             FROM access_tokens t
+             ORDER BY t.name"
+        );
+        query_all(&self.conn, &sql, [], token_row)
     }
 }
