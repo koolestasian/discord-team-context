@@ -1,0 +1,6 @@
+/target/
+.env
+secrets.env
+*.db
+*.db-wal
+*.db-shm

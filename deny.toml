@@ -1,0 +1,57 @@
+[graph]
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "x86_64-unknown-linux-musl",
+  "aarch64-unknown-linux-musl",
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+]
+all-features = false
+
+[advisories]
+yanked = "deny"
+# Unmaintained crates deeper in the tree are flagged for review, not blocked.
+unmaintained = "workspace"
+# Every entry needs { id = "RUSTSEC-...", reason = "..." } and a review date in the PR.
+ignore = []
+
+[licenses]
+confidence-threshold = 0.93
+# The list below is policy for the planned dependency stack, not a record of what the
+# tree uses today, so licences nothing has needed yet are not reported.
+unused-allowed-license = "allow"
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "ISC",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "Unicode-3.0",
+  "Zlib",
+  "CDLA-Permissive-2.0", # webpki-roots, only if that TLS root feature is chosen
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Workspace path dependencies carry no version; valid because every crate is publish = false.
+allow-wildcard-paths = true
+highlight = "all"
+deny = [
+  { crate = "openssl", use-instead = "rustls" },
+  { crate = "openssl-sys", use-instead = "rustls" },
+  { crate = "native-tls", use-instead = "rustls" },
+]
+
+[bans.workspace-dependencies]
+duplicates = "deny"
+include-path-dependencies = true
+unused = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
