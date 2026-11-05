@@ -1,8 +1,9 @@
 //! teamctx command-line program: CLI, configuration and wiring.
 //!
-//! Pre-alpha: the program only answers `--help` and `--version`. It depends on the
-//! connector, server and LLM crates to fix the shape of the workspace, but does not call
-//! them yet.
+//! Pre-alpha: init/doctor currently validate configuration offline; live Discord
+//! validation and sync are gated on a throwaway test server.
+
+mod config;
 
 use std::ffi::OsString;
 use std::fmt;
@@ -18,14 +19,26 @@ const HELP: &str = concat!(
     "\n",
     "Turns a team's Discord into a searchable team record.\n",
     "\n",
-    "This build has no commands yet. Progress is tracked in\n",
-    "docs/design/implementation-plan.md.\n",
+    "Offline init and doctor; live Discord support is not available yet.\n",
     "\n",
-    "Usage: teamctx [OPTIONS]\n",
+    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS]\n",
     "\n",
     "Options:\n",
     "  -h, --help     Print this help\n",
     "  -V, --version  Print the version\n",
+    "\nOffline commands:\n",
+    "  init          Print a config template and optional bot invite; writes no files\n",
+    "  doctor        Validate config and token presence; makes no network calls\n",
+    "\nOffline options:\n",
+    "  --config PATH         TOML file (default teamctx.toml if present)\n",
+    "  --guild-id ID         Discord server id (required unless in file/environment)\n",
+    "  --application-id ID   Print an invite in init\n",
+    "  --bind IP:PORT        Server bind (default 127.0.0.1:7420)\n",
+    "  --timezone NAME       Host timezone (default UTC; database not checked)\n",
+    "  --public-url URL      HTTP(S) URL used in links\n",
+    "  --token-env NAME      Environment variable containing bot token\n",
+    "  --include-channels LIST / --exclude-channels LIST (comma-separated)\n",
+    "  --backfill-days N / --recheck-window-hours N\n",
 );
 
 /// Exit code for a command-line usage error (the same code `clap` will use later).
@@ -35,12 +48,15 @@ const EXIT_USAGE: u8 = 2;
 enum Command {
     Help,
     Version,
+    Init(config::OfflineOptions),
+    Doctor(config::OfflineOptions),
 }
 
 #[derive(Debug, PartialEq, Eq)]
 enum UsageError {
     Unknown(OsString),
     Extra(OsString),
+    Config(config::ConfigError),
 }
 
 impl fmt::Display for UsageError {
@@ -49,11 +65,12 @@ impl fmt::Display for UsageError {
         match self {
             Self::Unknown(arg) => write!(f, "unrecognised argument {arg:?}"),
             Self::Extra(arg) => write!(f, "unexpected extra argument {arg:?}"),
+            Self::Config(error) => fmt::Display::fmt(error, f),
         }
     }
 }
 
-/// Accepts no arguments (same as `--help`) or exactly one known flag.
+/// Accepts help/version flags or an offline command with explicit config options.
 fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, UsageError> {
     let mut args = args.into_iter();
     let command = match args.next() {
@@ -61,6 +78,16 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, UsageError
         Some(arg) => match arg.to_str() {
             Some("-h" | "--help") => Command::Help,
             Some("-V" | "--version") => Command::Version,
+            Some("init") => {
+                return config::parse_cli(args)
+                    .map(Command::Init)
+                    .map_err(UsageError::Config);
+            }
+            Some("doctor") => {
+                return config::parse_cli(args)
+                    .map(Command::Doctor)
+                    .map_err(UsageError::Config);
+            }
             _ => return Err(UsageError::Unknown(arg)),
         },
     };
@@ -75,6 +102,8 @@ fn run(args: impl IntoIterator<Item = OsString>, out: &mut impl Write, err: &mut
     let written = match parse(args) {
         Ok(Command::Help) => out.write_all(HELP.as_bytes()),
         Ok(Command::Version) => out.write_all(VERSION.as_bytes()),
+        Ok(Command::Init(options)) => return run_offline(true, &options, out, err),
+        Ok(Command::Doctor(options)) => return run_offline(false, &options, out, err),
         Err(error) => {
             // If stderr is gone there is nowhere left to report that, so the error is dropped.
             let _ = writeln!(err, "error: {error}\nTry 'teamctx --help'.");
@@ -82,6 +111,21 @@ fn run(args: impl IntoIterator<Item = OsString>, out: &mut impl Write, err: &mut
         }
     };
     u8::from(written.is_err())
+}
+
+fn run_offline(
+    init: bool,
+    options: &config::OfflineOptions,
+    out: &mut impl Write,
+    err: &mut impl Write,
+) -> u8 {
+    match config::execute(init, options, out) {
+        Ok(success) => u8::from(!success),
+        Err(error) => {
+            let _ = writeln!(err, "error: {error}");
+            1
+        }
+    }
 }
 
 fn main() -> ExitCode {
