@@ -1,0 +1,5597 @@
+{
+  "schema_version": 1,
+  "fictional": true,
+  "source": {
+    "kind": "discord",
+    "external_id": "1",
+    "name": "Lantern Shelf ? fictional demo"
+  },
+  "members": [
+    {
+      "id": "101",
+      "display_name": "Aster Vale",
+      "is_bot": false
+    },
+    {
+      "id": "102",
+      "display_name": "Bram Fern",
+      "is_bot": false
+    },
+    {
+      "id": "103",
+      "display_name": "Cleo Moss",
+      "is_bot": false
+    },
+    {
+      "id": "104",
+      "display_name": "Dara Wren",
+      "is_bot": false
+    },
+    {
+      "id": "105",
+      "display_name": "Ellis Reed",
+      "is_bot": false
+    },
+    {
+      "id": "106",
+      "display_name": "Fenn Birch",
+      "is_bot": false
+    }
+  ],
+  "channels": [
+    {
+      "id": "201",
+      "parent_id": null,
+      "kind": "text",
+      "name": "planning",
+      "topic": "Fictional Lantern Shelf planning",
+      "included": true,
+      "archived": false
+    },
+    {
+      "id": "202",
+      "parent_id": null,
+      "kind": "text",
+      "name": "engineering",
+      "topic": "Fictional Lantern Shelf engineering",
+      "included": true,
+      "archived": false
+    },
+    {
+      "id": "203",
+      "parent_id": null,
+      "kind": "text",
+      "name": "reading-room",
+      "topic": "Fictional Lantern Shelf reading-room",
+      "included": true,
+      "archived": false
+    },
+    {
+      "id": "204",
+      "parent_id": null,
+      "kind": "text",
+      "name": "operations",
+      "topic": "Fictional Lantern Shelf operations",
+      "included": true,
+      "archived": false
+    },
+    {
+      "id": "211",
+      "parent_id": "201",
+      "kind": "thread",
+      "name": "storage-review",
+      "topic": null,
+      "included": true,
+      "archived": true
+    },
+    {
+      "id": "212",
+      "parent_id": "202",
+      "kind": "thread",
+      "name": "search-review",
+      "topic": null,
+      "included": true,
+      "archived": false
+    },
+    {
+      "id": "213",
+      "parent_id": "203",
+      "kind": "thread",
+      "name": "sync-review",
+      "topic": null,
+      "included": true,
+      "archived": false
+    },
+    {
+      "id": "214",
+      "parent_id": "204",
+      "kind": "thread",
+      "name": "privacy-review",
+      "topic": null,
+      "included": true,
+      "archived": false
+    },
+    {
+      "id": "215",
+      "parent_id": "201",
+      "kind": "thread",
+      "name": "backup-review",
+      "topic": null,
+      "included": true,
+      "archived": false
+    },
+    {
+      "id": "216",
+      "parent_id": "202",
+      "kind": "thread",
+      "name": "export-review",
+      "topic": null,
+      "included": true,
+      "archived": false
+    }
+  ],
+  "messages": [
+    {
+      "id": "1477591223500800000",
+      "channel_id": "211",
+      "author_id": "101",
+      "content": "What should Lantern Shelf use for database?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1772355600000,
+      "edited_at": null
+    },
+    {
+      "id": "1477593740083200001",
+      "channel_id": "211",
+      "author_id": "102",
+      "content": "I propose PostgreSQL for database. We should compare the alternatives.",
+      "reply_to": "1477591223500800000",
+      "attachment_names": [],
+      "created_at": 1772356200000,
+      "edited_at": null
+    },
+    {
+      "id": "1477596256665600002",
+      "channel_id": "211",
+      "author_id": "103",
+      "content": "Initial decision: use PostgreSQL for database.",
+      "reply_to": "1477591223500800000",
+      "attachment_names": [],
+      "created_at": 1772356800000,
+      "edited_at": null
+    },
+    {
+      "id": "1477598773248000003",
+      "channel_id": "211",
+      "author_id": "104",
+      "content": "The pilot review found that offline startup without a database service.",
+      "reply_to": "1477591223500800000",
+      "attachment_names": [],
+      "created_at": 1772357400000,
+      "edited_at": null
+    },
+    {
+      "id": "1477601289830400004",
+      "channel_id": "211",
+      "author_id": "105",
+      "content": "Could SQLite address that issue? Please compare it with PostgreSQL.",
+      "reply_to": "1477591223500800000",
+      "attachment_names": [],
+      "created_at": 1772358000000,
+      "edited_at": null
+    },
+    {
+      "id": "1477603806412800005",
+      "channel_id": "211",
+      "author_id": "106",
+      "content": "Review result: SQLite is simpler for our fictional pilot because offline startup without a database service.",
+      "reply_to": "1477591223500800000",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1772358600000,
+      "edited_at": null
+    },
+    {
+      "id": "1477606322995200006",
+      "channel_id": "211",
+      "author_id": "101",
+      "content": "Decision reversed: use SQLite for database, replacing the earlier choice of PostgreSQL.",
+      "reply_to": "1477591223500800000",
+      "attachment_names": [],
+      "created_at": 1772359200000,
+      "edited_at": null
+    },
+    {
+      "id": "1477608839577600007",
+      "channel_id": "211",
+      "author_id": "102",
+      "content": "Aster Vale will measure full-text query latency by 2026-03-04.",
+      "reply_to": "1477591223500800000",
+      "attachment_names": [],
+      "created_at": 1772359800000,
+      "edited_at": null
+    },
+    {
+      "id": "1477611356160000008",
+      "channel_id": "211",
+      "author_id": "103",
+      "content": "Meeting notes\nTopic: database\nCurrent choice: SQLite\nReason: offline startup without a database service\nOwner: Aster Vale\nNext step: measure full-text query latency",
+      "reply_to": "1477591223500800000",
+      "attachment_names": [],
+      "created_at": 1772360400000,
+      "edited_at": null
+    },
+    {
+      "id": "1477613872742400009",
+      "channel_id": "211",
+      "author_id": "104",
+      "content": "Check-in: the storage follow-up is still open. The current database choice remains SQLite.",
+      "reply_to": "1477591223500800000",
+      "attachment_names": [],
+      "created_at": 1772361000000,
+      "edited_at": null
+    },
+    {
+      "id": "1477953611366400010",
+      "channel_id": "212",
+      "author_id": "102",
+      "content": "What should Lantern Shelf use for search index?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1772442000000,
+      "edited_at": null
+    },
+    {
+      "id": "1477956127948800011",
+      "channel_id": "212",
+      "author_id": "103",
+      "content": "I propose a custom inverted index for search index. We should compare the alternatives.",
+      "reply_to": "1477953611366400010",
+      "attachment_names": [],
+      "created_at": 1772442600000,
+      "edited_at": null
+    },
+    {
+      "id": "1477958644531200012",
+      "channel_id": "212",
+      "author_id": "104",
+      "content": "Initial decision: use a custom inverted index for search index.",
+      "reply_to": "1477953611366400010",
+      "attachment_names": [],
+      "created_at": 1772443200000,
+      "edited_at": null
+    },
+    {
+      "id": "1477961161113600013",
+      "channel_id": "212",
+      "author_id": "105",
+      "content": "The pilot review found that transactional index updates.",
+      "reply_to": "1477953611366400010",
+      "attachment_names": [],
+      "created_at": 1772443800000,
+      "edited_at": null
+    },
+    {
+      "id": "1477963677696000014",
+      "channel_id": "212",
+      "author_id": "106",
+      "content": "Could SQLite FTS5 address that issue? Please compare it with a custom inverted index.",
+      "reply_to": "1477953611366400010",
+      "attachment_names": [],
+      "created_at": 1772444400000,
+      "edited_at": null
+    },
+    {
+      "id": "1477966194278400015",
+      "channel_id": "212",
+      "author_id": "101",
+      "content": "Review result: SQLite FTS5 is simpler for our fictional pilot because transactional index updates.",
+      "reply_to": "1477953611366400010",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1772445000000,
+      "edited_at": null
+    },
+    {
+      "id": "1477968710860800016",
+      "channel_id": "212",
+      "author_id": "102",
+      "content": "Decision reversed: use SQLite FTS5 for search index, replacing the earlier choice of a custom inverted index.",
+      "reply_to": "1477953611366400010",
+      "attachment_names": [],
+      "created_at": 1772445600000,
+      "edited_at": null
+    },
+    {
+      "id": "1477971227443200017",
+      "channel_id": "212",
+      "author_id": "103",
+      "content": "Bram Fern will test punctuation in search queries by 2026-03-05.",
+      "reply_to": "1477953611366400010",
+      "attachment_names": [],
+      "created_at": 1772446200000,
+      "edited_at": null
+    },
+    {
+      "id": "1477973744025600018",
+      "channel_id": "212",
+      "author_id": "104",
+      "content": "Meeting notes\nTopic: search index\nCurrent choice: SQLite FTS5\nReason: transactional index updates\nOwner: Bram Fern\nNext step: test punctuation in search queries",
+      "reply_to": "1477953611366400010",
+      "attachment_names": [],
+      "created_at": 1772446800000,
+      "edited_at": null
+    },
+    {
+      "id": "1477976260608000019",
+      "channel_id": "212",
+      "author_id": "105",
+      "content": "Check-in: the search follow-up is still open. The current search index choice remains SQLite FTS5.",
+      "reply_to": "1477953611366400010",
+      "attachment_names": [],
+      "created_at": 1772447400000,
+      "edited_at": null
+    },
+    {
+      "id": "1478315999232000020",
+      "channel_id": "213",
+      "author_id": "103",
+      "content": "What should Lantern Shelf use for sync cursor?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1772528400000,
+      "edited_at": null
+    },
+    {
+      "id": "1478318515814400021",
+      "channel_id": "213",
+      "author_id": "104",
+      "content": "I propose one cursor per server for sync cursor. We should compare the alternatives.",
+      "reply_to": "1478315999232000020",
+      "attachment_names": [],
+      "created_at": 1772529000000,
+      "edited_at": null
+    },
+    {
+      "id": "1478321032396800022",
+      "channel_id": "213",
+      "author_id": "105",
+      "content": "Initial decision: use one cursor per server for sync cursor.",
+      "reply_to": "1478315999232000020",
+      "attachment_names": [],
+      "created_at": 1772529600000,
+      "edited_at": null
+    },
+    {
+      "id": "1478323548979200023",
+      "channel_id": "213",
+      "author_id": "106",
+      "content": "The pilot review found that archived threads were skipped.",
+      "reply_to": "1478315999232000020",
+      "attachment_names": [],
+      "created_at": 1772530200000,
+      "edited_at": null
+    },
+    {
+      "id": "1478326065561600024",
+      "channel_id": "213",
+      "author_id": "101",
+      "content": "Could one cursor per thread address that issue? Please compare it with one cursor per server.",
+      "reply_to": "1478315999232000020",
+      "attachment_names": [],
+      "created_at": 1772530800000,
+      "edited_at": null
+    },
+    {
+      "id": "1478328582144000025",
+      "channel_id": "213",
+      "author_id": "102",
+      "content": "Review result: one cursor per thread is simpler for our fictional pilot because archived threads were skipped.",
+      "reply_to": "1478315999232000020",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1772531400000,
+      "edited_at": null
+    },
+    {
+      "id": "1478331098726400026",
+      "channel_id": "213",
+      "author_id": "103",
+      "content": "Decision reversed: use one cursor per thread for sync cursor, replacing the earlier choice of one cursor per server.",
+      "reply_to": "1478315999232000020",
+      "attachment_names": [],
+      "created_at": 1772532000000,
+      "edited_at": null
+    },
+    {
+      "id": "1478333615308800027",
+      "channel_id": "213",
+      "author_id": "104",
+      "content": "Cleo Moss will test an archived thread catch-up by 2026-03-06.",
+      "reply_to": "1478315999232000020",
+      "attachment_names": [],
+      "created_at": 1772532600000,
+      "edited_at": null
+    },
+    {
+      "id": "1478336131891200028",
+      "channel_id": "213",
+      "author_id": "105",
+      "content": "Meeting notes\nTopic: sync cursor\nCurrent choice: one cursor per thread\nReason: archived threads were skipped\nOwner: Cleo Moss\nNext step: test an archived thread catch-up",
+      "reply_to": "1478315999232000020",
+      "attachment_names": [],
+      "created_at": 1772533200000,
+      "edited_at": null
+    },
+    {
+      "id": "1478338648473600029",
+      "channel_id": "213",
+      "author_id": "106",
+      "content": "Check-in: the sync follow-up is still open. The current sync cursor choice remains one cursor per thread.",
+      "reply_to": "1478315999232000020",
+      "attachment_names": [],
+      "created_at": 1772533800000,
+      "edited_at": null
+    },
+    {
+      "id": "1478678387097600030",
+      "channel_id": "214",
+      "author_id": "104",
+      "content": "What should Lantern Shelf use for attachment storage?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1772614800000,
+      "edited_at": null
+    },
+    {
+      "id": "1478680903680000031",
+      "channel_id": "214",
+      "author_id": "105",
+      "content": "I propose downloaded attachment bodies for attachment storage. We should compare the alternatives.",
+      "reply_to": "1478678387097600030",
+      "attachment_names": [],
+      "created_at": 1772615400000,
+      "edited_at": null
+    },
+    {
+      "id": "1478683420262400032",
+      "channel_id": "214",
+      "author_id": "106",
+      "content": "Initial decision: use downloaded attachment bodies for attachment storage.",
+      "reply_to": "1478678387097600030",
+      "attachment_names": [],
+      "created_at": 1772616000000,
+      "edited_at": null
+    },
+    {
+      "id": "1478685936844800033",
+      "channel_id": "214",
+      "author_id": "101",
+      "content": "The pilot review found that large files may contain private material.",
+      "reply_to": "1478678387097600030",
+      "attachment_names": [],
+      "created_at": 1772616600000,
+      "edited_at": null
+    },
+    {
+      "id": "1478688453427200034",
+      "channel_id": "214",
+      "author_id": "102",
+      "content": "Could attachment filenames only address that issue? Please compare it with downloaded attachment bodies.",
+      "reply_to": "1478678387097600030",
+      "attachment_names": [],
+      "created_at": 1772617200000,
+      "edited_at": null
+    },
+    {
+      "id": "1478690970009600035",
+      "channel_id": "214",
+      "author_id": "103",
+      "content": "Review result: attachment filenames only is simpler for our fictional pilot because large files may contain private material.",
+      "reply_to": "1478678387097600030",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1772617800000,
+      "edited_at": null
+    },
+    {
+      "id": "1478693486592000036",
+      "channel_id": "214",
+      "author_id": "104",
+      "content": "Decision reversed: use attachment filenames only for attachment storage, replacing the earlier choice of downloaded attachment bodies.",
+      "reply_to": "1478678387097600030",
+      "attachment_names": [],
+      "created_at": 1772618400000,
+      "edited_at": null
+    },
+    {
+      "id": "1478696003174400037",
+      "channel_id": "214",
+      "author_id": "105",
+      "content": "Dara Wren will verify no attachment bytes are stored by 2026-03-07.",
+      "reply_to": "1478678387097600030",
+      "attachment_names": [],
+      "created_at": 1772619000000,
+      "edited_at": null
+    },
+    {
+      "id": "1478698519756800038",
+      "channel_id": "214",
+      "author_id": "106",
+      "content": "Meeting notes\nTopic: attachment storage\nCurrent choice: attachment filenames only\nReason: large files may contain private material\nOwner: Dara Wren\nNext step: verify no attachment bytes are stored",
+      "reply_to": "1478678387097600030",
+      "attachment_names": [],
+      "created_at": 1772619600000,
+      "edited_at": null
+    },
+    {
+      "id": "1478701036339200039",
+      "channel_id": "214",
+      "author_id": "101",
+      "content": "Check-in: the privacy follow-up is still open. The current attachment storage choice remains attachment filenames only.",
+      "reply_to": "1478678387097600030",
+      "attachment_names": [],
+      "created_at": 1772620200000,
+      "edited_at": null
+    },
+    {
+      "id": "1479040774963200040",
+      "channel_id": "215",
+      "author_id": "105",
+      "content": "What should Lantern Shelf use for backup cadence?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1772701200000,
+      "edited_at": null
+    },
+    {
+      "id": "1479043291545600041",
+      "channel_id": "215",
+      "author_id": "106",
+      "content": "I propose weekly backups for backup cadence. We should compare the alternatives.",
+      "reply_to": "1479040774963200040",
+      "attachment_names": [],
+      "created_at": 1772701800000,
+      "edited_at": null
+    },
+    {
+      "id": "1479045808128000042",
+      "channel_id": "215",
+      "author_id": "101",
+      "content": "Initial decision: use weekly backups for backup cadence.",
+      "reply_to": "1479040774963200040",
+      "attachment_names": [],
+      "created_at": 1772702400000,
+      "edited_at": null
+    },
+    {
+      "id": "1479048324710400043",
+      "channel_id": "215",
+      "author_id": "102",
+      "content": "The pilot review found that a week of notes is too much to lose.",
+      "reply_to": "1479040774963200040",
+      "attachment_names": [],
+      "created_at": 1772703000000,
+      "edited_at": null
+    },
+    {
+      "id": "1479050841292800044",
+      "channel_id": "215",
+      "author_id": "103",
+      "content": "Could daily backups at 02:00 UTC address that issue? Please compare it with weekly backups.",
+      "reply_to": "1479040774963200040",
+      "attachment_names": [],
+      "created_at": 1772703600000,
+      "edited_at": null
+    },
+    {
+      "id": "1479053357875200045",
+      "channel_id": "215",
+      "author_id": "104",
+      "content": "Review result: daily backups at 02:00 UTC is simpler for our fictional pilot because a week of notes is too much to lose.",
+      "reply_to": "1479040774963200040",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1772704200000,
+      "edited_at": null
+    },
+    {
+      "id": "1479055874457600046",
+      "channel_id": "215",
+      "author_id": "105",
+      "content": "Decision reversed: use daily backups at 02:00 UTC for backup cadence, replacing the earlier choice of weekly backups.",
+      "reply_to": "1479040774963200040",
+      "attachment_names": [],
+      "created_at": 1772704800000,
+      "edited_at": null
+    },
+    {
+      "id": "1479058391040000047",
+      "channel_id": "215",
+      "author_id": "106",
+      "content": "Ellis Reed will write the restore checklist by 2026-03-08.",
+      "reply_to": "1479040774963200040",
+      "attachment_names": [],
+      "created_at": 1772705400000,
+      "edited_at": null
+    },
+    {
+      "id": "1479060907622400048",
+      "channel_id": "215",
+      "author_id": "101",
+      "content": "Meeting notes\nTopic: backup cadence\nCurrent choice: daily backups at 02:00 UTC\nReason: a week of notes is too much to lose\nOwner: Ellis Reed\nNext step: write the restore checklist",
+      "reply_to": "1479040774963200040",
+      "attachment_names": [],
+      "created_at": 1772706000000,
+      "edited_at": null
+    },
+    {
+      "id": "1479063424204800049",
+      "channel_id": "215",
+      "author_id": "102",
+      "content": "Check-in: the backup follow-up is still open. The current backup cadence choice remains daily backups at 02:00 UTC.",
+      "reply_to": "1479040774963200040",
+      "attachment_names": [],
+      "created_at": 1772706600000,
+      "edited_at": null
+    },
+    {
+      "id": "1479403162828800050",
+      "channel_id": "216",
+      "author_id": "106",
+      "content": "What should Lantern Shelf use for export format?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1772787600000,
+      "edited_at": null
+    },
+    {
+      "id": "1479405679411200051",
+      "channel_id": "216",
+      "author_id": "101",
+      "content": "I propose a single HTML file for export format. We should compare the alternatives.",
+      "reply_to": "1479403162828800050",
+      "attachment_names": [],
+      "created_at": 1772788200000,
+      "edited_at": null
+    },
+    {
+      "id": "1479408195993600052",
+      "channel_id": "216",
+      "author_id": "102",
+      "content": "Initial decision: use a single HTML file for export format.",
+      "reply_to": "1479403162828800050",
+      "attachment_names": [],
+      "created_at": 1772788800000,
+      "edited_at": null
+    },
+    {
+      "id": "1479410712576000053",
+      "channel_id": "216",
+      "author_id": "103",
+      "content": "The pilot review found that people need files they can edit.",
+      "reply_to": "1479403162828800050",
+      "attachment_names": [],
+      "created_at": 1772789400000,
+      "edited_at": null
+    },
+    {
+      "id": "1479413229158400054",
+      "channel_id": "216",
+      "author_id": "104",
+      "content": "Could cross-linked Markdown address that issue? Please compare it with a single HTML file.",
+      "reply_to": "1479403162828800050",
+      "attachment_names": [],
+      "created_at": 1772790000000,
+      "edited_at": null
+    },
+    {
+      "id": "1479415745740800055",
+      "channel_id": "216",
+      "author_id": "105",
+      "content": "Review result: cross-linked Markdown is simpler for our fictional pilot because people need files they can edit.",
+      "reply_to": "1479403162828800050",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1772790600000,
+      "edited_at": null
+    },
+    {
+      "id": "1479418262323200056",
+      "channel_id": "216",
+      "author_id": "106",
+      "content": "Decision reversed: use cross-linked Markdown for export format, replacing the earlier choice of a single HTML file.",
+      "reply_to": "1479403162828800050",
+      "attachment_names": [],
+      "created_at": 1772791200000,
+      "edited_at": null
+    },
+    {
+      "id": "1479420778905600057",
+      "channel_id": "216",
+      "author_id": "101",
+      "content": "Fenn Birch will validate exported source footnotes by 2026-03-09.",
+      "reply_to": "1479403162828800050",
+      "attachment_names": [],
+      "created_at": 1772791800000,
+      "edited_at": null
+    },
+    {
+      "id": "1479423295488000058",
+      "channel_id": "216",
+      "author_id": "102",
+      "content": "Meeting notes\nTopic: export format\nCurrent choice: cross-linked Markdown\nReason: people need files they can edit\nOwner: Fenn Birch\nNext step: validate exported source footnotes",
+      "reply_to": "1479403162828800050",
+      "attachment_names": [],
+      "created_at": 1772792400000,
+      "edited_at": null
+    },
+    {
+      "id": "1479425812070400059",
+      "channel_id": "216",
+      "author_id": "103",
+      "content": "Check-in: the export follow-up is still open. The current export format choice remains cross-linked Markdown.",
+      "reply_to": "1479403162828800050",
+      "attachment_names": [],
+      "created_at": 1772793000000,
+      "edited_at": null
+    },
+    {
+      "id": "1479765550694400060",
+      "channel_id": "203",
+      "author_id": "101",
+      "content": "What should Lantern Shelf use for table of contents?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1772874000000,
+      "edited_at": null
+    },
+    {
+      "id": "1479768067276800061",
+      "channel_id": "203",
+      "author_id": "102",
+      "content": "I propose a flat chapter list for table of contents. We should compare the alternatives.",
+      "reply_to": "1479765550694400060",
+      "attachment_names": [],
+      "created_at": 1772874600000,
+      "edited_at": null
+    },
+    {
+      "id": "1479770583859200062",
+      "channel_id": "203",
+      "author_id": "103",
+      "content": "Initial decision: use a flat chapter list for table of contents.",
+      "reply_to": "1479765550694400060",
+      "attachment_names": [],
+      "created_at": 1772875200000,
+      "edited_at": null
+    },
+    {
+      "id": "1479773100441600063",
+      "channel_id": "203",
+      "author_id": "104",
+      "content": "The pilot review found that books include sections inside chapters.",
+      "reply_to": "1479765550694400060",
+      "attachment_names": [],
+      "created_at": 1772875800000,
+      "edited_at": null
+    },
+    {
+      "id": "1479775617024000064",
+      "channel_id": "203",
+      "author_id": "105",
+      "content": "Could a nested chapter tree address that issue? Please compare it with a flat chapter list.",
+      "reply_to": "1479765550694400060",
+      "attachment_names": [],
+      "created_at": 1772876400000,
+      "edited_at": null
+    },
+    {
+      "id": "1479778133606400065",
+      "channel_id": "203",
+      "author_id": "106",
+      "content": "Review result: a nested chapter tree is simpler for our fictional pilot because books include sections inside chapters.",
+      "reply_to": "1479765550694400060",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1772877000000,
+      "edited_at": null
+    },
+    {
+      "id": "1479780650188800066",
+      "channel_id": "203",
+      "author_id": "101",
+      "content": "Decision reversed: use a nested chapter tree for table of contents, replacing the earlier choice of a flat chapter list.",
+      "reply_to": "1479765550694400060",
+      "attachment_names": [],
+      "created_at": 1772877600000,
+      "edited_at": null
+    },
+    {
+      "id": "1479783166771200067",
+      "channel_id": "203",
+      "author_id": "102",
+      "content": "Aster Vale will test a three-level chapter tree by 2026-03-10.",
+      "reply_to": "1479765550694400060",
+      "attachment_names": [],
+      "created_at": 1772878200000,
+      "edited_at": null
+    },
+    {
+      "id": "1479785683353600068",
+      "channel_id": "203",
+      "author_id": "103",
+      "content": "Meeting notes\nTopic: table of contents\nCurrent choice: a nested chapter tree\nReason: books include sections inside chapters\nOwner: Aster Vale\nNext step: test a three-level chapter tree",
+      "reply_to": "1479765550694400060",
+      "attachment_names": [],
+      "created_at": 1772878800000,
+      "edited_at": null
+    },
+    {
+      "id": "1479788199936000069",
+      "channel_id": "203",
+      "author_id": "104",
+      "content": "Check-in: the reader follow-up is still open. The current table of contents choice remains a nested chapter tree.",
+      "reply_to": "1479765550694400060",
+      "attachment_names": [],
+      "created_at": 1772879400000,
+      "edited_at": null
+    },
+    {
+      "id": "1480127938560000070",
+      "channel_id": "204",
+      "author_id": "102",
+      "content": "What should Lantern Shelf use for default theme?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1772960400000,
+      "edited_at": null
+    },
+    {
+      "id": "1480130455142400071",
+      "channel_id": "204",
+      "author_id": "103",
+      "content": "I propose dark mode for default theme. We should compare the alternatives.",
+      "reply_to": "1480127938560000070",
+      "attachment_names": [],
+      "created_at": 1772961000000,
+      "edited_at": null
+    },
+    {
+      "id": "1480132971724800072",
+      "channel_id": "204",
+      "author_id": "104",
+      "content": "Initial decision: use dark mode for default theme.",
+      "reply_to": "1480127938560000070",
+      "attachment_names": [],
+      "created_at": 1772961600000,
+      "edited_at": null
+    },
+    {
+      "id": "1480135488307200073",
+      "channel_id": "204",
+      "author_id": "105",
+      "content": "The pilot review found that readers switch devices and lighting.",
+      "reply_to": "1480127938560000070",
+      "attachment_names": [],
+      "created_at": 1772962200000,
+      "edited_at": null
+    },
+    {
+      "id": "1480138004889600074",
+      "channel_id": "204",
+      "author_id": "106",
+      "content": "Could system preference address that issue? Please compare it with dark mode.",
+      "reply_to": "1480127938560000070",
+      "attachment_names": [],
+      "created_at": 1772962800000,
+      "edited_at": null
+    },
+    {
+      "id": "1480140521472000075",
+      "channel_id": "204",
+      "author_id": "101",
+      "content": "Review result: system preference is simpler for our fictional pilot because readers switch devices and lighting.",
+      "reply_to": "1480127938560000070",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1772963400000,
+      "edited_at": null
+    },
+    {
+      "id": "1480143038054400076",
+      "channel_id": "204",
+      "author_id": "102",
+      "content": "Decision reversed: use system preference for default theme, replacing the earlier choice of dark mode.",
+      "reply_to": "1480127938560000070",
+      "attachment_names": [],
+      "created_at": 1772964000000,
+      "edited_at": null
+    },
+    {
+      "id": "1480145554636800077",
+      "channel_id": "204",
+      "author_id": "103",
+      "content": "Bram Fern will check the high-contrast theme by 2026-03-11.",
+      "reply_to": "1480127938560000070",
+      "attachment_names": [],
+      "created_at": 1772964600000,
+      "edited_at": null
+    },
+    {
+      "id": "1480148071219200078",
+      "channel_id": "204",
+      "author_id": "104",
+      "content": "Meeting notes\nTopic: default theme\nCurrent choice: system preference\nReason: readers switch devices and lighting\nOwner: Bram Fern\nNext step: check the high-contrast theme",
+      "reply_to": "1480127938560000070",
+      "attachment_names": [],
+      "created_at": 1772965200000,
+      "edited_at": null
+    },
+    {
+      "id": "1480150587801600079",
+      "channel_id": "204",
+      "author_id": "105",
+      "content": "Check-in: the theme follow-up is still open. The current default theme choice remains system preference.",
+      "reply_to": "1480127938560000070",
+      "attachment_names": [],
+      "created_at": 1772965800000,
+      "edited_at": null
+    },
+    {
+      "id": "1480490326425600080",
+      "channel_id": "201",
+      "author_id": "103",
+      "content": "What should Lantern Shelf use for note editor?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1773046800000,
+      "edited_at": null
+    },
+    {
+      "id": "1480492843008000081",
+      "channel_id": "201",
+      "author_id": "104",
+      "content": "I propose rich text for note editor. We should compare the alternatives.",
+      "reply_to": "1480490326425600080",
+      "attachment_names": [],
+      "created_at": 1773047400000,
+      "edited_at": null
+    },
+    {
+      "id": "1480495359590400082",
+      "channel_id": "201",
+      "author_id": "105",
+      "content": "Initial decision: use rich text for note editor.",
+      "reply_to": "1480490326425600080",
+      "attachment_names": [],
+      "created_at": 1773048000000,
+      "edited_at": null
+    },
+    {
+      "id": "1480497876172800083",
+      "channel_id": "201",
+      "author_id": "106",
+      "content": "The pilot review found that portable notes matter more than toolbar controls.",
+      "reply_to": "1480490326425600080",
+      "attachment_names": [],
+      "created_at": 1773048600000,
+      "edited_at": null
+    },
+    {
+      "id": "1480500392755200084",
+      "channel_id": "201",
+      "author_id": "101",
+      "content": "Could plain Markdown address that issue? Please compare it with rich text.",
+      "reply_to": "1480490326425600080",
+      "attachment_names": [],
+      "created_at": 1773049200000,
+      "edited_at": null
+    },
+    {
+      "id": "1480502909337600085",
+      "channel_id": "201",
+      "author_id": "102",
+      "content": "Review result: plain Markdown is simpler for our fictional pilot because portable notes matter more than toolbar controls.",
+      "reply_to": "1480490326425600080",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1773049800000,
+      "edited_at": null
+    },
+    {
+      "id": "1480505425920000086",
+      "channel_id": "201",
+      "author_id": "103",
+      "content": "Decision reversed: use plain Markdown for note editor, replacing the earlier choice of rich text.",
+      "reply_to": "1480490326425600080",
+      "attachment_names": [],
+      "created_at": 1773050400000,
+      "edited_at": null
+    },
+    {
+      "id": "1480507942502400087",
+      "channel_id": "201",
+      "author_id": "104",
+      "content": "Cleo Moss will test fenced code in a note by 2026-03-12.",
+      "reply_to": "1480490326425600080",
+      "attachment_names": [],
+      "created_at": 1773051000000,
+      "edited_at": null
+    },
+    {
+      "id": "1480510459084800088",
+      "channel_id": "201",
+      "author_id": "105",
+      "content": "Meeting notes\nTopic: note editor\nCurrent choice: plain Markdown\nReason: portable notes matter more than toolbar controls\nOwner: Cleo Moss\nNext step: test fenced code in a note",
+      "reply_to": "1480490326425600080",
+      "attachment_names": [],
+      "created_at": 1773051600000,
+      "edited_at": null
+    },
+    {
+      "id": "1480512975667200089",
+      "channel_id": "201",
+      "author_id": "106",
+      "content": "Check-in: the notes follow-up is still open. The current note editor choice remains plain Markdown.",
+      "reply_to": "1480490326425600080",
+      "attachment_names": [],
+      "created_at": 1773052200000,
+      "edited_at": null
+    },
+    {
+      "id": "1480852714291200090",
+      "channel_id": "202",
+      "author_id": "104",
+      "content": "What should Lantern Shelf use for session cookie lifetime?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1773133200000,
+      "edited_at": null
+    },
+    {
+      "id": "1480855230873600091",
+      "channel_id": "202",
+      "author_id": "105",
+      "content": "I propose thirty days for session cookie lifetime. We should compare the alternatives.",
+      "reply_to": "1480852714291200090",
+      "attachment_names": [],
+      "created_at": 1773133800000,
+      "edited_at": null
+    },
+    {
+      "id": "1480857747456000092",
+      "channel_id": "202",
+      "author_id": "106",
+      "content": "Initial decision: use thirty days for session cookie lifetime.",
+      "reply_to": "1480852714291200090",
+      "attachment_names": [],
+      "created_at": 1773134400000,
+      "edited_at": null
+    },
+    {
+      "id": "1480860264038400093",
+      "channel_id": "202",
+      "author_id": "101",
+      "content": "The pilot review found that shared laptops need shorter access.",
+      "reply_to": "1480852714291200090",
+      "attachment_names": [],
+      "created_at": 1773135000000,
+      "edited_at": null
+    },
+    {
+      "id": "1480862780620800094",
+      "channel_id": "202",
+      "author_id": "102",
+      "content": "Could seven days address that issue? Please compare it with thirty days.",
+      "reply_to": "1480852714291200090",
+      "attachment_names": [],
+      "created_at": 1773135600000,
+      "edited_at": null
+    },
+    {
+      "id": "1480865297203200095",
+      "channel_id": "202",
+      "author_id": "103",
+      "content": "Review result: seven days is simpler for our fictional pilot because shared laptops need shorter access.",
+      "reply_to": "1480852714291200090",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1773136200000,
+      "edited_at": null
+    },
+    {
+      "id": "1480867813785600096",
+      "channel_id": "202",
+      "author_id": "104",
+      "content": "Decision reversed: use seven days for session cookie lifetime, replacing the earlier choice of thirty days.",
+      "reply_to": "1480852714291200090",
+      "attachment_names": [],
+      "created_at": 1773136800000,
+      "edited_at": null
+    },
+    {
+      "id": "1480870330368000097",
+      "channel_id": "202",
+      "author_id": "105",
+      "content": "Dara Wren will test expired sessions by 2026-03-13.",
+      "reply_to": "1480852714291200090",
+      "attachment_names": [],
+      "created_at": 1773137400000,
+      "edited_at": null
+    },
+    {
+      "id": "1480872846950400098",
+      "channel_id": "202",
+      "author_id": "106",
+      "content": "Meeting notes\nTopic: session cookie lifetime\nCurrent choice: seven days\nReason: shared laptops need shorter access\nOwner: Dara Wren\nNext step: test expired sessions",
+      "reply_to": "1480852714291200090",
+      "attachment_names": [],
+      "created_at": 1773138000000,
+      "edited_at": null
+    },
+    {
+      "id": "1480875363532800099",
+      "channel_id": "202",
+      "author_id": "101",
+      "content": "Check-in: the auth follow-up is still open. The current session cookie lifetime choice remains seven days.",
+      "reply_to": "1480852714291200090",
+      "attachment_names": [],
+      "created_at": 1773138600000,
+      "edited_at": null
+    },
+    {
+      "id": "1481215102156800100",
+      "channel_id": "203",
+      "author_id": "105",
+      "content": "What should Lantern Shelf use for hosting target?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1773219600000,
+      "edited_at": null
+    },
+    {
+      "id": "1481217618739200101",
+      "channel_id": "203",
+      "author_id": "106",
+      "content": "I propose a managed cluster for hosting target. We should compare the alternatives.",
+      "reply_to": "1481215102156800100",
+      "attachment_names": [],
+      "created_at": 1773220200000,
+      "edited_at": null
+    },
+    {
+      "id": "1481220135321600102",
+      "channel_id": "203",
+      "author_id": "101",
+      "content": "Initial decision: use a managed cluster for hosting target.",
+      "reply_to": "1481215102156800100",
+      "attachment_names": [],
+      "created_at": 1773220800000,
+      "edited_at": null
+    },
+    {
+      "id": "1481222651904000103",
+      "channel_id": "203",
+      "author_id": "102",
+      "content": "The pilot review found that the pilot has only five readers.",
+      "reply_to": "1481215102156800100",
+      "attachment_names": [],
+      "created_at": 1773221400000,
+      "edited_at": null
+    },
+    {
+      "id": "1481225168486400104",
+      "channel_id": "203",
+      "author_id": "103",
+      "content": "Could one Linux host address that issue? Please compare it with a managed cluster.",
+      "reply_to": "1481215102156800100",
+      "attachment_names": [],
+      "created_at": 1773222000000,
+      "edited_at": null
+    },
+    {
+      "id": "1481227685068800105",
+      "channel_id": "203",
+      "author_id": "104",
+      "content": "Review result: one Linux host is simpler for our fictional pilot because the pilot has only five readers.",
+      "reply_to": "1481215102156800100",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1773222600000,
+      "edited_at": null
+    },
+    {
+      "id": "1481230201651200106",
+      "channel_id": "203",
+      "author_id": "105",
+      "content": "Decision reversed: use one Linux host for hosting target, replacing the earlier choice of a managed cluster.",
+      "reply_to": "1481215102156800100",
+      "attachment_names": [],
+      "created_at": 1773223200000,
+      "edited_at": null
+    },
+    {
+      "id": "1481232718233600107",
+      "channel_id": "203",
+      "author_id": "106",
+      "content": "Ellis Reed will document systemd restart behavior by 2026-03-14.",
+      "reply_to": "1481215102156800100",
+      "attachment_names": [],
+      "created_at": 1773223800000,
+      "edited_at": null
+    },
+    {
+      "id": "1481235234816000108",
+      "channel_id": "203",
+      "author_id": "101",
+      "content": "Meeting notes\nTopic: hosting target\nCurrent choice: one Linux host\nReason: the pilot has only five readers\nOwner: Ellis Reed\nNext step: document systemd restart behavior",
+      "reply_to": "1481215102156800100",
+      "attachment_names": [],
+      "created_at": 1773224400000,
+      "edited_at": null
+    },
+    {
+      "id": "1481237751398400109",
+      "channel_id": "203",
+      "author_id": "102",
+      "content": "Check-in: the deploy follow-up is still open. The current hosting target choice remains one Linux host.",
+      "reply_to": "1481215102156800100",
+      "attachment_names": [],
+      "created_at": 1773225000000,
+      "edited_at": null
+    },
+    {
+      "id": "1481577490022400110",
+      "channel_id": "204",
+      "author_id": "106",
+      "content": "What should Lantern Shelf use for package format?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1773306000000,
+      "edited_at": null
+    },
+    {
+      "id": "1481580006604800111",
+      "channel_id": "204",
+      "author_id": "101",
+      "content": "I propose a system installer for package format. We should compare the alternatives.",
+      "reply_to": "1481577490022400110",
+      "attachment_names": [],
+      "created_at": 1773306600000,
+      "edited_at": null
+    },
+    {
+      "id": "1481582523187200112",
+      "channel_id": "204",
+      "author_id": "102",
+      "content": "Initial decision: use a system installer for package format.",
+      "reply_to": "1481577490022400110",
+      "attachment_names": [],
+      "created_at": 1773307200000,
+      "edited_at": null
+    },
+    {
+      "id": "1481585039769600113",
+      "channel_id": "204",
+      "author_id": "103",
+      "content": "The pilot review found that pilot users cannot install system packages.",
+      "reply_to": "1481577490022400110",
+      "attachment_names": [],
+      "created_at": 1773307800000,
+      "edited_at": null
+    },
+    {
+      "id": "1481587556352000114",
+      "channel_id": "204",
+      "author_id": "104",
+      "content": "Could a portable archive address that issue? Please compare it with a system installer.",
+      "reply_to": "1481577490022400110",
+      "attachment_names": [],
+      "created_at": 1773308400000,
+      "edited_at": null
+    },
+    {
+      "id": "1481590072934400115",
+      "channel_id": "204",
+      "author_id": "105",
+      "content": "Review result: a portable archive is simpler for our fictional pilot because pilot users cannot install system packages.",
+      "reply_to": "1481577490022400110",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1773309000000,
+      "edited_at": null
+    },
+    {
+      "id": "1481592589516800116",
+      "channel_id": "204",
+      "author_id": "106",
+      "content": "Decision reversed: use a portable archive for package format, replacing the earlier choice of a system installer.",
+      "reply_to": "1481577490022400110",
+      "attachment_names": [],
+      "created_at": 1773309600000,
+      "edited_at": null
+    },
+    {
+      "id": "1481595106099200117",
+      "channel_id": "204",
+      "author_id": "101",
+      "content": "Fenn Birch will test extraction without admin rights by 2026-03-15.",
+      "reply_to": "1481577490022400110",
+      "attachment_names": [],
+      "created_at": 1773310200000,
+      "edited_at": null
+    },
+    {
+      "id": "1481597622681600118",
+      "channel_id": "204",
+      "author_id": "102",
+      "content": "Meeting notes\nTopic: package format\nCurrent choice: a portable archive\nReason: pilot users cannot install system packages\nOwner: Fenn Birch\nNext step: test extraction without admin rights",
+      "reply_to": "1481577490022400110",
+      "attachment_names": [],
+      "created_at": 1773310800000,
+      "edited_at": null
+    },
+    {
+      "id": "1481600139264000119",
+      "channel_id": "204",
+      "author_id": "103",
+      "content": "Check-in: the packaging follow-up is still open. The current package format choice remains a portable archive.",
+      "reply_to": "1481577490022400110",
+      "attachment_names": [],
+      "created_at": 1773311400000,
+      "edited_at": null
+    },
+    {
+      "id": "1481939877888000120",
+      "channel_id": "201",
+      "author_id": "101",
+      "content": "What should Lantern Shelf use for interface language?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1773392400000,
+      "edited_at": null
+    },
+    {
+      "id": "1481942394470400121",
+      "channel_id": "201",
+      "author_id": "102",
+      "content": "I propose English only for interface language. We should compare the alternatives.",
+      "reply_to": "1481939877888000120",
+      "attachment_names": [],
+      "created_at": 1773393000000,
+      "edited_at": null
+    },
+    {
+      "id": "1481944911052800122",
+      "channel_id": "201",
+      "author_id": "103",
+      "content": "Initial decision: use English only for interface language.",
+      "reply_to": "1481939877888000120",
+      "attachment_names": [],
+      "created_at": 1773393600000,
+      "edited_at": null
+    },
+    {
+      "id": "1481947427635200123",
+      "channel_id": "201",
+      "author_id": "104",
+      "content": "The pilot review found that the fictional pilot includes both languages.",
+      "reply_to": "1481939877888000120",
+      "attachment_names": [],
+      "created_at": 1773394200000,
+      "edited_at": null
+    },
+    {
+      "id": "1481949944217600124",
+      "channel_id": "201",
+      "author_id": "105",
+      "content": "Could English and Spanish address that issue? Please compare it with English only.",
+      "reply_to": "1481939877888000120",
+      "attachment_names": [],
+      "created_at": 1773394800000,
+      "edited_at": null
+    },
+    {
+      "id": "1481952460800000125",
+      "channel_id": "201",
+      "author_id": "106",
+      "content": "Review result: English and Spanish is simpler for our fictional pilot because the fictional pilot includes both languages.",
+      "reply_to": "1481939877888000120",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1773395400000,
+      "edited_at": null
+    },
+    {
+      "id": "1481954977382400126",
+      "channel_id": "201",
+      "author_id": "101",
+      "content": "Decision reversed: use English and Spanish for interface language, replacing the earlier choice of English only.",
+      "reply_to": "1481939877888000120",
+      "attachment_names": [],
+      "created_at": 1773396000000,
+      "edited_at": null
+    },
+    {
+      "id": "1481957493964800127",
+      "channel_id": "201",
+      "author_id": "102",
+      "content": "Aster Vale will review Spanish button labels by 2026-03-16.",
+      "reply_to": "1481939877888000120",
+      "attachment_names": [],
+      "created_at": 1773396600000,
+      "edited_at": null
+    },
+    {
+      "id": "1481960010547200128",
+      "channel_id": "201",
+      "author_id": "103",
+      "content": "Meeting notes\nTopic: interface language\nCurrent choice: English and Spanish\nReason: the fictional pilot includes both languages\nOwner: Aster Vale\nNext step: review Spanish button labels",
+      "reply_to": "1481939877888000120",
+      "attachment_names": [],
+      "created_at": 1773397200000,
+      "edited_at": null
+    },
+    {
+      "id": "1481962527129600129",
+      "channel_id": "201",
+      "author_id": "104",
+      "content": "Check-in: the language follow-up is still open. The current interface language choice remains English and Spanish.",
+      "reply_to": "1481939877888000120",
+      "attachment_names": [],
+      "created_at": 1773397800000,
+      "edited_at": null
+    },
+    {
+      "id": "1482302265753600130",
+      "channel_id": "202",
+      "author_id": "102",
+      "content": "What should Lantern Shelf use for due date display?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1773478800000,
+      "edited_at": null
+    },
+    {
+      "id": "1482304782336000131",
+      "channel_id": "202",
+      "author_id": "103",
+      "content": "I propose UTC timestamps for due date display. We should compare the alternatives.",
+      "reply_to": "1482302265753600130",
+      "attachment_names": [],
+      "created_at": 1773479400000,
+      "edited_at": null
+    },
+    {
+      "id": "1482307298918400132",
+      "channel_id": "202",
+      "author_id": "104",
+      "content": "Initial decision: use UTC timestamps for due date display.",
+      "reply_to": "1482302265753600130",
+      "attachment_names": [],
+      "created_at": 1773480000000,
+      "edited_at": null
+    },
+    {
+      "id": "1482309815500800133",
+      "channel_id": "202",
+      "author_id": "105",
+      "content": "The pilot review found that midnight UTC looked like the previous day.",
+      "reply_to": "1482302265753600130",
+      "attachment_names": [],
+      "created_at": 1773480600000,
+      "edited_at": null
+    },
+    {
+      "id": "1482312332083200134",
+      "channel_id": "202",
+      "author_id": "106",
+      "content": "Could reader-local dates address that issue? Please compare it with UTC timestamps.",
+      "reply_to": "1482302265753600130",
+      "attachment_names": [],
+      "created_at": 1773481200000,
+      "edited_at": null
+    },
+    {
+      "id": "1482314848665600135",
+      "channel_id": "202",
+      "author_id": "101",
+      "content": "Review result: reader-local dates is simpler for our fictional pilot because midnight UTC looked like the previous day.",
+      "reply_to": "1482302265753600130",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1773481800000,
+      "edited_at": null
+    },
+    {
+      "id": "1482317365248000136",
+      "channel_id": "202",
+      "author_id": "102",
+      "content": "Decision reversed: use reader-local dates for due date display, replacing the earlier choice of UTC timestamps.",
+      "reply_to": "1482302265753600130",
+      "attachment_names": [],
+      "created_at": 1773482400000,
+      "edited_at": null
+    },
+    {
+      "id": "1482319881830400137",
+      "channel_id": "202",
+      "author_id": "103",
+      "content": "Bram Fern will test a date near midnight by 2026-03-17.",
+      "reply_to": "1482302265753600130",
+      "attachment_names": [],
+      "created_at": 1773483000000,
+      "edited_at": null
+    },
+    {
+      "id": "1482322398412800138",
+      "channel_id": "202",
+      "author_id": "104",
+      "content": "Meeting notes\nTopic: due date display\nCurrent choice: reader-local dates\nReason: midnight UTC looked like the previous day\nOwner: Bram Fern\nNext step: test a date near midnight",
+      "reply_to": "1482302265753600130",
+      "attachment_names": [],
+      "created_at": 1773483600000,
+      "edited_at": null
+    },
+    {
+      "id": "1482324914995200139",
+      "channel_id": "202",
+      "author_id": "105",
+      "content": "Check-in: the dates follow-up is still open. The current due date display choice remains reader-local dates.",
+      "reply_to": "1482302265753600130",
+      "attachment_names": [],
+      "created_at": 1773484200000,
+      "edited_at": null
+    },
+    {
+      "id": "1482664653619200140",
+      "channel_id": "203",
+      "author_id": "103",
+      "content": "What should Lantern Shelf use for search page size?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1773565200000,
+      "edited_at": null
+    },
+    {
+      "id": "1482667170201600141",
+      "channel_id": "203",
+      "author_id": "104",
+      "content": "I propose fifty results for search page size. We should compare the alternatives.",
+      "reply_to": "1482664653619200140",
+      "attachment_names": [],
+      "created_at": 1773565800000,
+      "edited_at": null
+    },
+    {
+      "id": "1482669686784000142",
+      "channel_id": "203",
+      "author_id": "105",
+      "content": "Initial decision: use fifty results for search page size.",
+      "reply_to": "1482664653619200140",
+      "attachment_names": [],
+      "created_at": 1773566400000,
+      "edited_at": null
+    },
+    {
+      "id": "1482672203366400143",
+      "channel_id": "203",
+      "author_id": "106",
+      "content": "The pilot review found that long pages hide the best matches.",
+      "reply_to": "1482664653619200140",
+      "attachment_names": [],
+      "created_at": 1773567000000,
+      "edited_at": null
+    },
+    {
+      "id": "1482674719948800144",
+      "channel_id": "203",
+      "author_id": "101",
+      "content": "Could twenty results address that issue? Please compare it with fifty results.",
+      "reply_to": "1482664653619200140",
+      "attachment_names": [],
+      "created_at": 1773567600000,
+      "edited_at": null
+    },
+    {
+      "id": "1482677236531200145",
+      "channel_id": "203",
+      "author_id": "102",
+      "content": "Review result: twenty results is simpler for our fictional pilot because long pages hide the best matches.",
+      "reply_to": "1482664653619200140",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1773568200000,
+      "edited_at": null
+    },
+    {
+      "id": "1482679753113600146",
+      "channel_id": "203",
+      "author_id": "103",
+      "content": "Decision reversed: use twenty results for search page size, replacing the earlier choice of fifty results.",
+      "reply_to": "1482664653619200140",
+      "attachment_names": [],
+      "created_at": 1773568800000,
+      "edited_at": null
+    },
+    {
+      "id": "1482682269696000147",
+      "channel_id": "203",
+      "author_id": "104",
+      "content": "Cleo Moss will test the next-page cursor by 2026-03-18.",
+      "reply_to": "1482664653619200140",
+      "attachment_names": [],
+      "created_at": 1773569400000,
+      "edited_at": null
+    },
+    {
+      "id": "1482684786278400148",
+      "channel_id": "203",
+      "author_id": "105",
+      "content": "Meeting notes\nTopic: search page size\nCurrent choice: twenty results\nReason: long pages hide the best matches\nOwner: Cleo Moss\nNext step: test the next-page cursor",
+      "reply_to": "1482664653619200140",
+      "attachment_names": [],
+      "created_at": 1773570000000,
+      "edited_at": null
+    },
+    {
+      "id": "1482687302860800149",
+      "channel_id": "203",
+      "author_id": "106",
+      "content": "Check-in: the pagination follow-up is still open. The current search page size choice remains twenty results.",
+      "reply_to": "1482664653619200140",
+      "attachment_names": [],
+      "created_at": 1773570600000,
+      "edited_at": null
+    },
+    {
+      "id": "1483027041484800150",
+      "channel_id": "204",
+      "author_id": "104",
+      "content": "What should Lantern Shelf use for library ordering?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1773651600000,
+      "edited_at": null
+    },
+    {
+      "id": "1483029558067200151",
+      "channel_id": "204",
+      "author_id": "105",
+      "content": "I propose upload time for library ordering. We should compare the alternatives.",
+      "reply_to": "1483027041484800150",
+      "attachment_names": [],
+      "created_at": 1773652200000,
+      "edited_at": null
+    },
+    {
+      "id": "1483032074649600152",
+      "channel_id": "204",
+      "author_id": "106",
+      "content": "Initial decision: use upload time for library ordering.",
+      "reply_to": "1483027041484800150",
+      "attachment_names": [],
+      "created_at": 1773652800000,
+      "edited_at": null
+    },
+    {
+      "id": "1483034591232000153",
+      "channel_id": "204",
+      "author_id": "101",
+      "content": "The pilot review found that readers return to ongoing books.",
+      "reply_to": "1483027041484800150",
+      "attachment_names": [],
+      "created_at": 1773653400000,
+      "edited_at": null
+    },
+    {
+      "id": "1483037107814400154",
+      "channel_id": "204",
+      "author_id": "102",
+      "content": "Could last opened time address that issue? Please compare it with upload time.",
+      "reply_to": "1483027041484800150",
+      "attachment_names": [],
+      "created_at": 1773654000000,
+      "edited_at": null
+    },
+    {
+      "id": "1483039624396800155",
+      "channel_id": "204",
+      "author_id": "103",
+      "content": "Review result: last opened time is simpler for our fictional pilot because readers return to ongoing books.",
+      "reply_to": "1483027041484800150",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1773654600000,
+      "edited_at": null
+    },
+    {
+      "id": "1483042140979200156",
+      "channel_id": "204",
+      "author_id": "104",
+      "content": "Decision reversed: use last opened time for library ordering, replacing the earlier choice of upload time.",
+      "reply_to": "1483027041484800150",
+      "attachment_names": [],
+      "created_at": 1773655200000,
+      "edited_at": null
+    },
+    {
+      "id": "1483044657561600157",
+      "channel_id": "204",
+      "author_id": "105",
+      "content": "Dara Wren will test stable ties in library ordering by 2026-03-19.",
+      "reply_to": "1483027041484800150",
+      "attachment_names": [],
+      "created_at": 1773655800000,
+      "edited_at": null
+    },
+    {
+      "id": "1483047174144000158",
+      "channel_id": "204",
+      "author_id": "106",
+      "content": "Meeting notes\nTopic: library ordering\nCurrent choice: last opened time\nReason: readers return to ongoing books\nOwner: Dara Wren\nNext step: test stable ties in library ordering",
+      "reply_to": "1483027041484800150",
+      "attachment_names": [],
+      "created_at": 1773656400000,
+      "edited_at": null
+    },
+    {
+      "id": "1483049690726400159",
+      "channel_id": "204",
+      "author_id": "101",
+      "content": "Check-in: the sort follow-up is still open. The current library ordering choice remains last opened time.",
+      "reply_to": "1483027041484800150",
+      "attachment_names": [],
+      "created_at": 1773657000000,
+      "edited_at": null
+    },
+    {
+      "id": "1483389429350400160",
+      "channel_id": "201",
+      "author_id": "105",
+      "content": "What should Lantern Shelf use for first-run experience?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1773738000000,
+      "edited_at": null
+    },
+    {
+      "id": "1483391945932800161",
+      "channel_id": "201",
+      "author_id": "106",
+      "content": "I propose a required account form for first-run experience. We should compare the alternatives.",
+      "reply_to": "1483389429350400160",
+      "attachment_names": [],
+      "created_at": 1773738600000,
+      "edited_at": null
+    },
+    {
+      "id": "1483394462515200162",
+      "channel_id": "201",
+      "author_id": "101",
+      "content": "Initial decision: use a required account form for first-run experience.",
+      "reply_to": "1483389429350400160",
+      "attachment_names": [],
+      "created_at": 1773739200000,
+      "edited_at": null
+    },
+    {
+      "id": "1483396979097600163",
+      "channel_id": "201",
+      "author_id": "102",
+      "content": "The pilot review found that people should try reading before setup.",
+      "reply_to": "1483389429350400160",
+      "attachment_names": [],
+      "created_at": 1773739800000,
+      "edited_at": null
+    },
+    {
+      "id": "1483399495680000164",
+      "channel_id": "201",
+      "author_id": "103",
+      "content": "Could a fictional demo library address that issue? Please compare it with a required account form.",
+      "reply_to": "1483389429350400160",
+      "attachment_names": [],
+      "created_at": 1773740400000,
+      "edited_at": null
+    },
+    {
+      "id": "1483402012262400165",
+      "channel_id": "201",
+      "author_id": "104",
+      "content": "Review result: a fictional demo library is simpler for our fictional pilot because people should try reading before setup.",
+      "reply_to": "1483389429350400160",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1773741000000,
+      "edited_at": null
+    },
+    {
+      "id": "1483404528844800166",
+      "channel_id": "201",
+      "author_id": "105",
+      "content": "Decision reversed: use a fictional demo library for first-run experience, replacing the earlier choice of a required account form.",
+      "reply_to": "1483389429350400160",
+      "attachment_names": [],
+      "created_at": 1773741600000,
+      "edited_at": null
+    },
+    {
+      "id": "1483407045427200167",
+      "channel_id": "201",
+      "author_id": "106",
+      "content": "Ellis Reed will write the demo welcome note by 2026-03-20.",
+      "reply_to": "1483389429350400160",
+      "attachment_names": [],
+      "created_at": 1773742200000,
+      "edited_at": null
+    },
+    {
+      "id": "1483409562009600168",
+      "channel_id": "201",
+      "author_id": "101",
+      "content": "Meeting notes\nTopic: first-run experience\nCurrent choice: a fictional demo library\nReason: people should try reading before setup\nOwner: Ellis Reed\nNext step: write the demo welcome note",
+      "reply_to": "1483389429350400160",
+      "attachment_names": [],
+      "created_at": 1773742800000,
+      "edited_at": null
+    },
+    {
+      "id": "1483412078592000169",
+      "channel_id": "201",
+      "author_id": "102",
+      "content": "Check-in: the onboarding follow-up is still open. The current first-run experience choice remains a fictional demo library.",
+      "reply_to": "1483389429350400160",
+      "attachment_names": [],
+      "created_at": 1773743400000,
+      "edited_at": null
+    },
+    {
+      "id": "1483751817216000170",
+      "channel_id": "202",
+      "author_id": "106",
+      "content": "What should Lantern Shelf use for usage measurement?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1773824400000,
+      "edited_at": null
+    },
+    {
+      "id": "1483754333798400171",
+      "channel_id": "202",
+      "author_id": "101",
+      "content": "I propose remote event collection for usage measurement. We should compare the alternatives.",
+      "reply_to": "1483751817216000170",
+      "attachment_names": [],
+      "created_at": 1773825000000,
+      "edited_at": null
+    },
+    {
+      "id": "1483756850380800172",
+      "channel_id": "202",
+      "author_id": "102",
+      "content": "Initial decision: use remote event collection for usage measurement.",
+      "reply_to": "1483751817216000170",
+      "attachment_names": [],
+      "created_at": 1773825600000,
+      "edited_at": null
+    },
+    {
+      "id": "1483759366963200173",
+      "channel_id": "202",
+      "author_id": "103",
+      "content": "The pilot review found that the pilot asked for no remote telemetry.",
+      "reply_to": "1483751817216000170",
+      "attachment_names": [],
+      "created_at": 1773826200000,
+      "edited_at": null
+    },
+    {
+      "id": "1483761883545600174",
+      "channel_id": "202",
+      "author_id": "104",
+      "content": "Could local aggregate counters address that issue? Please compare it with remote event collection.",
+      "reply_to": "1483751817216000170",
+      "attachment_names": [],
+      "created_at": 1773826800000,
+      "edited_at": null
+    },
+    {
+      "id": "1483764400128000175",
+      "channel_id": "202",
+      "author_id": "105",
+      "content": "Review result: local aggregate counters is simpler for our fictional pilot because the pilot asked for no remote telemetry.",
+      "reply_to": "1483751817216000170",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1773827400000,
+      "edited_at": null
+    },
+    {
+      "id": "1483766916710400176",
+      "channel_id": "202",
+      "author_id": "106",
+      "content": "Decision reversed: use local aggregate counters for usage measurement, replacing the earlier choice of remote event collection.",
+      "reply_to": "1483751817216000170",
+      "attachment_names": [],
+      "created_at": 1773828000000,
+      "edited_at": null
+    },
+    {
+      "id": "1483769433292800177",
+      "channel_id": "202",
+      "author_id": "101",
+      "content": "Fenn Birch will verify telemetry stays local by 2026-03-21.",
+      "reply_to": "1483751817216000170",
+      "attachment_names": [],
+      "created_at": 1773828600000,
+      "edited_at": null
+    },
+    {
+      "id": "1483771949875200178",
+      "channel_id": "202",
+      "author_id": "102",
+      "content": "Meeting notes\nTopic: usage measurement\nCurrent choice: local aggregate counters\nReason: the pilot asked for no remote telemetry\nOwner: Fenn Birch\nNext step: verify telemetry stays local",
+      "reply_to": "1483751817216000170",
+      "attachment_names": [],
+      "created_at": 1773829200000,
+      "edited_at": null
+    },
+    {
+      "id": "1483774466457600179",
+      "channel_id": "202",
+      "author_id": "103",
+      "content": "Check-in: the metrics follow-up is still open. The current usage measurement choice remains local aggregate counters.",
+      "reply_to": "1483751817216000170",
+      "attachment_names": [],
+      "created_at": 1773829800000,
+      "edited_at": null
+    },
+    {
+      "id": "1484114205081600180",
+      "channel_id": "203",
+      "author_id": "101",
+      "content": "What should Lantern Shelf use for cover image handling?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1773910800000,
+      "edited_at": null
+    },
+    {
+      "id": "1484116721664000181",
+      "channel_id": "203",
+      "author_id": "102",
+      "content": "I propose original resolution images for cover image handling. We should compare the alternatives.",
+      "reply_to": "1484114205081600180",
+      "attachment_names": [],
+      "created_at": 1773911400000,
+      "edited_at": null
+    },
+    {
+      "id": "1484119238246400182",
+      "channel_id": "203",
+      "author_id": "103",
+      "content": "Initial decision: use original resolution images for cover image handling.",
+      "reply_to": "1484114205081600180",
+      "attachment_names": [],
+      "created_at": 1773912000000,
+      "edited_at": null
+    },
+    {
+      "id": "1484121754828800183",
+      "channel_id": "203",
+      "author_id": "104",
+      "content": "The pilot review found that large covers slow the library screen.",
+      "reply_to": "1484114205081600180",
+      "attachment_names": [],
+      "created_at": 1773912600000,
+      "edited_at": null
+    },
+    {
+      "id": "1484124271411200184",
+      "channel_id": "203",
+      "author_id": "105",
+      "content": "Could small local thumbnails address that issue? Please compare it with original resolution images.",
+      "reply_to": "1484114205081600180",
+      "attachment_names": [],
+      "created_at": 1773913200000,
+      "edited_at": null
+    },
+    {
+      "id": "1484126787993600185",
+      "channel_id": "203",
+      "author_id": "106",
+      "content": "Review result: small local thumbnails is simpler for our fictional pilot because large covers slow the library screen.",
+      "reply_to": "1484114205081600180",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1773913800000,
+      "edited_at": null
+    },
+    {
+      "id": "1484129304576000186",
+      "channel_id": "203",
+      "author_id": "101",
+      "content": "Decision reversed: use small local thumbnails for cover image handling, replacing the earlier choice of original resolution images.",
+      "reply_to": "1484114205081600180",
+      "attachment_names": [],
+      "created_at": 1773914400000,
+      "edited_at": null
+    },
+    {
+      "id": "1484131821158400187",
+      "channel_id": "203",
+      "author_id": "102",
+      "content": "Aster Vale will measure thumbnail memory use by 2026-03-22.",
+      "reply_to": "1484114205081600180",
+      "attachment_names": [],
+      "created_at": 1773915000000,
+      "edited_at": null
+    },
+    {
+      "id": "1484134337740800188",
+      "channel_id": "203",
+      "author_id": "103",
+      "content": "Meeting notes\nTopic: cover image handling\nCurrent choice: small local thumbnails\nReason: large covers slow the library screen\nOwner: Aster Vale\nNext step: measure thumbnail memory use",
+      "reply_to": "1484114205081600180",
+      "attachment_names": [],
+      "created_at": 1773915600000,
+      "edited_at": null
+    },
+    {
+      "id": "1484136854323200189",
+      "channel_id": "203",
+      "author_id": "104",
+      "content": "Check-in: the images follow-up is still open. The current cover image handling choice remains small local thumbnails.",
+      "reply_to": "1484114205081600180",
+      "attachment_names": [],
+      "created_at": 1773916200000,
+      "edited_at": null
+    },
+    {
+      "id": "1484476592947200190",
+      "channel_id": "204",
+      "author_id": "102",
+      "content": "What should Lantern Shelf use for keyboard navigation?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1773997200000,
+      "edited_at": null
+    },
+    {
+      "id": "1484479109529600191",
+      "channel_id": "204",
+      "author_id": "103",
+      "content": "I propose single-key shortcuts for keyboard navigation. We should compare the alternatives.",
+      "reply_to": "1484476592947200190",
+      "attachment_names": [],
+      "created_at": 1773997800000,
+      "edited_at": null
+    },
+    {
+      "id": "1484481626112000192",
+      "channel_id": "204",
+      "author_id": "104",
+      "content": "Initial decision: use single-key shortcuts for keyboard navigation.",
+      "reply_to": "1484476592947200190",
+      "attachment_names": [],
+      "created_at": 1773998400000,
+      "edited_at": null
+    },
+    {
+      "id": "1484484142694400193",
+      "channel_id": "204",
+      "author_id": "105",
+      "content": "The pilot review found that typing notes triggered accidental actions.",
+      "reply_to": "1484476592947200190",
+      "attachment_names": [],
+      "created_at": 1773999000000,
+      "edited_at": null
+    },
+    {
+      "id": "1484486659276800194",
+      "channel_id": "204",
+      "author_id": "106",
+      "content": "Could modifier-key shortcuts address that issue? Please compare it with single-key shortcuts.",
+      "reply_to": "1484476592947200190",
+      "attachment_names": [],
+      "created_at": 1773999600000,
+      "edited_at": null
+    },
+    {
+      "id": "1484489175859200195",
+      "channel_id": "204",
+      "author_id": "101",
+      "content": "Review result: modifier-key shortcuts is simpler for our fictional pilot because typing notes triggered accidental actions.",
+      "reply_to": "1484476592947200190",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1774000200000,
+      "edited_at": null
+    },
+    {
+      "id": "1484491692441600196",
+      "channel_id": "204",
+      "author_id": "102",
+      "content": "Decision reversed: use modifier-key shortcuts for keyboard navigation, replacing the earlier choice of single-key shortcuts.",
+      "reply_to": "1484476592947200190",
+      "attachment_names": [],
+      "created_at": 1774000800000,
+      "edited_at": null
+    },
+    {
+      "id": "1484494209024000197",
+      "channel_id": "204",
+      "author_id": "103",
+      "content": "Bram Fern will test shortcuts inside text fields by 2026-03-23.",
+      "reply_to": "1484476592947200190",
+      "attachment_names": [],
+      "created_at": 1774001400000,
+      "edited_at": null
+    },
+    {
+      "id": "1484496725606400198",
+      "channel_id": "204",
+      "author_id": "104",
+      "content": "Meeting notes\nTopic: keyboard navigation\nCurrent choice: modifier-key shortcuts\nReason: typing notes triggered accidental actions\nOwner: Bram Fern\nNext step: test shortcuts inside text fields",
+      "reply_to": "1484476592947200190",
+      "attachment_names": [],
+      "created_at": 1774002000000,
+      "edited_at": null
+    },
+    {
+      "id": "1484499242188800199",
+      "channel_id": "204",
+      "author_id": "105",
+      "content": "Check-in: the keyboard follow-up is still open. The current keyboard navigation choice remains modifier-key shortcuts.",
+      "reply_to": "1484476592947200190",
+      "attachment_names": [],
+      "created_at": 1774002600000,
+      "edited_at": null
+    },
+    {
+      "id": "1484838980812800200",
+      "channel_id": "201",
+      "author_id": "103",
+      "content": "What should Lantern Shelf use for network retry policy?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1774083600000,
+      "edited_at": null
+    },
+    {
+      "id": "1484841497395200201",
+      "channel_id": "201",
+      "author_id": "104",
+      "content": "I propose immediate unlimited retries for network retry policy. We should compare the alternatives.",
+      "reply_to": "1484838980812800200",
+      "attachment_names": [],
+      "created_at": 1774084200000,
+      "edited_at": null
+    },
+    {
+      "id": "1484844013977600202",
+      "channel_id": "201",
+      "author_id": "105",
+      "content": "Initial decision: use immediate unlimited retries for network retry policy.",
+      "reply_to": "1484838980812800200",
+      "attachment_names": [],
+      "created_at": 1774084800000,
+      "edited_at": null
+    },
+    {
+      "id": "1484846530560000203",
+      "channel_id": "201",
+      "author_id": "106",
+      "content": "The pilot review found that an outage caused a retry storm.",
+      "reply_to": "1484838980812800200",
+      "attachment_names": [],
+      "created_at": 1774085400000,
+      "edited_at": null
+    },
+    {
+      "id": "1484849047142400204",
+      "channel_id": "201",
+      "author_id": "101",
+      "content": "Could bounded exponential retries address that issue? Please compare it with immediate unlimited retries.",
+      "reply_to": "1484838980812800200",
+      "attachment_names": [],
+      "created_at": 1774086000000,
+      "edited_at": null
+    },
+    {
+      "id": "1484851563724800205",
+      "channel_id": "201",
+      "author_id": "102",
+      "content": "Review result: bounded exponential retries is simpler for our fictional pilot because an outage caused a retry storm.",
+      "reply_to": "1484838980812800200",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1774086600000,
+      "edited_at": null
+    },
+    {
+      "id": "1484854080307200206",
+      "channel_id": "201",
+      "author_id": "103",
+      "content": "Decision reversed: use bounded exponential retries for network retry policy, replacing the earlier choice of immediate unlimited retries.",
+      "reply_to": "1484838980812800200",
+      "attachment_names": [],
+      "created_at": 1774087200000,
+      "edited_at": null
+    },
+    {
+      "id": "1484856596889600207",
+      "channel_id": "201",
+      "author_id": "104",
+      "content": "Cleo Moss will test recovery after a timeout by 2026-03-24.",
+      "reply_to": "1484838980812800200",
+      "attachment_names": [],
+      "created_at": 1774087800000,
+      "edited_at": null
+    },
+    {
+      "id": "1484859113472000208",
+      "channel_id": "201",
+      "author_id": "105",
+      "content": "Meeting notes\nTopic: network retry policy\nCurrent choice: bounded exponential retries\nReason: an outage caused a retry storm\nOwner: Cleo Moss\nNext step: test recovery after a timeout",
+      "reply_to": "1484838980812800200",
+      "attachment_names": [],
+      "created_at": 1774088400000,
+      "edited_at": null
+    },
+    {
+      "id": "1484861630054400209",
+      "channel_id": "201",
+      "author_id": "106",
+      "content": "Check-in: the network follow-up is still open. The current network retry policy choice remains bounded exponential retries.",
+      "reply_to": "1484838980812800200",
+      "attachment_names": [],
+      "created_at": 1774089000000,
+      "edited_at": null
+    },
+    {
+      "id": "1485201368678400210",
+      "channel_id": "202",
+      "author_id": "104",
+      "content": "What should Lantern Shelf use for message retention?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1774170000000,
+      "edited_at": null
+    },
+    {
+      "id": "1485203885260800211",
+      "channel_id": "202",
+      "author_id": "105",
+      "content": "I propose forever for message retention. We should compare the alternatives.",
+      "reply_to": "1485201368678400210",
+      "attachment_names": [],
+      "created_at": 1774170600000,
+      "edited_at": null
+    },
+    {
+      "id": "1485206401843200212",
+      "channel_id": "202",
+      "author_id": "106",
+      "content": "Initial decision: use forever for message retention.",
+      "reply_to": "1485201368678400210",
+      "attachment_names": [],
+      "created_at": 1774171200000,
+      "edited_at": null
+    },
+    {
+      "id": "1485208918425600213",
+      "channel_id": "202",
+      "author_id": "101",
+      "content": "The pilot review found that the fictional team requested a time limit.",
+      "reply_to": "1485201368678400210",
+      "attachment_names": [],
+      "created_at": 1774171800000,
+      "edited_at": null
+    },
+    {
+      "id": "1485211435008000214",
+      "channel_id": "202",
+      "author_id": "102",
+      "content": "Could ninety days address that issue? Please compare it with forever.",
+      "reply_to": "1485201368678400210",
+      "attachment_names": [],
+      "created_at": 1774172400000,
+      "edited_at": null
+    },
+    {
+      "id": "1485213951590400215",
+      "channel_id": "202",
+      "author_id": "103",
+      "content": "Review result: ninety days is simpler for our fictional pilot because the fictional team requested a time limit.",
+      "reply_to": "1485201368678400210",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1774173000000,
+      "edited_at": null
+    },
+    {
+      "id": "1485216468172800216",
+      "channel_id": "202",
+      "author_id": "104",
+      "content": "Decision reversed: use ninety days for message retention, replacing the earlier choice of forever.",
+      "reply_to": "1485201368678400210",
+      "attachment_names": [],
+      "created_at": 1774173600000,
+      "edited_at": null
+    },
+    {
+      "id": "1485218984755200217",
+      "channel_id": "202",
+      "author_id": "105",
+      "content": "Dara Wren will test retention removes copied titles by 2026-03-25.",
+      "reply_to": "1485201368678400210",
+      "attachment_names": [],
+      "created_at": 1774174200000,
+      "edited_at": null
+    },
+    {
+      "id": "1485221501337600218",
+      "channel_id": "202",
+      "author_id": "106",
+      "content": "Meeting notes\nTopic: message retention\nCurrent choice: ninety days\nReason: the fictional team requested a time limit\nOwner: Dara Wren\nNext step: test retention removes copied titles",
+      "reply_to": "1485201368678400210",
+      "attachment_names": [],
+      "created_at": 1774174800000,
+      "edited_at": null
+    },
+    {
+      "id": "1485224017920000219",
+      "channel_id": "202",
+      "author_id": "101",
+      "content": "Check-in: the retention follow-up is still open. The current message retention choice remains ninety days.",
+      "reply_to": "1485201368678400210",
+      "attachment_names": [],
+      "created_at": 1774175400000,
+      "edited_at": null
+    },
+    {
+      "id": "1485563756544000220",
+      "channel_id": "203",
+      "author_id": "105",
+      "content": "What should Lantern Shelf use for log content?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1774256400000,
+      "edited_at": null
+    },
+    {
+      "id": "1485566273126400221",
+      "channel_id": "203",
+      "author_id": "106",
+      "content": "I propose full request bodies for log content. We should compare the alternatives.",
+      "reply_to": "1485563756544000220",
+      "attachment_names": [],
+      "created_at": 1774257000000,
+      "edited_at": null
+    },
+    {
+      "id": "1485568789708800222",
+      "channel_id": "203",
+      "author_id": "101",
+      "content": "Initial decision: use full request bodies for log content.",
+      "reply_to": "1485563756544000220",
+      "attachment_names": [],
+      "created_at": 1774257600000,
+      "edited_at": null
+    },
+    {
+      "id": "1485571306291200223",
+      "channel_id": "203",
+      "author_id": "102",
+      "content": "The pilot review found that notes must never appear in logs.",
+      "reply_to": "1485563756544000220",
+      "attachment_names": [],
+      "created_at": 1774258200000,
+      "edited_at": null
+    },
+    {
+      "id": "1485573822873600224",
+      "channel_id": "203",
+      "author_id": "103",
+      "content": "Could request IDs and status codes address that issue? Please compare it with full request bodies.",
+      "reply_to": "1485563756544000220",
+      "attachment_names": [],
+      "created_at": 1774258800000,
+      "edited_at": null
+    },
+    {
+      "id": "1485576339456000225",
+      "channel_id": "203",
+      "author_id": "104",
+      "content": "Review result: request IDs and status codes is simpler for our fictional pilot because notes must never appear in logs.",
+      "reply_to": "1485563756544000220",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1774259400000,
+      "edited_at": null
+    },
+    {
+      "id": "1485578856038400226",
+      "channel_id": "203",
+      "author_id": "105",
+      "content": "Decision reversed: use request IDs and status codes for log content, replacing the earlier choice of full request bodies.",
+      "reply_to": "1485563756544000220",
+      "attachment_names": [],
+      "created_at": 1774260000000,
+      "edited_at": null
+    },
+    {
+      "id": "1485581372620800227",
+      "channel_id": "203",
+      "author_id": "106",
+      "content": "Ellis Reed will capture logs during an invalid request by 2026-03-26.",
+      "reply_to": "1485563756544000220",
+      "attachment_names": [],
+      "created_at": 1774260600000,
+      "edited_at": null
+    },
+    {
+      "id": "1485583889203200228",
+      "channel_id": "203",
+      "author_id": "101",
+      "content": "Meeting notes\nTopic: log content\nCurrent choice: request IDs and status codes\nReason: notes must never appear in logs\nOwner: Ellis Reed\nNext step: capture logs during an invalid request",
+      "reply_to": "1485563756544000220",
+      "attachment_names": [],
+      "created_at": 1774261200000,
+      "edited_at": null
+    },
+    {
+      "id": "1485586405785600229",
+      "channel_id": "203",
+      "author_id": "102",
+      "content": "Check-in: the logging follow-up is still open. The current log content choice remains request IDs and status codes.",
+      "reply_to": "1485563756544000220",
+      "attachment_names": [],
+      "created_at": 1774261800000,
+      "edited_at": null
+    },
+    {
+      "id": "1485926144409600230",
+      "channel_id": "204",
+      "author_id": "106",
+      "content": "What should Lantern Shelf use for pilot release day?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1774342800000,
+      "edited_at": null
+    },
+    {
+      "id": "1485928660992000231",
+      "channel_id": "204",
+      "author_id": "101",
+      "content": "I propose Friday for pilot release day. We should compare the alternatives.",
+      "reply_to": "1485926144409600230",
+      "attachment_names": [],
+      "created_at": 1774343400000,
+      "edited_at": null
+    },
+    {
+      "id": "1485931177574400232",
+      "channel_id": "204",
+      "author_id": "102",
+      "content": "Initial decision: use Friday for pilot release day.",
+      "reply_to": "1485926144409600230",
+      "attachment_names": [],
+      "created_at": 1774344000000,
+      "edited_at": null
+    },
+    {
+      "id": "1485933694156800233",
+      "channel_id": "204",
+      "author_id": "103",
+      "content": "The pilot review found that the team can support weekday feedback.",
+      "reply_to": "1485926144409600230",
+      "attachment_names": [],
+      "created_at": 1774344600000,
+      "edited_at": null
+    },
+    {
+      "id": "1485936210739200234",
+      "channel_id": "204",
+      "author_id": "104",
+      "content": "Could Tuesday address that issue? Please compare it with Friday.",
+      "reply_to": "1485926144409600230",
+      "attachment_names": [],
+      "created_at": 1774345200000,
+      "edited_at": null
+    },
+    {
+      "id": "1485938727321600235",
+      "channel_id": "204",
+      "author_id": "105",
+      "content": "Review result: Tuesday is simpler for our fictional pilot because the team can support weekday feedback.",
+      "reply_to": "1485926144409600230",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1774345800000,
+      "edited_at": null
+    },
+    {
+      "id": "1485941243904000236",
+      "channel_id": "204",
+      "author_id": "106",
+      "content": "Decision reversed: use Tuesday for pilot release day, replacing the earlier choice of Friday.",
+      "reply_to": "1485926144409600230",
+      "attachment_names": [],
+      "created_at": 1774346400000,
+      "edited_at": null
+    },
+    {
+      "id": "1485943760486400237",
+      "channel_id": "204",
+      "author_id": "101",
+      "content": "Fenn Birch will prepare the Tuesday pilot checklist by 2026-03-27.",
+      "reply_to": "1485926144409600230",
+      "attachment_names": [],
+      "created_at": 1774347000000,
+      "edited_at": null
+    },
+    {
+      "id": "1485946277068800238",
+      "channel_id": "204",
+      "author_id": "102",
+      "content": "Meeting notes\nTopic: pilot release day\nCurrent choice: Tuesday\nReason: the team can support weekday feedback\nOwner: Fenn Birch\nNext step: prepare the Tuesday pilot checklist",
+      "reply_to": "1485926144409600230",
+      "attachment_names": [],
+      "created_at": 1774347600000,
+      "edited_at": null
+    },
+    {
+      "id": "1485948793651200239",
+      "channel_id": "204",
+      "author_id": "103",
+      "content": "Check-in: the release follow-up is still open. The current pilot release day choice remains Tuesday.",
+      "reply_to": "1485926144409600230",
+      "attachment_names": [],
+      "created_at": 1774348200000,
+      "edited_at": null
+    },
+    {
+      "id": "1486288532275200240",
+      "channel_id": "201",
+      "author_id": "101",
+      "content": "What should Lantern Shelf use for focus indication?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1774429200000,
+      "edited_at": null
+    },
+    {
+      "id": "1486291048857600241",
+      "channel_id": "201",
+      "author_id": "102",
+      "content": "I propose a subtle gray outline for focus indication. We should compare the alternatives.",
+      "reply_to": "1486288532275200240",
+      "attachment_names": [],
+      "created_at": 1774429800000,
+      "edited_at": null
+    },
+    {
+      "id": "1486293565440000242",
+      "channel_id": "201",
+      "author_id": "103",
+      "content": "Initial decision: use a subtle gray outline for focus indication.",
+      "reply_to": "1486288532275200240",
+      "attachment_names": [],
+      "created_at": 1774430400000,
+      "edited_at": null
+    },
+    {
+      "id": "1486296082022400243",
+      "channel_id": "201",
+      "author_id": "104",
+      "content": "The pilot review found that keyboard users lost their position.",
+      "reply_to": "1486288532275200240",
+      "attachment_names": [],
+      "created_at": 1774431000000,
+      "edited_at": null
+    },
+    {
+      "id": "1486298598604800244",
+      "channel_id": "201",
+      "author_id": "105",
+      "content": "Could a visible blue outline address that issue? Please compare it with a subtle gray outline.",
+      "reply_to": "1486288532275200240",
+      "attachment_names": [],
+      "created_at": 1774431600000,
+      "edited_at": null
+    },
+    {
+      "id": "1486301115187200245",
+      "channel_id": "201",
+      "author_id": "106",
+      "content": "Review result: a visible blue outline is simpler for our fictional pilot because keyboard users lost their position.",
+      "reply_to": "1486288532275200240",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1774432200000,
+      "edited_at": null
+    },
+    {
+      "id": "1486303631769600246",
+      "channel_id": "201",
+      "author_id": "101",
+      "content": "Decision reversed: use a visible blue outline for focus indication, replacing the earlier choice of a subtle gray outline.",
+      "reply_to": "1486288532275200240",
+      "attachment_names": [],
+      "created_at": 1774432800000,
+      "edited_at": null
+    },
+    {
+      "id": "1486306148352000247",
+      "channel_id": "201",
+      "author_id": "102",
+      "content": "Aster Vale will check focus in every dialog by 2026-03-28.",
+      "reply_to": "1486288532275200240",
+      "attachment_names": [],
+      "created_at": 1774433400000,
+      "edited_at": null
+    },
+    {
+      "id": "1486308664934400248",
+      "channel_id": "201",
+      "author_id": "103",
+      "content": "Meeting notes\nTopic: focus indication\nCurrent choice: a visible blue outline\nReason: keyboard users lost their position\nOwner: Aster Vale\nNext step: check focus in every dialog",
+      "reply_to": "1486288532275200240",
+      "attachment_names": [],
+      "created_at": 1774434000000,
+      "edited_at": null
+    },
+    {
+      "id": "1486311181516800249",
+      "channel_id": "201",
+      "author_id": "104",
+      "content": "Check-in: the accessibility follow-up is still open. The current focus indication choice remains a visible blue outline.",
+      "reply_to": "1486288532275200240",
+      "attachment_names": [],
+      "created_at": 1774434600000,
+      "edited_at": null
+    },
+    {
+      "id": "1486650920140800250",
+      "channel_id": "202",
+      "author_id": "102",
+      "content": "What should Lantern Shelf use for book import validation?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1774515600000,
+      "edited_at": null
+    },
+    {
+      "id": "1486653436723200251",
+      "channel_id": "202",
+      "author_id": "103",
+      "content": "I propose trusting the filename extension for book import validation. We should compare the alternatives.",
+      "reply_to": "1486650920140800250",
+      "attachment_names": [],
+      "created_at": 1774516200000,
+      "edited_at": null
+    },
+    {
+      "id": "1486655953305600252",
+      "channel_id": "202",
+      "author_id": "104",
+      "content": "Initial decision: use trusting the filename extension for book import validation.",
+      "reply_to": "1486650920140800250",
+      "attachment_names": [],
+      "created_at": 1774516800000,
+      "edited_at": null
+    },
+    {
+      "id": "1486658469888000253",
+      "channel_id": "202",
+      "author_id": "105",
+      "content": "The pilot review found that renamed files produced confusing errors.",
+      "reply_to": "1486650920140800250",
+      "attachment_names": [],
+      "created_at": 1774517400000,
+      "edited_at": null
+    },
+    {
+      "id": "1486660986470400254",
+      "channel_id": "202",
+      "author_id": "106",
+      "content": "Could checking the archive structure address that issue? Please compare it with trusting the filename extension.",
+      "reply_to": "1486650920140800250",
+      "attachment_names": [],
+      "created_at": 1774518000000,
+      "edited_at": null
+    },
+    {
+      "id": "1486663503052800255",
+      "channel_id": "202",
+      "author_id": "101",
+      "content": "Review result: checking the archive structure is simpler for our fictional pilot because renamed files produced confusing errors.",
+      "reply_to": "1486650920140800250",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1774518600000,
+      "edited_at": null
+    },
+    {
+      "id": "1486666019635200256",
+      "channel_id": "202",
+      "author_id": "102",
+      "content": "Decision reversed: use checking the archive structure for book import validation, replacing the earlier choice of trusting the filename extension.",
+      "reply_to": "1486650920140800250",
+      "attachment_names": [],
+      "created_at": 1774519200000,
+      "edited_at": null
+    },
+    {
+      "id": "1486668536217600257",
+      "channel_id": "202",
+      "author_id": "103",
+      "content": "Bram Fern will test a renamed invalid archive by 2026-03-29.",
+      "reply_to": "1486650920140800250",
+      "attachment_names": [],
+      "created_at": 1774519800000,
+      "edited_at": null
+    },
+    {
+      "id": "1486671052800000258",
+      "channel_id": "202",
+      "author_id": "104",
+      "content": "Meeting notes\nTopic: book import validation\nCurrent choice: checking the archive structure\nReason: renamed files produced confusing errors\nOwner: Bram Fern\nNext step: test a renamed invalid archive",
+      "reply_to": "1486650920140800250",
+      "attachment_names": [],
+      "created_at": 1774520400000,
+      "edited_at": null
+    },
+    {
+      "id": "1486673569382400259",
+      "channel_id": "202",
+      "author_id": "105",
+      "content": "Check-in: the import follow-up is still open. The current book import validation choice remains checking the archive structure.",
+      "reply_to": "1486650920140800250",
+      "attachment_names": [],
+      "created_at": 1774521000000,
+      "edited_at": null
+    },
+    {
+      "id": "1487013308006400260",
+      "channel_id": "203",
+      "author_id": "103",
+      "content": "What should Lantern Shelf use for startup budget?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1774602000000,
+      "edited_at": null
+    },
+    {
+      "id": "1487015824588800261",
+      "channel_id": "203",
+      "author_id": "104",
+      "content": "I propose five seconds for startup budget. We should compare the alternatives.",
+      "reply_to": "1487013308006400260",
+      "attachment_names": [],
+      "created_at": 1774602600000,
+      "edited_at": null
+    },
+    {
+      "id": "1487018341171200262",
+      "channel_id": "203",
+      "author_id": "105",
+      "content": "Initial decision: use five seconds for startup budget.",
+      "reply_to": "1487013308006400260",
+      "attachment_names": [],
+      "created_at": 1774603200000,
+      "edited_at": null
+    },
+    {
+      "id": "1487020857753600263",
+      "channel_id": "203",
+      "author_id": "106",
+      "content": "The pilot review found that the offline library should open quickly.",
+      "reply_to": "1487013308006400260",
+      "attachment_names": [],
+      "created_at": 1774603800000,
+      "edited_at": null
+    },
+    {
+      "id": "1487023374336000264",
+      "channel_id": "203",
+      "author_id": "101",
+      "content": "Could two seconds address that issue? Please compare it with five seconds.",
+      "reply_to": "1487013308006400260",
+      "attachment_names": [],
+      "created_at": 1774604400000,
+      "edited_at": null
+    },
+    {
+      "id": "1487025890918400265",
+      "channel_id": "203",
+      "author_id": "102",
+      "content": "Review result: two seconds is simpler for our fictional pilot because the offline library should open quickly.",
+      "reply_to": "1487013308006400260",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1774605000000,
+      "edited_at": null
+    },
+    {
+      "id": "1487028407500800266",
+      "channel_id": "203",
+      "author_id": "103",
+      "content": "Decision reversed: use two seconds for startup budget, replacing the earlier choice of five seconds.",
+      "reply_to": "1487013308006400260",
+      "attachment_names": [],
+      "created_at": 1774605600000,
+      "edited_at": null
+    },
+    {
+      "id": "1487030924083200267",
+      "channel_id": "203",
+      "author_id": "104",
+      "content": "Cleo Moss will measure cold startup on the demo library by 2026-03-30.",
+      "reply_to": "1487013308006400260",
+      "attachment_names": [],
+      "created_at": 1774606200000,
+      "edited_at": null
+    },
+    {
+      "id": "1487033440665600268",
+      "channel_id": "203",
+      "author_id": "105",
+      "content": "Meeting notes\nTopic: startup budget\nCurrent choice: two seconds\nReason: the offline library should open quickly\nOwner: Cleo Moss\nNext step: measure cold startup on the demo library",
+      "reply_to": "1487013308006400260",
+      "attachment_names": [],
+      "created_at": 1774606800000,
+      "edited_at": null
+    },
+    {
+      "id": "1487035957248000269",
+      "channel_id": "203",
+      "author_id": "106",
+      "content": "Check-in: the performance follow-up is still open. The current startup budget choice remains two seconds.",
+      "reply_to": "1487013308006400260",
+      "attachment_names": [],
+      "created_at": 1774607400000,
+      "edited_at": null
+    },
+    {
+      "id": "1487375695872000270",
+      "channel_id": "204",
+      "author_id": "104",
+      "content": "What should Lantern Shelf use for offline behavior?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1774688400000,
+      "edited_at": null
+    },
+    {
+      "id": "1487378212454400271",
+      "channel_id": "204",
+      "author_id": "105",
+      "content": "I propose an error screen for offline behavior. We should compare the alternatives.",
+      "reply_to": "1487375695872000270",
+      "attachment_names": [],
+      "created_at": 1774689000000,
+      "edited_at": null
+    },
+    {
+      "id": "1487380729036800272",
+      "channel_id": "204",
+      "author_id": "106",
+      "content": "Initial decision: use an error screen for offline behavior.",
+      "reply_to": "1487375695872000270",
+      "attachment_names": [],
+      "created_at": 1774689600000,
+      "edited_at": null
+    },
+    {
+      "id": "1487383245619200273",
+      "channel_id": "204",
+      "author_id": "101",
+      "content": "The pilot review found that train commuters lose connectivity.",
+      "reply_to": "1487375695872000270",
+      "attachment_names": [],
+      "created_at": 1774690200000,
+      "edited_at": null
+    },
+    {
+      "id": "1487385762201600274",
+      "channel_id": "204",
+      "author_id": "102",
+      "content": "Could cached books and notes address that issue? Please compare it with an error screen.",
+      "reply_to": "1487375695872000270",
+      "attachment_names": [],
+      "created_at": 1774690800000,
+      "edited_at": null
+    },
+    {
+      "id": "1487388278784000275",
+      "channel_id": "204",
+      "author_id": "103",
+      "content": "Review result: cached books and notes is simpler for our fictional pilot because train commuters lose connectivity.",
+      "reply_to": "1487375695872000270",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1774691400000,
+      "edited_at": null
+    },
+    {
+      "id": "1487390795366400276",
+      "channel_id": "204",
+      "author_id": "104",
+      "content": "Decision reversed: use cached books and notes for offline behavior, replacing the earlier choice of an error screen.",
+      "reply_to": "1487375695872000270",
+      "attachment_names": [],
+      "created_at": 1774692000000,
+      "edited_at": null
+    },
+    {
+      "id": "1487393311948800277",
+      "channel_id": "204",
+      "author_id": "105",
+      "content": "Dara Wren will test a complete reading session offline by 2026-03-31.",
+      "reply_to": "1487375695872000270",
+      "attachment_names": [],
+      "created_at": 1774692600000,
+      "edited_at": null
+    },
+    {
+      "id": "1487395828531200278",
+      "channel_id": "204",
+      "author_id": "106",
+      "content": "Meeting notes\nTopic: offline behavior\nCurrent choice: cached books and notes\nReason: train commuters lose connectivity\nOwner: Dara Wren\nNext step: test a complete reading session offline",
+      "reply_to": "1487375695872000270",
+      "attachment_names": [],
+      "created_at": 1774693200000,
+      "edited_at": null
+    },
+    {
+      "id": "1487398345113600279",
+      "channel_id": "204",
+      "author_id": "101",
+      "content": "Check-in: the offline follow-up is still open. The current offline behavior choice remains cached books and notes.",
+      "reply_to": "1487375695872000270",
+      "attachment_names": [],
+      "created_at": 1774693800000,
+      "edited_at": null
+    },
+    {
+      "id": "1487738083737600280",
+      "channel_id": "201",
+      "author_id": "105",
+      "content": "What should Lantern Shelf use for note conflict handling?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1774774800000,
+      "edited_at": null
+    },
+    {
+      "id": "1487740600320000281",
+      "channel_id": "201",
+      "author_id": "106",
+      "content": "I propose last write wins for note conflict handling. We should compare the alternatives.",
+      "reply_to": "1487738083737600280",
+      "attachment_names": [],
+      "created_at": 1774775400000,
+      "edited_at": null
+    },
+    {
+      "id": "1487743116902400282",
+      "channel_id": "201",
+      "author_id": "101",
+      "content": "Initial decision: use last write wins for note conflict handling.",
+      "reply_to": "1487738083737600280",
+      "attachment_names": [],
+      "created_at": 1774776000000,
+      "edited_at": null
+    },
+    {
+      "id": "1487745633484800283",
+      "channel_id": "201",
+      "author_id": "102",
+      "content": "The pilot review found that a silent overwrite lost a paragraph.",
+      "reply_to": "1487738083737600280",
+      "attachment_names": [],
+      "created_at": 1774776600000,
+      "edited_at": null
+    },
+    {
+      "id": "1487748150067200284",
+      "channel_id": "201",
+      "author_id": "103",
+      "content": "Could keep both versions address that issue? Please compare it with last write wins.",
+      "reply_to": "1487738083737600280",
+      "attachment_names": [],
+      "created_at": 1774777200000,
+      "edited_at": null
+    },
+    {
+      "id": "1487750666649600285",
+      "channel_id": "201",
+      "author_id": "104",
+      "content": "Review result: keep both versions is simpler for our fictional pilot because a silent overwrite lost a paragraph.",
+      "reply_to": "1487738083737600280",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1774777800000,
+      "edited_at": null
+    },
+    {
+      "id": "1487753183232000286",
+      "channel_id": "201",
+      "author_id": "105",
+      "content": "Decision reversed: use keep both versions for note conflict handling, replacing the earlier choice of last write wins.",
+      "reply_to": "1487738083737600280",
+      "attachment_names": [],
+      "created_at": 1774778400000,
+      "edited_at": null
+    },
+    {
+      "id": "1487755699814400287",
+      "channel_id": "201",
+      "author_id": "106",
+      "content": "Ellis Reed will test simultaneous edits from two devices by 2026-04-01.",
+      "reply_to": "1487738083737600280",
+      "attachment_names": [],
+      "created_at": 1774779000000,
+      "edited_at": null
+    },
+    {
+      "id": "1487758216396800288",
+      "channel_id": "201",
+      "author_id": "101",
+      "content": "Meeting notes\nTopic: note conflict handling\nCurrent choice: keep both versions\nReason: a silent overwrite lost a paragraph\nOwner: Ellis Reed\nNext step: test simultaneous edits from two devices",
+      "reply_to": "1487738083737600280",
+      "attachment_names": [],
+      "created_at": 1774779600000,
+      "edited_at": null
+    },
+    {
+      "id": "1487760732979200289",
+      "channel_id": "201",
+      "author_id": "102",
+      "content": "Check-in: the conflicts follow-up is still open. The current note conflict handling choice remains keep both versions.",
+      "reply_to": "1487738083737600280",
+      "attachment_names": [],
+      "created_at": 1774780200000,
+      "edited_at": null
+    },
+    {
+      "id": "1488100471603200290",
+      "channel_id": "202",
+      "author_id": "106",
+      "content": "What should Lantern Shelf use for reminder behavior?",
+      "reply_to": null,
+      "attachment_names": [],
+      "created_at": 1774861200000,
+      "edited_at": null
+    },
+    {
+      "id": "1488102988185600291",
+      "channel_id": "202",
+      "author_id": "101",
+      "content": "I propose desktop popups for reminder behavior. We should compare the alternatives.",
+      "reply_to": "1488100471603200290",
+      "attachment_names": [],
+      "created_at": 1774861800000,
+      "edited_at": null
+    },
+    {
+      "id": "1488105504768000292",
+      "channel_id": "202",
+      "author_id": "102",
+      "content": "Initial decision: use desktop popups for reminder behavior.",
+      "reply_to": "1488100471603200290",
+      "attachment_names": [],
+      "created_at": 1774862400000,
+      "edited_at": null
+    },
+    {
+      "id": "1488108021350400293",
+      "channel_id": "202",
+      "author_id": "103",
+      "content": "The pilot review found that readers asked for fewer interruptions.",
+      "reply_to": "1488100471603200290",
+      "attachment_names": [],
+      "created_at": 1774863000000,
+      "edited_at": null
+    },
+    {
+      "id": "1488110537932800294",
+      "channel_id": "202",
+      "author_id": "104",
+      "content": "Could an in-app due list address that issue? Please compare it with desktop popups.",
+      "reply_to": "1488100471603200290",
+      "attachment_names": [],
+      "created_at": 1774863600000,
+      "edited_at": null
+    },
+    {
+      "id": "1488113054515200295",
+      "channel_id": "202",
+      "author_id": "105",
+      "content": "Review result: an in-app due list is simpler for our fictional pilot because readers asked for fewer interruptions.",
+      "reply_to": "1488100471603200290",
+      "attachment_names": [
+        "comparison.md"
+      ],
+      "created_at": 1774864200000,
+      "edited_at": null
+    },
+    {
+      "id": "1488115571097600296",
+      "channel_id": "202",
+      "author_id": "106",
+      "content": "Decision reversed: use an in-app due list for reminder behavior, replacing the earlier choice of desktop popups.",
+      "reply_to": "1488100471603200290",
+      "attachment_names": [],
+      "created_at": 1774864800000,
+      "edited_at": null
+    },
+    {
+      "id": "1488118087680000297",
+      "channel_id": "202",
+      "author_id": "101",
+      "content": "Fenn Birch will test the due list with overdue notes by 2026-04-02.",
+      "reply_to": "1488100471603200290",
+      "attachment_names": [],
+      "created_at": 1774865400000,
+      "edited_at": null
+    },
+    {
+      "id": "1488120604262400298",
+      "channel_id": "202",
+      "author_id": "102",
+      "content": "Meeting notes\nTopic: reminder behavior\nCurrent choice: an in-app due list\nReason: readers asked for fewer interruptions\nOwner: Fenn Birch\nNext step: test the due list with overdue notes",
+      "reply_to": "1488100471603200290",
+      "attachment_names": [],
+      "created_at": 1774866000000,
+      "edited_at": null
+    },
+    {
+      "id": "1488123120844800299",
+      "channel_id": "202",
+      "author_id": "103",
+      "content": "Check-in: the notifications follow-up is still open. The current reminder behavior choice remains an in-app due list.",
+      "reply_to": "1488100471603200290",
+      "attachment_names": [],
+      "created_at": 1774866600000,
+      "edited_at": null
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for database?",
+      "title_is_copied": true,
+      "source_message_id": "1477591223500800000",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "storage"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1477606322995200006",
+      "created_at": 1772355600000,
+      "updated_at": 1772359200000
+    },
+    {
+      "id": 2,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use PostgreSQL for database.",
+      "title_is_copied": true,
+      "source_message_id": "1477596256665600002",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "storage"
+      ],
+      "replaces": null,
+      "superseded_by": 3,
+      "answered_by_message_id": null,
+      "created_at": 1772356800000,
+      "updated_at": 1772359200000
+    },
+    {
+      "id": 3,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use SQLite for database, replacing the earlier choice of PostgreSQL.",
+      "title_is_copied": true,
+      "source_message_id": "1477606322995200006",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "storage"
+      ],
+      "replaces": 2,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772359200000,
+      "updated_at": 1772359200000
+    },
+    {
+      "id": 4,
+      "kind": "task",
+      "status": "open",
+      "title": "Measure full-text query latency",
+      "title_is_copied": false,
+      "source_message_id": "1477608839577600007",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": "101",
+      "due_at": 1772614800000,
+      "tags": [
+        "storage"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772359800000,
+      "updated_at": 1772359800000
+    },
+    {
+      "id": 5,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for search index?",
+      "title_is_copied": true,
+      "source_message_id": "1477953611366400010",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "search"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1477968710860800016",
+      "created_at": 1772442000000,
+      "updated_at": 1772445600000
+    },
+    {
+      "id": 6,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use a custom inverted index for search index.",
+      "title_is_copied": true,
+      "source_message_id": "1477958644531200012",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "search"
+      ],
+      "replaces": null,
+      "superseded_by": 7,
+      "answered_by_message_id": null,
+      "created_at": 1772443200000,
+      "updated_at": 1772445600000
+    },
+    {
+      "id": 7,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use SQLite FTS5 for search index, replacing the earlier choice of a custom inverted index.",
+      "title_is_copied": true,
+      "source_message_id": "1477968710860800016",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "search"
+      ],
+      "replaces": 6,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772445600000,
+      "updated_at": 1772445600000
+    },
+    {
+      "id": 8,
+      "kind": "task",
+      "status": "open",
+      "title": "Test punctuation in search queries",
+      "title_is_copied": false,
+      "source_message_id": "1477971227443200017",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": "102",
+      "due_at": 1772701200000,
+      "tags": [
+        "search"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772446200000,
+      "updated_at": 1772446200000
+    },
+    {
+      "id": 9,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for sync cursor?",
+      "title_is_copied": true,
+      "source_message_id": "1478315999232000020",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "sync"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1478331098726400026",
+      "created_at": 1772528400000,
+      "updated_at": 1772532000000
+    },
+    {
+      "id": 10,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use one cursor per server for sync cursor.",
+      "title_is_copied": true,
+      "source_message_id": "1478321032396800022",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "sync"
+      ],
+      "replaces": null,
+      "superseded_by": 11,
+      "answered_by_message_id": null,
+      "created_at": 1772529600000,
+      "updated_at": 1772532000000
+    },
+    {
+      "id": 11,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use one cursor per thread for sync cursor, replacing the earlier choice of one cursor per server.",
+      "title_is_copied": true,
+      "source_message_id": "1478331098726400026",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "sync"
+      ],
+      "replaces": 10,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772532000000,
+      "updated_at": 1772532000000
+    },
+    {
+      "id": 12,
+      "kind": "task",
+      "status": "open",
+      "title": "Test an archived thread catch-up",
+      "title_is_copied": false,
+      "source_message_id": "1478333615308800027",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": "103",
+      "due_at": 1772787600000,
+      "tags": [
+        "sync"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772532600000,
+      "updated_at": 1772532600000
+    },
+    {
+      "id": 13,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for attachment storage?",
+      "title_is_copied": true,
+      "source_message_id": "1478678387097600030",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "privacy"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1478693486592000036",
+      "created_at": 1772614800000,
+      "updated_at": 1772618400000
+    },
+    {
+      "id": 14,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use downloaded attachment bodies for attachment storage.",
+      "title_is_copied": true,
+      "source_message_id": "1478683420262400032",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "privacy"
+      ],
+      "replaces": null,
+      "superseded_by": 15,
+      "answered_by_message_id": null,
+      "created_at": 1772616000000,
+      "updated_at": 1772618400000
+    },
+    {
+      "id": 15,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use attachment filenames only for attachment storage, replacing the earlier choice of downloaded attachment bodies.",
+      "title_is_copied": true,
+      "source_message_id": "1478693486592000036",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "privacy"
+      ],
+      "replaces": 14,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772618400000,
+      "updated_at": 1772618400000
+    },
+    {
+      "id": 16,
+      "kind": "task",
+      "status": "open",
+      "title": "Verify no attachment bytes are stored",
+      "title_is_copied": false,
+      "source_message_id": "1478696003174400037",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": "104",
+      "due_at": 1772874000000,
+      "tags": [
+        "privacy"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772619000000,
+      "updated_at": 1772619000000
+    },
+    {
+      "id": 17,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for backup cadence?",
+      "title_is_copied": true,
+      "source_message_id": "1479040774963200040",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "backup"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1479055874457600046",
+      "created_at": 1772701200000,
+      "updated_at": 1772704800000
+    },
+    {
+      "id": 18,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use weekly backups for backup cadence.",
+      "title_is_copied": true,
+      "source_message_id": "1479045808128000042",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "backup"
+      ],
+      "replaces": null,
+      "superseded_by": 19,
+      "answered_by_message_id": null,
+      "created_at": 1772702400000,
+      "updated_at": 1772704800000
+    },
+    {
+      "id": 19,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use daily backups at 02:00 UTC for backup cadence, replacing the earlier choice of weekly backups.",
+      "title_is_copied": true,
+      "source_message_id": "1479055874457600046",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "backup"
+      ],
+      "replaces": 18,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772704800000,
+      "updated_at": 1772704800000
+    },
+    {
+      "id": 20,
+      "kind": "task",
+      "status": "open",
+      "title": "Write the restore checklist",
+      "title_is_copied": false,
+      "source_message_id": "1479058391040000047",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": "105",
+      "due_at": 1772960400000,
+      "tags": [
+        "backup"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772705400000,
+      "updated_at": 1772705400000
+    },
+    {
+      "id": 21,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for export format?",
+      "title_is_copied": true,
+      "source_message_id": "1479403162828800050",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "export"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1479418262323200056",
+      "created_at": 1772787600000,
+      "updated_at": 1772791200000
+    },
+    {
+      "id": 22,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use a single HTML file for export format.",
+      "title_is_copied": true,
+      "source_message_id": "1479408195993600052",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "export"
+      ],
+      "replaces": null,
+      "superseded_by": 23,
+      "answered_by_message_id": null,
+      "created_at": 1772788800000,
+      "updated_at": 1772791200000
+    },
+    {
+      "id": 23,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use cross-linked Markdown for export format, replacing the earlier choice of a single HTML file.",
+      "title_is_copied": true,
+      "source_message_id": "1479418262323200056",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "export"
+      ],
+      "replaces": 22,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772791200000,
+      "updated_at": 1772791200000
+    },
+    {
+      "id": 24,
+      "kind": "task",
+      "status": "open",
+      "title": "Validate exported source footnotes",
+      "title_is_copied": false,
+      "source_message_id": "1479420778905600057",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": "106",
+      "due_at": 1773046800000,
+      "tags": [
+        "export"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772791800000,
+      "updated_at": 1772791800000
+    },
+    {
+      "id": 25,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for table of contents?",
+      "title_is_copied": true,
+      "source_message_id": "1479765550694400060",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "reader"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1479780650188800066",
+      "created_at": 1772874000000,
+      "updated_at": 1772877600000
+    },
+    {
+      "id": 26,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use a flat chapter list for table of contents.",
+      "title_is_copied": true,
+      "source_message_id": "1479770583859200062",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "reader"
+      ],
+      "replaces": null,
+      "superseded_by": 27,
+      "answered_by_message_id": null,
+      "created_at": 1772875200000,
+      "updated_at": 1772877600000
+    },
+    {
+      "id": 27,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use a nested chapter tree for table of contents, replacing the earlier choice of a flat chapter list.",
+      "title_is_copied": true,
+      "source_message_id": "1479780650188800066",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "reader"
+      ],
+      "replaces": 26,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772877600000,
+      "updated_at": 1772877600000
+    },
+    {
+      "id": 28,
+      "kind": "task",
+      "status": "open",
+      "title": "Test a three-level chapter tree",
+      "title_is_copied": false,
+      "source_message_id": "1479783166771200067",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": "101",
+      "due_at": 1773133200000,
+      "tags": [
+        "reader"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772878200000,
+      "updated_at": 1772878200000
+    },
+    {
+      "id": 29,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for default theme?",
+      "title_is_copied": true,
+      "source_message_id": "1480127938560000070",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "theme"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1480143038054400076",
+      "created_at": 1772960400000,
+      "updated_at": 1772964000000
+    },
+    {
+      "id": 30,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use dark mode for default theme.",
+      "title_is_copied": true,
+      "source_message_id": "1480132971724800072",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "theme"
+      ],
+      "replaces": null,
+      "superseded_by": 31,
+      "answered_by_message_id": null,
+      "created_at": 1772961600000,
+      "updated_at": 1772964000000
+    },
+    {
+      "id": 31,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use system preference for default theme, replacing the earlier choice of dark mode.",
+      "title_is_copied": true,
+      "source_message_id": "1480143038054400076",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "theme"
+      ],
+      "replaces": 30,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772964000000,
+      "updated_at": 1772964000000
+    },
+    {
+      "id": 32,
+      "kind": "task",
+      "status": "open",
+      "title": "Check the high-contrast theme",
+      "title_is_copied": false,
+      "source_message_id": "1480145554636800077",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": "102",
+      "due_at": 1773219600000,
+      "tags": [
+        "theme"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1772964600000,
+      "updated_at": 1772964600000
+    },
+    {
+      "id": 33,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for note editor?",
+      "title_is_copied": true,
+      "source_message_id": "1480490326425600080",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "notes"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1480505425920000086",
+      "created_at": 1773046800000,
+      "updated_at": 1773050400000
+    },
+    {
+      "id": 34,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use rich text for note editor.",
+      "title_is_copied": true,
+      "source_message_id": "1480495359590400082",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "notes"
+      ],
+      "replaces": null,
+      "superseded_by": 35,
+      "answered_by_message_id": null,
+      "created_at": 1773048000000,
+      "updated_at": 1773050400000
+    },
+    {
+      "id": 35,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use plain Markdown for note editor, replacing the earlier choice of rich text.",
+      "title_is_copied": true,
+      "source_message_id": "1480505425920000086",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "notes"
+      ],
+      "replaces": 34,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773050400000,
+      "updated_at": 1773050400000
+    },
+    {
+      "id": 36,
+      "kind": "task",
+      "status": "open",
+      "title": "Test fenced code in a note",
+      "title_is_copied": false,
+      "source_message_id": "1480507942502400087",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": "103",
+      "due_at": 1773306000000,
+      "tags": [
+        "notes"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773051000000,
+      "updated_at": 1773051000000
+    },
+    {
+      "id": 37,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for session cookie lifetime?",
+      "title_is_copied": true,
+      "source_message_id": "1480852714291200090",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "auth"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1480867813785600096",
+      "created_at": 1773133200000,
+      "updated_at": 1773136800000
+    },
+    {
+      "id": 38,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use thirty days for session cookie lifetime.",
+      "title_is_copied": true,
+      "source_message_id": "1480857747456000092",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "auth"
+      ],
+      "replaces": null,
+      "superseded_by": 39,
+      "answered_by_message_id": null,
+      "created_at": 1773134400000,
+      "updated_at": 1773136800000
+    },
+    {
+      "id": 39,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use seven days for session cookie lifetime, replacing the earlier choice of thirty days.",
+      "title_is_copied": true,
+      "source_message_id": "1480867813785600096",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "auth"
+      ],
+      "replaces": 38,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773136800000,
+      "updated_at": 1773136800000
+    },
+    {
+      "id": 40,
+      "kind": "task",
+      "status": "open",
+      "title": "Test expired sessions",
+      "title_is_copied": false,
+      "source_message_id": "1480870330368000097",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": "104",
+      "due_at": 1773392400000,
+      "tags": [
+        "auth"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773137400000,
+      "updated_at": 1773137400000
+    },
+    {
+      "id": 41,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for hosting target?",
+      "title_is_copied": true,
+      "source_message_id": "1481215102156800100",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "deploy"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1481230201651200106",
+      "created_at": 1773219600000,
+      "updated_at": 1773223200000
+    },
+    {
+      "id": 42,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use a managed cluster for hosting target.",
+      "title_is_copied": true,
+      "source_message_id": "1481220135321600102",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "deploy"
+      ],
+      "replaces": null,
+      "superseded_by": 43,
+      "answered_by_message_id": null,
+      "created_at": 1773220800000,
+      "updated_at": 1773223200000
+    },
+    {
+      "id": 43,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use one Linux host for hosting target, replacing the earlier choice of a managed cluster.",
+      "title_is_copied": true,
+      "source_message_id": "1481230201651200106",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "deploy"
+      ],
+      "replaces": 42,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773223200000,
+      "updated_at": 1773223200000
+    },
+    {
+      "id": 44,
+      "kind": "task",
+      "status": "open",
+      "title": "Document systemd restart behavior",
+      "title_is_copied": false,
+      "source_message_id": "1481232718233600107",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": "105",
+      "due_at": 1773478800000,
+      "tags": [
+        "deploy"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773223800000,
+      "updated_at": 1773223800000
+    },
+    {
+      "id": 45,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for package format?",
+      "title_is_copied": true,
+      "source_message_id": "1481577490022400110",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "packaging"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1481592589516800116",
+      "created_at": 1773306000000,
+      "updated_at": 1773309600000
+    },
+    {
+      "id": 46,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use a system installer for package format.",
+      "title_is_copied": true,
+      "source_message_id": "1481582523187200112",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "packaging"
+      ],
+      "replaces": null,
+      "superseded_by": 47,
+      "answered_by_message_id": null,
+      "created_at": 1773307200000,
+      "updated_at": 1773309600000
+    },
+    {
+      "id": 47,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use a portable archive for package format, replacing the earlier choice of a system installer.",
+      "title_is_copied": true,
+      "source_message_id": "1481592589516800116",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "packaging"
+      ],
+      "replaces": 46,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773309600000,
+      "updated_at": 1773309600000
+    },
+    {
+      "id": 48,
+      "kind": "task",
+      "status": "open",
+      "title": "Test extraction without admin rights",
+      "title_is_copied": false,
+      "source_message_id": "1481595106099200117",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": "106",
+      "due_at": 1773565200000,
+      "tags": [
+        "packaging"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773310200000,
+      "updated_at": 1773310200000
+    },
+    {
+      "id": 49,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for interface language?",
+      "title_is_copied": true,
+      "source_message_id": "1481939877888000120",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "language"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1481954977382400126",
+      "created_at": 1773392400000,
+      "updated_at": 1773396000000
+    },
+    {
+      "id": 50,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use English only for interface language.",
+      "title_is_copied": true,
+      "source_message_id": "1481944911052800122",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "language"
+      ],
+      "replaces": null,
+      "superseded_by": 51,
+      "answered_by_message_id": null,
+      "created_at": 1773393600000,
+      "updated_at": 1773396000000
+    },
+    {
+      "id": 51,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use English and Spanish for interface language, replacing the earlier choice of English only.",
+      "title_is_copied": true,
+      "source_message_id": "1481954977382400126",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "language"
+      ],
+      "replaces": 50,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773396000000,
+      "updated_at": 1773396000000
+    },
+    {
+      "id": 52,
+      "kind": "task",
+      "status": "open",
+      "title": "Review Spanish button labels",
+      "title_is_copied": false,
+      "source_message_id": "1481957493964800127",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": "101",
+      "due_at": 1773651600000,
+      "tags": [
+        "language"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773396600000,
+      "updated_at": 1773396600000
+    },
+    {
+      "id": 53,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for due date display?",
+      "title_is_copied": true,
+      "source_message_id": "1482302265753600130",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "dates"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1482317365248000136",
+      "created_at": 1773478800000,
+      "updated_at": 1773482400000
+    },
+    {
+      "id": 54,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use UTC timestamps for due date display.",
+      "title_is_copied": true,
+      "source_message_id": "1482307298918400132",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "dates"
+      ],
+      "replaces": null,
+      "superseded_by": 55,
+      "answered_by_message_id": null,
+      "created_at": 1773480000000,
+      "updated_at": 1773482400000
+    },
+    {
+      "id": 55,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use reader-local dates for due date display, replacing the earlier choice of UTC timestamps.",
+      "title_is_copied": true,
+      "source_message_id": "1482317365248000136",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "dates"
+      ],
+      "replaces": 54,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773482400000,
+      "updated_at": 1773482400000
+    },
+    {
+      "id": 56,
+      "kind": "task",
+      "status": "open",
+      "title": "Test a date near midnight",
+      "title_is_copied": false,
+      "source_message_id": "1482319881830400137",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": "102",
+      "due_at": 1773738000000,
+      "tags": [
+        "dates"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773483000000,
+      "updated_at": 1773483000000
+    },
+    {
+      "id": 57,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for search page size?",
+      "title_is_copied": true,
+      "source_message_id": "1482664653619200140",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "pagination"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1482679753113600146",
+      "created_at": 1773565200000,
+      "updated_at": 1773568800000
+    },
+    {
+      "id": 58,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use fifty results for search page size.",
+      "title_is_copied": true,
+      "source_message_id": "1482669686784000142",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "pagination"
+      ],
+      "replaces": null,
+      "superseded_by": 59,
+      "answered_by_message_id": null,
+      "created_at": 1773566400000,
+      "updated_at": 1773568800000
+    },
+    {
+      "id": 59,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use twenty results for search page size, replacing the earlier choice of fifty results.",
+      "title_is_copied": true,
+      "source_message_id": "1482679753113600146",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "pagination"
+      ],
+      "replaces": 58,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773568800000,
+      "updated_at": 1773568800000
+    },
+    {
+      "id": 60,
+      "kind": "task",
+      "status": "open",
+      "title": "Test the next-page cursor",
+      "title_is_copied": false,
+      "source_message_id": "1482682269696000147",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": "103",
+      "due_at": 1773824400000,
+      "tags": [
+        "pagination"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773569400000,
+      "updated_at": 1773569400000
+    },
+    {
+      "id": 61,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for library ordering?",
+      "title_is_copied": true,
+      "source_message_id": "1483027041484800150",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "sort"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1483042140979200156",
+      "created_at": 1773651600000,
+      "updated_at": 1773655200000
+    },
+    {
+      "id": 62,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use upload time for library ordering.",
+      "title_is_copied": true,
+      "source_message_id": "1483032074649600152",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "sort"
+      ],
+      "replaces": null,
+      "superseded_by": 63,
+      "answered_by_message_id": null,
+      "created_at": 1773652800000,
+      "updated_at": 1773655200000
+    },
+    {
+      "id": 63,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use last opened time for library ordering, replacing the earlier choice of upload time.",
+      "title_is_copied": true,
+      "source_message_id": "1483042140979200156",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "sort"
+      ],
+      "replaces": 62,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773655200000,
+      "updated_at": 1773655200000
+    },
+    {
+      "id": 64,
+      "kind": "task",
+      "status": "open",
+      "title": "Test stable ties in library ordering",
+      "title_is_copied": false,
+      "source_message_id": "1483044657561600157",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": "104",
+      "due_at": 1773910800000,
+      "tags": [
+        "sort"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773655800000,
+      "updated_at": 1773655800000
+    },
+    {
+      "id": 65,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for first-run experience?",
+      "title_is_copied": true,
+      "source_message_id": "1483389429350400160",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "onboarding"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1483404528844800166",
+      "created_at": 1773738000000,
+      "updated_at": 1773741600000
+    },
+    {
+      "id": 66,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use a required account form for first-run experience.",
+      "title_is_copied": true,
+      "source_message_id": "1483394462515200162",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "onboarding"
+      ],
+      "replaces": null,
+      "superseded_by": 67,
+      "answered_by_message_id": null,
+      "created_at": 1773739200000,
+      "updated_at": 1773741600000
+    },
+    {
+      "id": 67,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use a fictional demo library for first-run experience, replacing the earlier choice of a required account form.",
+      "title_is_copied": true,
+      "source_message_id": "1483404528844800166",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "onboarding"
+      ],
+      "replaces": 66,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773741600000,
+      "updated_at": 1773741600000
+    },
+    {
+      "id": 68,
+      "kind": "task",
+      "status": "open",
+      "title": "Write the demo welcome note",
+      "title_is_copied": false,
+      "source_message_id": "1483407045427200167",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": "105",
+      "due_at": 1773997200000,
+      "tags": [
+        "onboarding"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773742200000,
+      "updated_at": 1773742200000
+    },
+    {
+      "id": 69,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for usage measurement?",
+      "title_is_copied": true,
+      "source_message_id": "1483751817216000170",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "metrics"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1483766916710400176",
+      "created_at": 1773824400000,
+      "updated_at": 1773828000000
+    },
+    {
+      "id": 70,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use remote event collection for usage measurement.",
+      "title_is_copied": true,
+      "source_message_id": "1483756850380800172",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "metrics"
+      ],
+      "replaces": null,
+      "superseded_by": 71,
+      "answered_by_message_id": null,
+      "created_at": 1773825600000,
+      "updated_at": 1773828000000
+    },
+    {
+      "id": 71,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use local aggregate counters for usage measurement, replacing the earlier choice of remote event collection.",
+      "title_is_copied": true,
+      "source_message_id": "1483766916710400176",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "metrics"
+      ],
+      "replaces": 70,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773828000000,
+      "updated_at": 1773828000000
+    },
+    {
+      "id": 72,
+      "kind": "task",
+      "status": "open",
+      "title": "Verify telemetry stays local",
+      "title_is_copied": false,
+      "source_message_id": "1483769433292800177",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": "106",
+      "due_at": 1774083600000,
+      "tags": [
+        "metrics"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773828600000,
+      "updated_at": 1773828600000
+    },
+    {
+      "id": 73,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for cover image handling?",
+      "title_is_copied": true,
+      "source_message_id": "1484114205081600180",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "images"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1484129304576000186",
+      "created_at": 1773910800000,
+      "updated_at": 1773914400000
+    },
+    {
+      "id": 74,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use original resolution images for cover image handling.",
+      "title_is_copied": true,
+      "source_message_id": "1484119238246400182",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "images"
+      ],
+      "replaces": null,
+      "superseded_by": 75,
+      "answered_by_message_id": null,
+      "created_at": 1773912000000,
+      "updated_at": 1773914400000
+    },
+    {
+      "id": 75,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use small local thumbnails for cover image handling, replacing the earlier choice of original resolution images.",
+      "title_is_copied": true,
+      "source_message_id": "1484129304576000186",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "images"
+      ],
+      "replaces": 74,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773914400000,
+      "updated_at": 1773914400000
+    },
+    {
+      "id": 76,
+      "kind": "task",
+      "status": "open",
+      "title": "Measure thumbnail memory use",
+      "title_is_copied": false,
+      "source_message_id": "1484131821158400187",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": "101",
+      "due_at": 1774170000000,
+      "tags": [
+        "images"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1773915000000,
+      "updated_at": 1773915000000
+    },
+    {
+      "id": 77,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for keyboard navigation?",
+      "title_is_copied": true,
+      "source_message_id": "1484476592947200190",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "keyboard"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1484491692441600196",
+      "created_at": 1773997200000,
+      "updated_at": 1774000800000
+    },
+    {
+      "id": 78,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use single-key shortcuts for keyboard navigation.",
+      "title_is_copied": true,
+      "source_message_id": "1484481626112000192",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "keyboard"
+      ],
+      "replaces": null,
+      "superseded_by": 79,
+      "answered_by_message_id": null,
+      "created_at": 1773998400000,
+      "updated_at": 1774000800000
+    },
+    {
+      "id": 79,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use modifier-key shortcuts for keyboard navigation, replacing the earlier choice of single-key shortcuts.",
+      "title_is_copied": true,
+      "source_message_id": "1484491692441600196",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "keyboard"
+      ],
+      "replaces": 78,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774000800000,
+      "updated_at": 1774000800000
+    },
+    {
+      "id": 80,
+      "kind": "task",
+      "status": "open",
+      "title": "Test shortcuts inside text fields",
+      "title_is_copied": false,
+      "source_message_id": "1484494209024000197",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": "102",
+      "due_at": 1774256400000,
+      "tags": [
+        "keyboard"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774001400000,
+      "updated_at": 1774001400000
+    },
+    {
+      "id": 81,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for network retry policy?",
+      "title_is_copied": true,
+      "source_message_id": "1484838980812800200",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "network"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1484854080307200206",
+      "created_at": 1774083600000,
+      "updated_at": 1774087200000
+    },
+    {
+      "id": 82,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use immediate unlimited retries for network retry policy.",
+      "title_is_copied": true,
+      "source_message_id": "1484844013977600202",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "network"
+      ],
+      "replaces": null,
+      "superseded_by": 83,
+      "answered_by_message_id": null,
+      "created_at": 1774084800000,
+      "updated_at": 1774087200000
+    },
+    {
+      "id": 83,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use bounded exponential retries for network retry policy, replacing the earlier choice of immediate unlimited retries.",
+      "title_is_copied": true,
+      "source_message_id": "1484854080307200206",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "network"
+      ],
+      "replaces": 82,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774087200000,
+      "updated_at": 1774087200000
+    },
+    {
+      "id": 84,
+      "kind": "task",
+      "status": "open",
+      "title": "Test recovery after a timeout",
+      "title_is_copied": false,
+      "source_message_id": "1484856596889600207",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": "103",
+      "due_at": 1774342800000,
+      "tags": [
+        "network"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774087800000,
+      "updated_at": 1774087800000
+    },
+    {
+      "id": 85,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for message retention?",
+      "title_is_copied": true,
+      "source_message_id": "1485201368678400210",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "retention"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1485216468172800216",
+      "created_at": 1774170000000,
+      "updated_at": 1774173600000
+    },
+    {
+      "id": 86,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use forever for message retention.",
+      "title_is_copied": true,
+      "source_message_id": "1485206401843200212",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "retention"
+      ],
+      "replaces": null,
+      "superseded_by": 87,
+      "answered_by_message_id": null,
+      "created_at": 1774171200000,
+      "updated_at": 1774173600000
+    },
+    {
+      "id": 87,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use ninety days for message retention, replacing the earlier choice of forever.",
+      "title_is_copied": true,
+      "source_message_id": "1485216468172800216",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "retention"
+      ],
+      "replaces": 86,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774173600000,
+      "updated_at": 1774173600000
+    },
+    {
+      "id": 88,
+      "kind": "task",
+      "status": "open",
+      "title": "Test retention removes copied titles",
+      "title_is_copied": false,
+      "source_message_id": "1485218984755200217",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": "104",
+      "due_at": 1774429200000,
+      "tags": [
+        "retention"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774174200000,
+      "updated_at": 1774174200000
+    },
+    {
+      "id": 89,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for log content?",
+      "title_is_copied": true,
+      "source_message_id": "1485563756544000220",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "logging"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1485578856038400226",
+      "created_at": 1774256400000,
+      "updated_at": 1774260000000
+    },
+    {
+      "id": 90,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use full request bodies for log content.",
+      "title_is_copied": true,
+      "source_message_id": "1485568789708800222",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "logging"
+      ],
+      "replaces": null,
+      "superseded_by": 91,
+      "answered_by_message_id": null,
+      "created_at": 1774257600000,
+      "updated_at": 1774260000000
+    },
+    {
+      "id": 91,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use request IDs and status codes for log content, replacing the earlier choice of full request bodies.",
+      "title_is_copied": true,
+      "source_message_id": "1485578856038400226",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "logging"
+      ],
+      "replaces": 90,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774260000000,
+      "updated_at": 1774260000000
+    },
+    {
+      "id": 92,
+      "kind": "task",
+      "status": "open",
+      "title": "Capture logs during an invalid request",
+      "title_is_copied": false,
+      "source_message_id": "1485581372620800227",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": "105",
+      "due_at": 1774515600000,
+      "tags": [
+        "logging"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774260600000,
+      "updated_at": 1774260600000
+    },
+    {
+      "id": 93,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for pilot release day?",
+      "title_is_copied": true,
+      "source_message_id": "1485926144409600230",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "release"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1485941243904000236",
+      "created_at": 1774342800000,
+      "updated_at": 1774346400000
+    },
+    {
+      "id": 94,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use Friday for pilot release day.",
+      "title_is_copied": true,
+      "source_message_id": "1485931177574400232",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "release"
+      ],
+      "replaces": null,
+      "superseded_by": 95,
+      "answered_by_message_id": null,
+      "created_at": 1774344000000,
+      "updated_at": 1774346400000
+    },
+    {
+      "id": 95,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use Tuesday for pilot release day, replacing the earlier choice of Friday.",
+      "title_is_copied": true,
+      "source_message_id": "1485941243904000236",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "release"
+      ],
+      "replaces": 94,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774346400000,
+      "updated_at": 1774346400000
+    },
+    {
+      "id": 96,
+      "kind": "task",
+      "status": "open",
+      "title": "Prepare the Tuesday pilot checklist",
+      "title_is_copied": false,
+      "source_message_id": "1485943760486400237",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": "106",
+      "due_at": 1774602000000,
+      "tags": [
+        "release"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774347000000,
+      "updated_at": 1774347000000
+    },
+    {
+      "id": 97,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for focus indication?",
+      "title_is_copied": true,
+      "source_message_id": "1486288532275200240",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "accessibility"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1486303631769600246",
+      "created_at": 1774429200000,
+      "updated_at": 1774432800000
+    },
+    {
+      "id": 98,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use a subtle gray outline for focus indication.",
+      "title_is_copied": true,
+      "source_message_id": "1486293565440000242",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "accessibility"
+      ],
+      "replaces": null,
+      "superseded_by": 99,
+      "answered_by_message_id": null,
+      "created_at": 1774430400000,
+      "updated_at": 1774432800000
+    },
+    {
+      "id": 99,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use a visible blue outline for focus indication, replacing the earlier choice of a subtle gray outline.",
+      "title_is_copied": true,
+      "source_message_id": "1486303631769600246",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "accessibility"
+      ],
+      "replaces": 98,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774432800000,
+      "updated_at": 1774432800000
+    },
+    {
+      "id": 100,
+      "kind": "task",
+      "status": "open",
+      "title": "Check focus in every dialog",
+      "title_is_copied": false,
+      "source_message_id": "1486306148352000247",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": "101",
+      "due_at": 1774688400000,
+      "tags": [
+        "accessibility"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774433400000,
+      "updated_at": 1774433400000
+    },
+    {
+      "id": 101,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for book import validation?",
+      "title_is_copied": true,
+      "source_message_id": "1486650920140800250",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "import"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1486666019635200256",
+      "created_at": 1774515600000,
+      "updated_at": 1774519200000
+    },
+    {
+      "id": 102,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use trusting the filename extension for book import validation.",
+      "title_is_copied": true,
+      "source_message_id": "1486655953305600252",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "import"
+      ],
+      "replaces": null,
+      "superseded_by": 103,
+      "answered_by_message_id": null,
+      "created_at": 1774516800000,
+      "updated_at": 1774519200000
+    },
+    {
+      "id": 103,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use checking the archive structure for book import validation, replacing the earlier choice of trusting the filename extension.",
+      "title_is_copied": true,
+      "source_message_id": "1486666019635200256",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "import"
+      ],
+      "replaces": 102,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774519200000,
+      "updated_at": 1774519200000
+    },
+    {
+      "id": 104,
+      "kind": "task",
+      "status": "open",
+      "title": "Test a renamed invalid archive",
+      "title_is_copied": false,
+      "source_message_id": "1486668536217600257",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": "102",
+      "due_at": 1774774800000,
+      "tags": [
+        "import"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774519800000,
+      "updated_at": 1774519800000
+    },
+    {
+      "id": 105,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for startup budget?",
+      "title_is_copied": true,
+      "source_message_id": "1487013308006400260",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "performance"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1487028407500800266",
+      "created_at": 1774602000000,
+      "updated_at": 1774605600000
+    },
+    {
+      "id": 106,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use five seconds for startup budget.",
+      "title_is_copied": true,
+      "source_message_id": "1487018341171200262",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "performance"
+      ],
+      "replaces": null,
+      "superseded_by": 107,
+      "answered_by_message_id": null,
+      "created_at": 1774603200000,
+      "updated_at": 1774605600000
+    },
+    {
+      "id": 107,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use two seconds for startup budget, replacing the earlier choice of five seconds.",
+      "title_is_copied": true,
+      "source_message_id": "1487028407500800266",
+      "created_by": "103",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "performance"
+      ],
+      "replaces": 106,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774605600000,
+      "updated_at": 1774605600000
+    },
+    {
+      "id": 108,
+      "kind": "task",
+      "status": "open",
+      "title": "Measure cold startup on the demo library",
+      "title_is_copied": false,
+      "source_message_id": "1487030924083200267",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": "103",
+      "due_at": 1774861200000,
+      "tags": [
+        "performance"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774606200000,
+      "updated_at": 1774606200000
+    },
+    {
+      "id": 109,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for offline behavior?",
+      "title_is_copied": true,
+      "source_message_id": "1487375695872000270",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "offline"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1487390795366400276",
+      "created_at": 1774688400000,
+      "updated_at": 1774692000000
+    },
+    {
+      "id": 110,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use an error screen for offline behavior.",
+      "title_is_copied": true,
+      "source_message_id": "1487380729036800272",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "offline"
+      ],
+      "replaces": null,
+      "superseded_by": 111,
+      "answered_by_message_id": null,
+      "created_at": 1774689600000,
+      "updated_at": 1774692000000
+    },
+    {
+      "id": 111,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use cached books and notes for offline behavior, replacing the earlier choice of an error screen.",
+      "title_is_copied": true,
+      "source_message_id": "1487390795366400276",
+      "created_by": "104",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "offline"
+      ],
+      "replaces": 110,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774692000000,
+      "updated_at": 1774692000000
+    },
+    {
+      "id": 112,
+      "kind": "task",
+      "status": "open",
+      "title": "Test a complete reading session offline",
+      "title_is_copied": false,
+      "source_message_id": "1487393311948800277",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": "104",
+      "due_at": 1774947600000,
+      "tags": [
+        "offline"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774692600000,
+      "updated_at": 1774692600000
+    },
+    {
+      "id": 113,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for note conflict handling?",
+      "title_is_copied": true,
+      "source_message_id": "1487738083737600280",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "conflicts"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1487753183232000286",
+      "created_at": 1774774800000,
+      "updated_at": 1774778400000
+    },
+    {
+      "id": 114,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use last write wins for note conflict handling.",
+      "title_is_copied": true,
+      "source_message_id": "1487743116902400282",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "conflicts"
+      ],
+      "replaces": null,
+      "superseded_by": 115,
+      "answered_by_message_id": null,
+      "created_at": 1774776000000,
+      "updated_at": 1774778400000
+    },
+    {
+      "id": 115,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use keep both versions for note conflict handling, replacing the earlier choice of last write wins.",
+      "title_is_copied": true,
+      "source_message_id": "1487753183232000286",
+      "created_by": "105",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "conflicts"
+      ],
+      "replaces": 114,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774778400000,
+      "updated_at": 1774778400000
+    },
+    {
+      "id": 116,
+      "kind": "task",
+      "status": "open",
+      "title": "Test simultaneous edits from two devices",
+      "title_is_copied": false,
+      "source_message_id": "1487755699814400287",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": "105",
+      "due_at": 1775034000000,
+      "tags": [
+        "conflicts"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774779000000,
+      "updated_at": 1774779000000
+    },
+    {
+      "id": 117,
+      "kind": "question",
+      "status": "answered",
+      "title": "What should Lantern Shelf use for reminder behavior?",
+      "title_is_copied": true,
+      "source_message_id": "1488100471603200290",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "notifications"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": "1488115571097600296",
+      "created_at": 1774861200000,
+      "updated_at": 1774864800000
+    },
+    {
+      "id": 118,
+      "kind": "decision",
+      "status": "superseded",
+      "title": "Initial decision: use desktop popups for reminder behavior.",
+      "title_is_copied": true,
+      "source_message_id": "1488105504768000292",
+      "created_by": "102",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "notifications"
+      ],
+      "replaces": null,
+      "superseded_by": 119,
+      "answered_by_message_id": null,
+      "created_at": 1774862400000,
+      "updated_at": 1774864800000
+    },
+    {
+      "id": 119,
+      "kind": "decision",
+      "status": "active",
+      "title": "Decision reversed: use an in-app due list for reminder behavior, replacing the earlier choice of desktop popups.",
+      "title_is_copied": true,
+      "source_message_id": "1488115571097600296",
+      "created_by": "106",
+      "created_via": "slash",
+      "owner_id": null,
+      "due_at": null,
+      "tags": [
+        "notifications"
+      ],
+      "replaces": 118,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774864800000,
+      "updated_at": 1774864800000
+    },
+    {
+      "id": 120,
+      "kind": "task",
+      "status": "open",
+      "title": "Test the due list with overdue notes",
+      "title_is_copied": false,
+      "source_message_id": "1488118087680000297",
+      "created_by": "101",
+      "created_via": "slash",
+      "owner_id": "106",
+      "due_at": 1775120400000,
+      "tags": [
+        "notifications"
+      ],
+      "replaces": null,
+      "superseded_by": null,
+      "answered_by_message_id": null,
+      "created_at": 1774865400000,
+      "updated_at": 1774865400000
+    }
+  ]
+}
