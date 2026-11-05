@@ -20,8 +20,11 @@ release.
   explicitly deferred.
 - Query parsing and literal FTS5 expression compilation, deterministic ranking,
   citation formatting and escaped untrusted-chat framing in core.
-- Fictional demo data (300 messages) and 50 grounded retrieval evaluation questions,
-  with fixture validation. Retrieval scoring and its baseline are not implemented yet.
+- Fictional demo data (314 hand-written messages of a six-person team, 76 record entries
+  with reversed decisions, tasks and questions) and 62 retrieval evaluation questions.
+  Fixture tests check the data's structure, that paraphrase questions share no words
+  with their answers, and that no record follows the two planted prompt-injection
+  messages. Retrieval scoring and its baseline are not implemented yet.
 - Core domain types, record lifecycle rules, query AST and repository contracts,
   with invariant tests and a contract map in `docs/design/contracts.md`.
 - Spike S4: `teamctx-store` links the bundled SQLite (`rusqlite`) and tests an FTS5
@@ -52,3 +55,11 @@ release.
 
 - Docs: work runs as parallel tasks that stop at maintainer steps; the Rust go/no-go bar,
   the eval acceptance threshold and the v0.1 token-file decision are recorded in the plan.
+- The schema is a single migration (`0001_init.sql`), written one column per line with
+  comments; queries name their columns instead of `SELECT *`.
+- The contributing guide, security policy and code of conduct moved to `.github/`.
+  Code of Conduct reports now go through GitHub's private reporting form.
+
+### Removed
+
+- `docs/guides/repo-settings.md`, a maintainer-only checklist of GitHub settings.
