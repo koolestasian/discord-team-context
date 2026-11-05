@@ -138,6 +138,8 @@ pub struct Message {
     pub author: Option<Member>,
     /// Normalised text with mentions resolved to names (plan section 6). Untrusted.
     pub content: String,
+    /// Mentioned external user ids, kept separately from normalized display text.
+    pub mentions: Vec<Snowflake>,
     /// The external id of the message this one replies to, if any.
     pub reply_to: Option<Snowflake>,
     /// Attachment file names only, never contents (plan section 6.1). An empty list
@@ -162,6 +164,8 @@ pub struct MessagePatch {
     pub id: MessageRef,
     /// New normalised content.
     pub content: Option<String>,
+    /// Complete replacement mention list; `None` preserves the stored list.
+    pub mentions: Option<Vec<Snowflake>>,
     /// New attachment names (the full list, not a delta).
     pub attachment_names: Option<Vec<String>>,
     /// New edit time.
@@ -187,6 +191,12 @@ impl MessagePatch {
             return Err(PatchTargetMismatch);
         }
         let mut changed = false;
+        if let Some(mentions) = &self.mentions
+            && *mentions != message.mentions
+        {
+            message.mentions.clone_from(mentions);
+            changed = true;
+        }
         if let Some(content) = &self.content
             && *content != message.content
         {
@@ -233,8 +243,8 @@ pub struct Marker {
 pub enum SourceEvent {
     /// A channel, thread or forum post was created, changed or discovered.
     ChannelUpsert(Channel),
-    /// A channel, thread or forum post was deleted. What happens to its stored messages
-    /// is an open question (`docs/design/contracts.md`).
+    /// A channel was deleted. Purge its messages and child threads using the message
+    /// deletion rule, including source redaction on record entries.
     ChannelDelete {
         /// The deleted channel.
         channel: Snowflake,
@@ -286,6 +296,7 @@ mod tests {
                 is_bot: false,
             }),
             content: "We will ship the beta on Friday.".to_owned(),
+            mentions: vec![sf(40)],
             reply_to: None,
             attachment_names: vec!["plan.txt".to_owned()],
             created_at: UnixMillis::from_millis(1_000),
@@ -297,6 +308,7 @@ mod tests {
         MessagePatch {
             id: message().id,
             content: None,
+            mentions: None,
             attachment_names: None,
             edited_at: None,
         }
@@ -360,6 +372,25 @@ mod tests {
         let mut stored = message();
         assert_eq!(empty_patch().apply(&mut stored), Ok(false));
         assert_eq!(stored, message());
+    }
+
+    #[test]
+    fn mention_patch_replaces_and_clears_without_changing_text() {
+        let mut stored = message();
+        let patch = MessagePatch {
+            mentions: Some(vec![sf(50)]),
+            ..empty_patch()
+        };
+        assert_eq!(patch.apply(&mut stored), Ok(true));
+        assert_eq!(stored.mentions, vec![sf(50)]);
+        assert_eq!(patch.apply(&mut stored), Ok(false));
+        let clear = MessagePatch {
+            mentions: Some(Vec::new()),
+            ..empty_patch()
+        };
+        assert_eq!(clear.apply(&mut stored), Ok(true));
+        assert!(stored.mentions.is_empty());
+        assert_eq!(stored.content, message().content);
     }
 
     #[test]
