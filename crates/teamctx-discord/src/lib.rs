@@ -5,4 +5,5 @@
 //! interactions. Everything it learns goes through `teamctx-store`; it never talks to the
 //! server or LLM crates.
 
+pub mod mapping;
 pub mod permissions;

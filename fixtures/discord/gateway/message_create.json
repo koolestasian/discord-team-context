@@ -1,0 +1,76 @@
+{
+  "op": 0,
+  "s": 2,
+  "t": "MESSAGE_CREATE",
+  "d": {
+    "id": "1100000000000001001",
+    "channel_id": "1100000000000000101",
+    "guild_id": "1100000000000000001",
+    "type": 0,
+    "content": "Decision: we ship the beta on Friday. cc <@1100000000000000202> and <@!1100000000000000203>, role <@&1100000000000000301>.",
+    "author": {
+      "id": "1100000000000000201",
+      "username": "robin_example",
+      "global_name": "Robin Example",
+      "discriminator": "0",
+      "avatar": null,
+      "bot": false,
+      "public_flags": 0
+    },
+    "mentions": [
+      {
+        "id": "1100000000000000202",
+        "username": "sam_sample",
+        "global_name": "Sam Sample",
+        "discriminator": "0",
+        "avatar": null,
+        "public_flags": 0
+      },
+      {
+        "id": "1100000000000000203",
+        "username": "kit_demo",
+        "global_name": null,
+        "discriminator": "0",
+        "avatar": null,
+        "public_flags": 0,
+        "member": {
+          "nick": "Kit D.",
+          "roles": [],
+          "joined_at": "2025-01-02T03:04:05.000000+00:00",
+          "deaf": false,
+          "mute": false,
+          "flags": 0
+        }
+      }
+    ],
+    "mention_roles": [
+      "1100000000000000301"
+    ],
+    "mention_everyone": false,
+    "attachments": [
+      {
+        "id": "1100000000000009001",
+        "filename": "release-plan.pdf",
+        "size": 2048,
+        "url": "https://cdn.example.invalid/attachments/1/1/release-plan.pdf",
+        "proxy_url": "https://media.example.invalid/attachments/1/1/release-plan.pdf",
+        "content_type": "application/pdf"
+      }
+    ],
+    "embeds": [],
+    "pinned": false,
+    "tts": false,
+    "timestamp": "2026-03-04T10:00:00.000000+00:00",
+    "edited_timestamp": null,
+    "flags": 0,
+    "components": [],
+    "member": {
+      "nick": "Robin (release lead)",
+      "roles": [],
+      "joined_at": "2025-01-02T03:04:05.000000+00:00",
+      "deaf": false,
+      "mute": false,
+      "flags": 0
+    }
+  }
+}

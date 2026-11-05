@@ -1,0 +1,61 @@
+{
+  "op": 0,
+  "s": 22,
+  "t": "THREAD_LIST_SYNC",
+  "d": {
+    "guild_id": "1100000000000000001",
+    "channel_ids": [
+      "1100000000000000101",
+      "1100000000000000103"
+    ],
+    "threads": [
+      {
+        "id": "1100000000000000501",
+        "guild_id": "1100000000000000001",
+        "parent_id": "1100000000000000101",
+        "owner_id": "1100000000000000201",
+        "type": 11,
+        "name": "Beta checklist",
+        "thread_metadata": {
+          "archived": false,
+          "archive_timestamp": "2026-03-04T10:10:00.000000+00:00",
+          "auto_archive_duration": 1440,
+          "locked": false
+        }
+      },
+      {
+        "id": "1100000000000000502",
+        "guild_id": "1100000000000000001",
+        "parent_id": "1100000000000000103",
+        "owner_id": "1100000000000000202",
+        "type": 11,
+        "name": "Idea: weekly digest",
+        "thread_metadata": {
+          "archived": false,
+          "archive_timestamp": "2026-03-04T10:10:00.000000+00:00",
+          "auto_archive_duration": 1440,
+          "locked": false
+        },
+        "applied_tags": [
+          "1100000000000000401"
+        ],
+        "newly_created": true
+      },
+      {
+        "id": "1100000000000000503",
+        "guild_id": "1100000000000000001",
+        "parent_id": "1100000000000000101",
+        "owner_id": "1100000000000000203",
+        "type": 12,
+        "name": "Private planning",
+        "thread_metadata": {
+          "archived": false,
+          "archive_timestamp": "2026-03-04T10:10:00.000000+00:00",
+          "auto_archive_duration": 1440,
+          "locked": false
+        }
+      }
+    ],
+    "members": []
+  }
+}
