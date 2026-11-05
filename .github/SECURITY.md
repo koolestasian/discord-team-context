@@ -39,5 +39,5 @@ Out of scope: vulnerabilities in Discord, LLM providers or other third-party ser
 Report those to the provider.
 
 The threat model is planned for milestone M8 (`docs/design/threat-model.md`). Until then,
-[plan §13](docs/design/implementation-plan.md#13-security-and-privacy) summarises the
+[plan §13](../docs/design/implementation-plan.md#13-security-and-privacy) summarises the
 threats the design addresses.
