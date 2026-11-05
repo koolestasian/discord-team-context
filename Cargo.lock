@@ -1519,6 +1519,9 @@ dependencies = [
 [[package]]
 name = "teamctx-core"
 version = "0.0.0"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "teamctx-discord"
