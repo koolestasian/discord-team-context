@@ -1520,9 +1520,12 @@ dependencies = [
 name = "teamctx"
 version = "0.0.0"
 dependencies = [
+ "serde",
  "teamctx-discord",
  "teamctx-llm",
  "teamctx-server",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]
