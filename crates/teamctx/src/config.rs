@@ -66,7 +66,7 @@ impl Default for ReactionCapture {
     fn default() -> Self {
         Self {
             enabled: false,
-            decision: "ðŸ“Œ".to_owned(),
+            decision: "\u{1F4CC}".to_owned(),
         }
     }
 }
@@ -434,6 +434,8 @@ mod tests {
         assert_eq!(config.server.bind, "127.0.0.1:7420");
         assert_eq!(config.sync.backfill_days, 90);
         assert_eq!(config.sync.recheck_window_hours, 48);
+        assert_eq!(config.discord.reaction_capture.decision, "\u{1F4CC}");
+        assert_eq!(config.discord.reaction_capture.decision.chars().count(), 1);
         assert!(config.llm.is_none());
         assert_eq!(config.retention.max_age_days, 0);
     }
