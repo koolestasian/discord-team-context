@@ -1,0 +1,43 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.89"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/koolestasian/discord-team-context"
+
+# Internal crates only. External dependencies are added when first used, and
+# cargo-deny fails on entries nothing uses.
+[workspace.dependencies]
+teamctx-core = { path = "crates/teamctx-core" }
+teamctx-store = { path = "crates/teamctx-store" }
+teamctx-discord = { path = "crates/teamctx-discord" }
+teamctx-llm = { path = "crates/teamctx-llm" }
+teamctx-server = { path = "crates/teamctx-server" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+rust_2018_idioms = { level = "warn", priority = -1 }
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+# No unwrap/expect outside tests. For a proven-infallible spot use
+# #[expect(clippy::expect_used, reason = "...")]. Tests are exempt via clippy.toml.
+unwrap_used = "deny"
+expect_used = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+mem_forget = "deny"
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+str_to_string = "warn"
+manual_let_else = "warn"
+implicit_clone = "warn"
+needless_pass_by_value = "warn"
+cloned_instead_of_copied = "warn"
+large_futures = "warn"

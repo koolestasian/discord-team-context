@@ -1,0 +1,15 @@
+[package]
+name = "teamctx-llm"
+description = "Optional /ask pipeline and LLM adapters for teamctx."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+teamctx-store.workspace = true

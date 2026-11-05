@@ -1,0 +1,8 @@
+[alias]
+xtask = "run --package xtask --bin xtask --"
+
+# Statically link the C runtime on Windows MSVC so the binary runs without the
+# VC++ redistributable. CI must not set the RUSTFLAGS environment variable: it
+# replaces this setting instead of adding to it.
+[target.'cfg(all(target_env = "msvc", target_os = "windows"))']
+rustflags = ["-C", "target-feature=+crt-static"]
