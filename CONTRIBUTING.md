@@ -14,13 +14,17 @@ against the plan.
 
 ## Build and check
 
-Install a stable Rust toolchain and [cargo-deny](https://github.com/EmbarkStudios/cargo-deny).
+Install [rustup](https://rustup.rs/) and [cargo-deny](https://github.com/EmbarkStudios/cargo-deny).
+rustup installs the toolchain pinned in `rust-toolchain.toml` on first use. On Windows,
+also install the Visual Studio Build Tools with the "Desktop development with C++"
+workload; the MSVC linker and C compiler are required.
+
 Before you open a pull request, run:
 
 ```sh
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace
 cargo deny check
 ```
 
