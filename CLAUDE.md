@@ -6,4 +6,4 @@ Self-hosted Rust program that turns a team's Discord into a searchable team reco
 
 ## Status
 
-M0 Foundation in progress on branch `m0-foundation`; next: M1 (plan section 18).
+M0 Foundation complete (2026-11-04). Next: M1 de-risking spikes (plan section 18).
