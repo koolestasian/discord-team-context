@@ -2,8 +2,8 @@
 
 The shared types and traits in `crates/teamctx-core` that the other crates build on.
 Source of truth for behaviour is the [implementation plan](implementation-plan.md); this
-page maps each contract to its plan section, states the invariants, and says which task
-fills what. Rust doc comments hold the full contract of every item.
+page maps each contract to its plan section, states the invariants, and says which crate
+or milestone builds on it. Rust doc comments hold the full contract of every item.
 
 ## Map
 
@@ -11,12 +11,12 @@ fills what. Rust doc comments hold the full contract of every item.
 |---|---|---|---|
 | `Snowflake`, row ids (`SourceId`, `ChannelId`, `MemberId`, `MessageId`, `EntryId`, `TokenId`) | `src/id.rs` | §5.3, §6 | everyone |
 | `UnixMillis`, `CalendarDate` | `src/time.rs` | §5.2, §9 | everyone |
-| `SourceKind`, `ChannelKind`, `Channel`, `Member`, `Message`, `MessageRef`, `MessagePatch`, `Marker`, `SourceEvent` | `src/source.rs` | §5.3, §6, §6.1, §7.2 | T15 (Discord mapping produces), T07 (store applies) |
-| `EntryKind`, `EntryStatus`, `check_transition`, `StatusChange`, `ShortId`, `EntryTitle`, `Tag`, `CreatedVia`, `NewEntry`, `RecordEntry`, `RecordAction`, `RecordEvent` | `src/record.rs` | §6, §6.1, §8 | T07, M5 commands, T12 |
-| `Query`, `Clause` (syntax tree only) | `src/query/ast.rs` | §9 | T04 adds the parser in `src/query/**` |
-| Ranking | `src/rank.rs` (placeholder) | §9 | T04 |
-| Untrusted framing, citation format | `src/framing.rs`, `src/citation.rs` (not created) | §10.1, §11 | T08 creates both and adds `pub mod framing; pub mod citation;` to `src/lib.rs` |
-| Repository traits and their row types, `RepoError` | `src/repo.rs` | §5.2, §6, §6.1, §8, §9, §10.1 | T07 implements; T12, T15 and the bin call |
+| `SourceKind`, `ChannelKind`, `Channel`, `Member`, `Message`, `MessageRef`, `MessagePatch`, `Marker`, `SourceEvent` | `src/source.rs` | §5.3, §6, §6.1, §7.2 | Discord mapping produces (M3); store applies |
+| `EntryKind`, `EntryStatus`, `check_transition`, `StatusChange`, `ShortId`, `EntryTitle`, `Tag`, `CreatedVia`, `NewEntry`, `RecordEntry`, `RecordAction`, `RecordEvent` | `src/record.rs` | §6, §6.1, §8 | store; M4 MCP tools; M5 commands |
+| `Query`, `Clause` (syntax tree only) | `src/query/ast.rs` | §9 | parser in `src/query/parser.rs`; store compiles it to SQL |
+| Ranking | `src/rank.rs` | §9 | store search; tuned by the M2 eval |
+| Untrusted framing, citation format | `src/framing.rs`, `src/citation.rs` | §10.1, §11 | M4 MCP tools, M6 `/ask` |
+| Repository traits and their row types, `RepoError` | `src/repo.rs` | §5.2, §6, §6.1, §8, §9, §10.1 | `teamctx-store` implements; server, Discord connector and the binary call |
 | `ParseEnumError` and the `text_enum!` macro | `src/text_enum.rs` | §6 (text columns) | internal |
 
 ## Invariants (pinned by unit tests in each file)
@@ -54,7 +54,7 @@ fills what. Rust doc comments hold the full contract of every item.
 - **Core boundary:** no I/O, no async, no clock; `thiserror` is the only external
   dependency (`crates/teamctx/tests/architecture.rs` checks it).
 
-## Decisions made in T01 (each needs no ADR; revisit freely before M2 ends)
+## Decisions made while defining the contracts (each needs no ADR; revisit freely before M2 ends)
 
 1. External ids are `Snowflake` (a non-zero `u64`), as the task brief asked. Slack
    (v0.2) uses string ids, so a second connector will need an external-id type change

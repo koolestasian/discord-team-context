@@ -1,4 +1,4 @@
-//! Initial deterministic retrieval baseline (plan section 9), pending T09 evaluation.
+//! Initial deterministic retrieval baseline (plan section 9), pending the M2 retrieval evaluation.
 //!
 //! Score = `max(-bm25, 0) / (1 + age_days / 30) * entry_boost`, where entry_boost is
 //! 2 for record entries and 1 for messages. Sort descending, then by a stable item id.

@@ -1,6 +1,6 @@
 # Discord test bot setup
 
-Use a throwaway server with fictional messages for the live spikes (G1). This build's
+Use a throwaway server with fictional messages for the live spikes S1 and S2. This build's
 `init` and `doctor` commands run **offline**. They do not connect the bot, register
 commands, validate a token with Discord, or establish that US-1 is complete.
 
@@ -96,7 +96,7 @@ offline checker rejects symlinks/nonregular files and on Unix requires mode 0600
 On Windows it reports that ACL validation is not implemented; restrict access to the
 host account. Environment-only setup avoids storing a token in a file.
 
-## 4. Run the offline doctor and hand off G1
+## 4. Run the offline doctor
 
 ```text
 cargo run -p teamctx -- doctor --config <path-to-teamctx.toml>
