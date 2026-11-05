@@ -19,8 +19,9 @@ Repository: `koolestasian/discord-team-context`. Settings are at
 - [ ] Create a branch ruleset that targets the default branch. Repository settings →
   Rules → Rulesets → New branch ruleset.
 - [ ] In that ruleset, enable "Require a pull request before merging".
-- [ ] In that ruleset, enable "Require status checks to pass" and select the CI jobs from
-  `ci.yml`. The job names only appear after CI has run once.
+- [ ] In that ruleset, enable "Require status checks to pass" and select the single
+  `ci-ok` check from `ci.yml` (it fails if any CI job fails). Check names only appear
+  after CI has run once.
 - [ ] In that ruleset, enable "Require linear history".
 - [ ] In that ruleset, enable "Block force pushes" and "Restrict deletions".
 
