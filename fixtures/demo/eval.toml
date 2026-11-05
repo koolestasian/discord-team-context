@@ -4,7 +4,7 @@
 # expected_messages: external snowflake IDs; expected_entries: fixture short IDs.
 # Score messages and entries against the collection the tool can return; do not
 # penalize message-only search for not returning entries. T09 defines baselines.
-# answer_contains is a human-reviewed evidence fragment, not model grading logic.
+# answer_contains is an evidence fragment checked by the fixture validator, not model grading.
 # expected_status applies to the cited entries in the dataset snapshot.
 schema_version = 1
 dataset = "dataset.json"
