@@ -4,6 +4,7 @@
 //! depends on `teamctx-core` and nothing else in the workspace. The connector, server and
 //! LLM crates reach stored data only through it.
 
+pub mod demo;
 mod read;
 mod write;
 mod writer;
