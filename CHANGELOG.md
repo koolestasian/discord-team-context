@@ -24,7 +24,12 @@ release.
   with reversed decisions, tasks and questions) and 62 retrieval evaluation questions.
   Fixture tests check the data's structure, that paraphrase questions share no words
   with their answers, and that no record follows the two planted prompt-injection
-  messages. Retrieval scoring and its baseline are not implemented yet.
+  messages.
+- `teamctx eval` (also `cargo xtask eval`): imports the demo, runs the 62 questions through
+  `search` and `context_for`, and prints recall@10 and MRR per category. The measured
+  baseline is stored in `fixtures/demo/eval-baseline.toml` and CI fails when an overall
+  number drops below it. Today every number is 0.0000 because natural-language questions
+  are ANDed; see `docs/research/M2.md`.
 - Core domain types, record lifecycle rules, query AST and repository contracts,
   with invariant tests and a contract map in `docs/design/contracts.md`.
 - Spike S4: `teamctx-store` links the bundled SQLite (`rusqlite`) and tests an FTS5
