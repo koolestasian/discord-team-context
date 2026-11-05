@@ -779,7 +779,7 @@ they're rough.
 
 | M | Goal | Key deliverables | Done when | Est. |
 |---|---|---|---|---|
-| **M0** | Foundation | Rust toolchain; workspace skeleton; CI/security workflows; ADRs 0001–0011; community files; `AGENTS.md`/`CLAUDE.md`; repo settings checklist | CI green on all three OSes with an empty binary; ADRs merged | 2–3 days |
+| **M0** | Foundation | Rust toolchain; workspace skeleton; CI/security workflows; ADRs 0001–0014 (§17); community files; `AGENTS.md`/`CLAUDE.md`; repo settings checklist | CI green on all three OSes with an empty binary; ADRs merged | 2–3 days |
 | **M1** | De-risk (time-boxed spikes) | S1 twilight gateway receives MESSAGE_CREATE with content on a test server · S2 interaction reply without Send Messages · S3 rmcp streamable HTTP behind bearer middleware, connected from Claude Code · S4 bundled SQLite FTS5 on all OSes in CI | Each spike has a written result (keep/change ADR); spike code thrown away or promoted deliberately | 3–4 days |
 | **M2** | Store + search + demo | migrations, repositories, FTS, ranking, query parser; fictional demo dataset (~300 messages, 4 channels, decisions with reversals, tasks, a pasted meeting-notes block); **eval set + `xtask eval` with baseline**; `teamctx demo`, `search` | US-2 (CLI part); store tests pass; migration tests pass; eval baseline recorded | 1 week |
 | **M3** | Discord sync | discovery, catch-up, backfill, live events, threads, deletes, recheck window, `init`, `doctor`, permission check | US-1, US-9 on the test server; fixture tests for every event type | 1–1.5 weeks |
