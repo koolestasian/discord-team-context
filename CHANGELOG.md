@@ -15,6 +15,9 @@ release.
 - Spike S4: `teamctx-store` links the bundled SQLite (`rusqlite`) and tests an FTS5
   external-content index on in-memory and file databases; CI builds and tests for
   `x86_64-unknown-linux-musl`. Result in `docs/research/S4.md`.
+- Spike S3 (`docs/research/S3.md`): `teamctx-server` serves an `rmcp` streamable HTTP MCP
+  endpoint at `/mcp` behind bearer-token middleware, with a read-only `ping` tool and
+  integration tests over real HTTP. Result: ADR 0006 stands.
 - Implementation plan (`docs/design/implementation-plan.md`).
 - Architecture decisions ADR 0001 to 0014.
 - Community files: MIT and Apache-2.0 licences, code of conduct, contributing guide,
