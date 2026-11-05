@@ -9,7 +9,7 @@
 
 The program holds a Discord token, personal access tokens and a copy of private chat.
 Every dependency is code that runs with that access. The plan's supply-chain stance is
-few dependencies, `cargo-deny` and `cargo-audit` in CI, a committed lockfile, actions
+few dependencies, `cargo-deny` in CI, a committed lockfile, actions
 pinned by SHA, and releases with attestations (§13, §16).
 
 ## Decision
@@ -28,12 +28,15 @@ crates already in the tree.
 Versions are the latest stable at scaffolding time and are recorded in `Cargo.lock`,
 which is committed.
 
-**Tools are not dependencies.** `cargo-deny`, `cargo-audit`, `cargo-dist` and
+**Tools are not dependencies.** `cargo-deny`, `cargo-dist` and
 `cargo-llvm-cov` run in CI or on a developer machine; they are not runtime
 dependencies and do not appear in the binary's dependency tree.
 
 `deny.toml` encodes the policy: allowed licences (ADR 0009), advisories, bans and
-sources. CI runs `cargo deny check` and `cargo audit` on every change.
+sources. CI runs `cargo deny check` on every change and `cargo deny check advisories`
+daily, so a new advisory surfaces without a code change. `cargo-audit` is not run
+separately: it reads the same RustSec database (decided 2026-11-04, see
+`docs/research/M0.md` §3).
 
 ## Alternatives considered
 
