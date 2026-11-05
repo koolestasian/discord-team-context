@@ -134,7 +134,7 @@ fn migrations_reopen_readonly_and_reject_newer_schema() {
     assert_eq!(
         conn.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
             .unwrap(),
-        2
+        1
     );
     assert_eq!(
         conn.pragma_query_value(None, "journal_mode", |r| r.get::<_, String>(0))
@@ -806,43 +806,87 @@ fn parent_reinclusion_restores_only_requested_descendants() {
 }
 
 #[test]
-fn version_one_migration_preserves_exclusions_until_connector_rediscovery() {
+fn read_only_open_refuses_a_database_the_writer_has_not_migrated() {
     let file = tempfile::NamedTempFile::new().unwrap();
-    let conn = rusqlite::Connection::open(file.path()).unwrap();
-    conn.execute_batch(include_str!("../migrations/0001_init.sql"))
-        .unwrap();
-    conn.execute_batch("INSERT INTO sources(id,kind,external_id,name) VALUES(1,'discord','1','Fiction'); INSERT INTO channels(id,source_id,external_id,kind,name,is_included,archived) VALUES(1,1,'10','text','room-10',0,0); INSERT INTO channels(id,source_id,external_id,parent_id,kind,name,is_included,archived) VALUES(2,1,'11',1,'thread','room-11',0,0);").unwrap();
-    conn.pragma_update(None, "user_version", 1).unwrap();
-    drop(conn);
     assert!(Store::open_read_only(file.path()).is_err());
+    drop(Store::open(file.path()).unwrap());
+    assert!(Store::open_read_only(file.path()).is_ok());
+}
+
+#[test]
+fn requested_and_effective_channel_inclusion_are_stored_separately() {
+    let file = tempfile::NamedTempFile::new().unwrap();
     let mut db = Store::open(file.path()).unwrap();
-    let source = SourceId::new(1).unwrap();
-    db.apply_event(
-        source,
-        &SourceEvent::ChannelUpsert(channel(10, None)),
-        at(2),
-    )
-    .unwrap();
-    let child = db
-        .channels(source)
-        .unwrap()
-        .into_iter()
-        .find(|c| c.external_id == sf(11))
+    let source = db
+        .upsert_source(SourceKind::Discord, sf(1), "Fiction")
         .unwrap();
-    assert!(!child.included);
-    assert_eq!(child.parent, ChannelId::new(1));
-    assert_eq!(child.name, "room-11");
-    // v1's lossy exclusion cannot be inferred safely. Connector intent restores it.
+    let mut root = channel(10, None);
+    db.apply_event(source, &SourceEvent::ChannelUpsert(root.clone()), at(1))
+        .unwrap();
     db.apply_event(
         source,
         &SourceEvent::ChannelUpsert(channel(11, Some(10))),
-        at(3),
+        at(1),
     )
     .unwrap();
-    assert!(db.channels(source).unwrap().iter().all(|c| c.included));
-    drop(db);
-    let reader = Store::open_read_only(file.path()).unwrap();
-    assert_eq!(reader.channels(source).unwrap().len(), 2);
+    let mut opted_out = channel(12, Some(10));
+    opted_out.included = false;
+    db.apply_event(source, &SourceEvent::ChannelUpsert(opted_out), at(1))
+        .unwrap();
+    // (external id, requested_included, is_included) as stored.
+    let stored = || {
+        let conn = rusqlite::Connection::open(file.path()).unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT external_id, requested_included, is_included FROM channels ORDER BY id",
+            )
+            .unwrap();
+        stmt.query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, bool>(1)?,
+                r.get::<_, bool>(2)?,
+            ))
+        })
+        .unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap()
+    };
+    let row = |id: &str, requested, effective| (id.to_owned(), requested, effective);
+    assert_eq!(
+        stored(),
+        [
+            row("10", true, true),
+            row("11", true, true),
+            row("12", false, false)
+        ]
+    );
+
+    // Excluding the root hides the subtree but keeps what each child asked for.
+    root.included = false;
+    db.apply_event(source, &SourceEvent::ChannelUpsert(root.clone()), at(2))
+        .unwrap();
+    assert_eq!(
+        stored(),
+        [
+            row("10", false, false),
+            row("11", true, false),
+            row("12", false, false)
+        ]
+    );
+
+    // Re-including the root restores only the child that requested inclusion.
+    root.included = true;
+    db.apply_event(source, &SourceEvent::ChannelUpsert(root), at(3))
+        .unwrap();
+    assert_eq!(
+        stored(),
+        [
+            row("10", true, true),
+            row("11", true, true),
+            row("12", false, false)
+        ]
+    );
 }
 
 #[test]
