@@ -269,8 +269,9 @@ pub trait IngestWrite {
     ///   [`RecordAction::SourceDeleted`](crate::record::RecordAction::SourceDeleted)
     ///   event stamped `now` with no actor. An answering message that is deleted clears
     ///   `answered_by_message`.
-    /// - `ChannelDelete`, `MarkerAdd`, `MarkerRemove`: semantics pending the open
-    ///   questions in `docs/design/contracts.md`.
+    /// - `ChannelDelete`: purge its messages and child threads using the deletion rule.
+    /// - `MarkerAdd`: capture at most one entry per message/kind.
+    /// - `MarkerRemove`: keep the captured entry unchanged.
     ///
     /// New/updated message events for a channel with `included = false` return
     /// [`ApplyOutcome::Excluded`] and store nothing. Deletion events always clean up
@@ -303,7 +304,7 @@ pub trait IngestWrite {
 
     /// Retention (plan section 6.1): deletes every message with `created_at < cutoff`.
     /// Record entries are kept; a copied title citing a purged message is replaced by
-    /// [`SOURCE_DELETED_TITLE`](crate::record::SOURCE_DELETED_TITLE). Whether
+    /// [`SOURCE_DELETED_TITLE`](crate::record::SOURCE_DELETED_TITLE). The flag
     /// `source_deleted` is also set, with a `SourceDeleted` audit event and no actor.
     /// Returns how many messages were deleted.
     ///
