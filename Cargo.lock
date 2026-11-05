@@ -1555,6 +1555,7 @@ name = "teamctx-store"
 version = "0.0.0"
 dependencies = [
  "rusqlite",
+ "serde_json",
  "teamctx-core",
  "tempfile",
 ]
