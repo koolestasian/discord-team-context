@@ -28,10 +28,10 @@ fn eval_questions_cite_existing_evidence_with_matching_status() {
         .map(|e| (e["id"].as_i64().expect("entry ID"), e))
         .collect();
     let cases = eval["cases"].as_array().expect("cases");
-    assert!(cases.len() >= 40);
+    assert!(cases.len() >= 50);
     let mut ids = BTreeSet::new();
     let mut questions = BTreeSet::new();
-    let mut categories = BTreeSet::new();
+    let mut categories: BTreeMap<&str, usize> = BTreeMap::new();
     for case in cases {
         let case = case.as_table().expect("case table");
         let label = case["id"].as_str().expect("case ID");
@@ -40,7 +40,8 @@ fn eval_questions_cite_existing_evidence_with_matching_status() {
         assert!(!question.trim().is_empty());
         assert!(questions.insert(question), "duplicate question {label}");
         assert!(!case["query"].as_str().expect("query").trim().is_empty());
-        categories.insert(case["category"].as_str().expect("category"));
+        let category = case["category"].as_str().expect("category");
+        *categories.entry(category).or_default() += 1;
         let expected_messages = case["expected_messages"].as_array().expect("message gold");
         let expected_entries = case["expected_entries"].as_array().expect("entry gold");
         assert!(
@@ -85,10 +86,74 @@ fn eval_questions_cite_existing_evidence_with_matching_status() {
             "unsupported answer for {label}"
         );
     }
-    for required in ["paraphrase", "reversed", "name", "date"] {
+    for (required, minimum) in [
+        ("paraphrase", 20),
+        ("reversed", 8),
+        ("name", 6),
+        ("date", 6),
+        ("thread-context", 4),
+    ] {
+        let found = categories.get(required).copied().unwrap_or(0);
         assert!(
-            categories.contains(required),
-            "missing eval category {required}"
+            found >= minimum,
+            "eval category {required} has {found} cases, needs {minimum}"
         );
     }
+}
+
+/// English function words that do not count as content when comparing a query with its
+/// answer fragment.
+const STOPWORDS: &[&str] = &[
+    "a", "about", "above", "after", "again", "all", "also", "am", "an", "and", "any", "are", "as",
+    "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by",
+    "can", "could", "did", "do", "does", "doing", "down", "during", "each", "few", "for", "from",
+    "further", "had", "has", "have", "having", "he", "her", "here", "hers", "him", "his", "how",
+    "i", "if", "in", "into", "is", "it", "its", "itself", "just", "me", "more", "most", "my",
+    "myself", "no", "nor", "not", "now", "of", "off", "on", "once", "only", "or", "other", "our",
+    "ours", "out", "over", "own", "same", "she", "should", "so", "some", "such", "than", "that",
+    "the", "their", "theirs", "them", "then", "there", "these", "they", "this", "those", "through",
+    "to", "too", "under", "until", "up", "very", "was", "we", "were", "what", "when", "where",
+    "which", "while", "who", "whom", "why", "will", "with", "would", "you", "your", "yours",
+];
+
+/// Lowercased alphanumeric words, with a trailing plural `s` removed from longer words so
+/// that "cover" and "covers" count as the same word.
+fn words(text: &str) -> Vec<String> {
+    text.to_lowercase()
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(|w| match w.strip_suffix('s') {
+            Some(stem) if w.len() > 3 => stem.to_owned(),
+            _ => w.to_owned(),
+        })
+        .collect()
+}
+
+#[test]
+fn paraphrase_queries_share_no_content_word_with_their_answer() {
+    let eval: toml::Table = include_str!("../../../fixtures/demo/eval.toml")
+        .parse()
+        .expect("valid eval TOML");
+    let stopwords: BTreeSet<String> = words(&STOPWORDS.join(" ")).into_iter().collect();
+    let mut checked = 0;
+    for case in eval["cases"].as_array().expect("cases") {
+        let case = case.as_table().expect("case table");
+        if case["category"].as_str() != Some("paraphrase") {
+            continue;
+        }
+        let label = case["id"].as_str().expect("case ID");
+        let query = case["query"].as_str().expect("query");
+        let answer = case["answer_contains"].as_str().expect("answer fragment");
+        let answer_words: BTreeSet<String> = words(answer).into_iter().collect();
+        let shared: Vec<String> = words(query)
+            .into_iter()
+            .filter(|w| !stopwords.contains(w) && answer_words.contains(w))
+            .collect();
+        assert!(
+            shared.is_empty(),
+            "paraphrase {label} shares {shared:?} between query and answer"
+        );
+        checked += 1;
+    }
+    assert!(checked >= 20, "only {checked} paraphrase cases");
 }
