@@ -37,6 +37,18 @@ impl fmt::Debug for Store {
     }
 }
 
+/// Schema migrations in order. Entry `n` takes the database from `user_version` `n` to
+/// `n + 1`, so a new migration is one new line here.
+const MIGRATIONS: &[&str] = &[include_str!("../migrations/0001_init.sql")];
+
+/// Reads `PRAGMA user_version`, which counts the migrations already applied.
+fn schema_version(conn: &Connection) -> RepoResult<usize> {
+    let version: i64 = conn
+        .pragma_query_value(None, "user_version", |r| r.get(0))
+        .map_err(backend)?;
+    usize::try_from(version).map_err(|_| invalid("database schema version is invalid"))
+}
+
 pub(crate) fn backend(error: impl std::error::Error + Send + Sync + 'static) -> RepoError {
     RepoError::Backend(Box::new(error))
 }
@@ -57,27 +69,23 @@ impl Store {
     }
 
     fn initialize(mut conn: Connection) -> RepoResult<Self> {
-        conn.execute_batch("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;").map_err(backend)?;
-        let version: i64 = conn
-            .pragma_query_value(None, "user_version", |r| r.get(0))
-            .map_err(backend)?;
-        if version > 2 {
+        conn.execute_batch(
+            "PRAGMA foreign_keys=ON;
+             PRAGMA busy_timeout=5000;
+             PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;",
+        )
+        .map_err(backend)?;
+        let applied = schema_version(&conn)?;
+        if applied > MIGRATIONS.len() {
             return Err(invalid("database schema is newer than this binary"));
         }
-        if version < 1 {
+        for (index, sql) in MIGRATIONS.iter().enumerate().skip(applied) {
             let tx = conn.transaction().map_err(backend)?;
-            tx.execute_batch(include_str!("../migrations/0001_init.sql"))
+            tx.execute_batch(sql).map_err(backend)?;
+            let version = i64::try_from(index + 1).map_err(|_| invalid("too many migrations"))?;
+            tx.pragma_update(None, "user_version", version)
                 .map_err(backend)?;
-            tx.pragma_update(None, "user_version", 1).map_err(backend)?;
-            tx.commit().map_err(backend)?;
-        }
-        if version < 2 {
-            let tx = conn.transaction().map_err(backend)?;
-            tx.execute_batch(include_str!(
-                "../migrations/0002_requested_channel_inclusion.sql"
-            ))
-            .map_err(backend)?;
-            tx.pragma_update(None, "user_version", 2).map_err(backend)?;
             tx.commit().map_err(backend)?;
         }
         Ok(Self {
@@ -92,10 +100,7 @@ impl Store {
             Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(backend)?;
         conn.execute_batch("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;")
             .map_err(backend)?;
-        let version: i64 = conn
-            .pragma_query_value(None, "user_version", |r| r.get(0))
-            .map_err(backend)?;
-        if version != 2 {
+        if schema_version(&conn)? != MIGRATIONS.len() {
             return Err(invalid("database requires migration by the writer"));
         }
         Ok(Self {
