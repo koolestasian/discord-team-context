@@ -122,7 +122,10 @@ fn delete_message(conn: &Connection, id: MessageId, now: UnixMillis) -> RepoResu
         conn.execute("UPDATE record_entries SET source_deleted=1,source_message_id=NULL,title=CASE WHEN title_is_copied=1 THEN ? ELSE title END,updated_at=max(updated_at,?) WHERE id=?",params![SOURCE_DELETED_TITLE,now.as_millis(),raw]).map_err(backend)?;
         audit(conn, entry, None, RecordAction::SourceDeleted, now)?;
     }
-    // Foreign keys clear answering-message references and mention rows; FTS triggers
+    // Losing an answer is a record change even when its original source survives.
+    // Advance the catch-up watermark before the foreign key removes the reference.
+    conn.execute("UPDATE record_entries SET answered_by_message_id=NULL,updated_at=max(updated_at,?) WHERE answered_by_message_id=?",params![now.as_millis(),id.get()]).map_err(backend)?;
+    // Foreign keys clear mention rows; FTS triggers
     // remove both the message text and any copied record title in this transaction.
     Ok(conn
         .execute("DELETE FROM messages WHERE id=?", [id.get()])
@@ -135,19 +138,41 @@ fn subtree(conn: &Connection, root: ChannelId) -> RepoResult<Vec<ChannelId>> {
 }
 fn purge_channels(conn: &Connection, root: ChannelId, now: UnixMillis) -> RepoResult<()> {
     for channel in subtree(conn, root)? {
-        let ids = conn
-            .prepare("SELECT id FROM messages WHERE channel_id=?")
-            .map_err(backend)?
-            .query_map([channel.get()], |r| r.get::<_, i64>(0))
-            .map_err(backend)?
-            .collect::<rusqlite::Result<Vec<_>>>()
+        purge_channel(conn, channel, now)?;
+    }
+    Ok(())
+}
+
+fn purge_channel(conn: &Connection, channel: ChannelId, now: UnixMillis) -> RepoResult<()> {
+    let ids = conn
+        .prepare("SELECT id FROM messages WHERE channel_id=?")
+        .map_err(backend)?
+        .query_map([channel.get()], |r| r.get::<_, i64>(0))
+        .map_err(backend)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(backend)?;
+    for raw in ids {
+        delete_message(
+            conn,
+            MessageId::new(raw).ok_or_else(|| invalid("invalid message id"))?,
+            now,
+        )?;
+    }
+    Ok(())
+}
+
+fn refresh_visibility(conn: &Connection, root: ChannelId, now: UnixMillis) -> RepoResult<()> {
+    conn.execute("WITH RECURSIVE visibility(id,included) AS (SELECT c.id,c.requested_included AND coalesce(p.is_included,1) FROM channels c LEFT JOIN channels p ON p.id=c.parent_id WHERE c.id=? UNION ALL SELECT c.id,c.requested_included AND v.included FROM channels c JOIN visibility v ON c.parent_id=v.id) UPDATE channels SET is_included=(SELECT included FROM visibility WHERE visibility.id=channels.id) WHERE id IN (SELECT id FROM visibility)",[root.get()]).map_err(backend)?;
+    for channel in subtree(conn, root)? {
+        let included: bool = conn
+            .query_row(
+                "SELECT is_included FROM channels WHERE id=?",
+                [channel.get()],
+                |r| r.get(0),
+            )
             .map_err(backend)?;
-        for raw in ids {
-            delete_message(
-                conn,
-                MessageId::new(raw).ok_or_else(|| invalid("invalid message id"))?,
-                now,
-            )?;
+        if !included {
+            purge_channel(conn, channel, now)?;
         }
     }
     Ok(())
@@ -314,9 +339,11 @@ impl IngestWrite for Store {
         let old=find_channel(conn,source,channel.id)?;
         if let (Some(old),Some(parent))=(&old,&parent) && subtree(conn,old.id)?.contains(&parent.id){return Err(invalid("channel hierarchy would contain a cycle"));}
         let included=channel.included&&parent.as_ref().is_none_or(|parent|parent.included);
-        if old.as_ref().is_some_and(|old|old.parent==parent.as_ref().map(|p|p.id)&&old.kind==channel.kind&&old.name==channel.name&&old.topic==channel.topic&&old.included==included&&old.archived==channel.archived){return Ok(ApplyOutcome::Unchanged);}
-        conn.execute("INSERT INTO channels(source_id,external_id,parent_id,kind,name,topic,is_included,archived) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(source_id,external_id) DO UPDATE SET parent_id=excluded.parent_id,kind=excluded.kind,name=excluded.name,topic=excluded.topic,is_included=excluded.is_included,archived=excluded.archived",params![source.get(),channel.id.to_string(),parent.as_ref().map(|p|p.id.get()),channel.kind.as_str(),channel.name,channel.topic,included,channel.archived]).map_err(backend)?;
-        if !included{let id=find_channel(conn,source,channel.id)?.ok_or_else(||missing("channel"))?.id;purge_channels(conn,id,now)?;for child in subtree(conn,id)?{conn.execute("UPDATE channels SET is_included=0 WHERE id=?",[child.get()]).map_err(backend)?;}}
+        let requested=old.as_ref().map(|old|conn.query_row("SELECT requested_included FROM channels WHERE id=?",[old.id.get()],|r|r.get::<_,bool>(0)).map_err(backend)).transpose()?;
+        if old.as_ref().is_some_and(|old|old.parent==parent.as_ref().map(|p|p.id)&&old.kind==channel.kind&&old.name==channel.name&&old.topic==channel.topic&&old.included==included&&old.archived==channel.archived&&requested==Some(channel.included)){return Ok(ApplyOutcome::Unchanged);}
+        conn.execute("INSERT INTO channels(source_id,external_id,parent_id,kind,name,topic,is_included,archived,requested_included) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(source_id,external_id) DO UPDATE SET parent_id=excluded.parent_id,kind=excluded.kind,name=excluded.name,topic=excluded.topic,is_included=excluded.is_included,archived=excluded.archived,requested_included=excluded.requested_included",params![source.get(),channel.id.to_string(),parent.as_ref().map(|p|p.id.get()),channel.kind.as_str(),channel.name,channel.topic,included,channel.archived,channel.included]).map_err(backend)?;
+        let id=find_channel(conn,source,channel.id)?.ok_or_else(||missing("channel"))?.id;
+        refresh_visibility(conn,id,now)?;
         Ok(ApplyOutcome::Applied)
       }
       SourceEvent::ChannelDelete{channel}=>{let Some(channel)=find_channel(conn,source,*channel)?else{return Ok(ApplyOutcome::Unchanged);};purge_channels(conn,channel.id,now)?;conn.execute("DELETE FROM channels WHERE id=?",[channel.id.get()]).map_err(backend)?;Ok(ApplyOutcome::Applied)}
