@@ -1,0 +1,113 @@
+# Retrieval baseline for the fictional demo, written by `cargo xtask eval -- --write-baseline`.
+# CI fails when an overall number falls below this file. Definitions: crates/teamctx/src/eval.rs.
+# Messages are scored against expected_messages and entries against expected_entries.
+schema_version = 1
+cases = 62
+
+[search.date]
+cases = 9
+messages_recall_at_10 = 0.0
+messages_mrr = 0.0
+entries_recall_at_10 = 0.0
+entries_mrr = 0.0
+combined_recall_at_10 = 0.0
+combined_mrr = 0.0
+
+[search.name]
+cases = 9
+messages_recall_at_10 = 0.0
+messages_mrr = 0.0
+entries_recall_at_10 = 0.0
+entries_mrr = 0.0
+combined_recall_at_10 = 0.0
+combined_mrr = 0.0
+
+[search.overall]
+cases = 62
+messages_recall_at_10 = 0.0
+messages_mrr = 0.0
+entries_recall_at_10 = 0.0
+entries_mrr = 0.0
+combined_recall_at_10 = 0.0
+combined_mrr = 0.0
+
+[search.paraphrase]
+cases = 22
+messages_recall_at_10 = 0.0
+messages_mrr = 0.0
+entries_recall_at_10 = 0.0
+entries_mrr = 0.0
+combined_recall_at_10 = 0.0
+combined_mrr = 0.0
+
+[search.reversed]
+cases = 13
+messages_recall_at_10 = 0.0
+messages_mrr = 0.0
+entries_recall_at_10 = 0.0
+entries_mrr = 0.0
+combined_recall_at_10 = 0.0
+combined_mrr = 0.0
+
+[search.thread-context]
+cases = 9
+messages_recall_at_10 = 0.0
+messages_mrr = 0.0
+entries_recall_at_10 = 0.0
+entries_mrr = 0.0
+combined_recall_at_10 = 0.0
+combined_mrr = 0.0
+
+[context_for.date]
+cases = 9
+messages_recall_at_10 = 0.0
+messages_mrr = 0.0
+entries_recall_at_10 = 0.0
+entries_mrr = 0.0
+combined_recall_at_10 = 0.0
+combined_mrr = 0.0
+
+[context_for.name]
+cases = 9
+messages_recall_at_10 = 0.0
+messages_mrr = 0.0
+entries_recall_at_10 = 0.0
+entries_mrr = 0.0
+combined_recall_at_10 = 0.0
+combined_mrr = 0.0
+
+[context_for.overall]
+cases = 62
+messages_recall_at_10 = 0.0
+messages_mrr = 0.0
+entries_recall_at_10 = 0.0
+entries_mrr = 0.0
+combined_recall_at_10 = 0.0
+combined_mrr = 0.0
+
+[context_for.paraphrase]
+cases = 22
+messages_recall_at_10 = 0.0
+messages_mrr = 0.0
+entries_recall_at_10 = 0.0
+entries_mrr = 0.0
+combined_recall_at_10 = 0.0
+combined_mrr = 0.0
+
+[context_for.reversed]
+cases = 13
+messages_recall_at_10 = 0.0
+messages_mrr = 0.0
+entries_recall_at_10 = 0.0
+entries_mrr = 0.0
+combined_recall_at_10 = 0.0
+combined_mrr = 0.0
+
+[context_for.thread-context]
+cases = 9
+messages_recall_at_10 = 0.0
+messages_mrr = 0.0
+entries_recall_at_10 = 0.0
+entries_mrr = 0.0
+combined_recall_at_10 = 0.0
+combined_mrr = 0.0

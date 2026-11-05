@@ -4,6 +4,7 @@
 //! validation and sync are gated on a throwaway test server.
 
 mod config;
+mod eval;
 mod token;
 
 use std::ffi::OsString;
@@ -53,6 +54,7 @@ enum Command {
     Init(config::OfflineOptions),
     Doctor(config::OfflineOptions),
     Token(token::Command),
+    Eval(eval::Options),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -61,6 +63,7 @@ enum UsageError {
     Extra(OsString),
     Config(config::ConfigError),
     Token(token::UsageError),
+    Eval(eval::ArgError),
 }
 
 impl fmt::Display for UsageError {
@@ -71,6 +74,7 @@ impl fmt::Display for UsageError {
             Self::Extra(arg) => write!(f, "unexpected extra argument {arg:?}"),
             Self::Config(error) => fmt::Display::fmt(error, f),
             Self::Token(error) => fmt::Display::fmt(error, f),
+            Self::Eval(error) => fmt::Display::fmt(error, f),
         }
     }
 }
@@ -98,6 +102,11 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, UsageError
                     .map(Command::Token)
                     .map_err(UsageError::Token);
             }
+            Some("eval") => {
+                return eval::parse_args(args)
+                    .map(Command::Eval)
+                    .map_err(UsageError::Eval);
+            }
             _ => return Err(UsageError::Unknown(arg)),
         },
     };
@@ -115,6 +124,7 @@ fn run(args: impl IntoIterator<Item = OsString>, out: &mut impl Write, err: &mut
         Ok(Command::Init(options)) => return run_offline(true, &options, out, err),
         Ok(Command::Doctor(options)) => return run_offline(false, &options, out, err),
         Ok(Command::Token(command)) => return token::run(&command, out, err),
+        Ok(Command::Eval(options)) => return run_eval(&options, out, err),
         Err(error) => {
             // If stderr is gone there is nowhere left to report that, so the error is dropped.
             let _ = writeln!(err, "error: {error}\nTry 'teamctx --help'.");
@@ -131,6 +141,16 @@ fn run_offline(
     err: &mut impl Write,
 ) -> u8 {
     match config::execute(init, options, out) {
+        Ok(success) => u8::from(!success),
+        Err(error) => {
+            let _ = writeln!(err, "error: {error}");
+            1
+        }
+    }
+}
+
+fn run_eval(options: &eval::Options, out: &mut impl Write, err: &mut impl Write) -> u8 {
+    match eval::execute(options, out) {
         Ok(success) => u8::from(!success),
         Err(error) => {
             let _ = writeln!(err, "error: {error}");
