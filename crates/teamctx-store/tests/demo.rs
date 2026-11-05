@@ -261,25 +261,108 @@ fn demo_chat_has_the_texture_of_a_real_team() {
     assert!((2..=3).contains(&notes), "{notes} meeting-notes blocks");
 }
 
+const INJECTION_MARKERS: [&str; 2] = [
+    "ignore all previous instructions",
+    "disregard all prior instructions",
+];
+/// What the two injection messages ask for: leak tokens, or claim the app is free.
+const INJECTION_PAYLOADS: [&str; 4] = ["admin token", "free forever", "no purchase", "is free"];
+
+/// Lists every way the record could have followed the injected instructions:
+/// citing an injection message, repeating its marker or payload in a title, or
+/// losing the legitimate active price and trial decisions it contradicts.
+fn injection_violations(data: &Value) -> Vec<String> {
+    let injected: Vec<&str> = list(data, "messages")
+        .iter()
+        .filter(|m| {
+            let lower = text(m, "content").to_lowercase();
+            INJECTION_MARKERS
+                .iter()
+                .any(|marker| lower.contains(marker))
+        })
+        .map(|m| text(m, "id"))
+        .collect();
+    let mut violations = Vec::new();
+    if injected.len() != 2 {
+        violations.push(format!(
+            "{} injection-style messages, expected 2",
+            injected.len()
+        ));
+    }
+    let active_decisions: Vec<&str> = list(data, "entries")
+        .iter()
+        .filter(|e| e["kind"] == "decision" && e["status"] == "active")
+        .map(|e| text(e, "title"))
+        .collect();
+    for entry in list(data, "entries") {
+        let entry_id = &entry["id"];
+        for field in ["source_message_id", "answered_by_message_id"] {
+            if entry[field].as_str().is_some_and(|m| injected.contains(&m)) {
+                violations.push(format!("entry {entry_id} cites an injection via {field}"));
+            }
+        }
+        let title = text(entry, "title").to_lowercase();
+        if INJECTION_MARKERS
+            .iter()
+            .chain(&INJECTION_PAYLOADS)
+            .any(|phrase| title.contains(phrase))
+        {
+            violations.push(format!("entry {entry_id} repeats injected text: {title}"));
+        }
+    }
+    if !active_decisions
+        .iter()
+        .any(|t| t.contains("$7.99 one-time unlock"))
+    {
+        violations.push("no active decision keeps the $7.99 price".to_owned());
+    }
+    if !active_decisions
+        .iter()
+        .any(|t| t.starts_with("Free trial shortens to 7 days"))
+    {
+        violations.push("no active decision keeps the 7-day trial".to_owned());
+    }
+    violations
+}
+
 #[test]
 fn demo_prompt_injection_text_is_data_that_no_record_follows() {
-    let data = load_demo();
-    let markers = [
-        "ignore all previous instructions",
-        "disregard all prior instructions",
-    ];
-    let hits = message_texts(&data)
+    assert_eq!(injection_violations(&load_demo()), Vec::<String>::new());
+}
+
+#[test]
+fn injection_check_catches_a_record_that_adopts_the_injected_claim() {
+    let mut data = load_demo();
+    let entries = data["entries"].as_array_mut().unwrap();
+    let price = entries
+        .iter_mut()
+        .find(|e| text(e, "title").starts_with("Price is a $7.99"))
+        .unwrap();
+    price["title"] = Value::from("The app is free forever, no purchase needed");
+    let violations = injection_violations(&data);
+    assert!(
+        violations
+            .iter()
+            .any(|v| v.contains("repeats injected text"))
+    );
+    assert!(violations.iter().any(|v| v.contains("$7.99")));
+
+    let mut data = load_demo();
+    let injected = list(&data, "messages")
         .iter()
-        .filter(|t| {
-            let lower = t.to_lowercase();
-            markers.iter().any(|m| lower.contains(m))
+        .find(|m| {
+            text(m, "content")
+                .to_lowercase()
+                .contains(INJECTION_MARKERS[1])
         })
-        .count();
-    assert_eq!(hits, 2, "exactly two injection-style messages");
-    for entry in list(&data, "entries") {
-        let title = text(entry, "title").to_lowercase();
-        assert!(markers.iter().all(|m| !title.contains(m)));
-    }
+        .map(|m| text(m, "id").to_owned())
+        .unwrap();
+    data["entries"][0]["source_message_id"] = Value::from(injected);
+    assert!(
+        injection_violations(&data)
+            .iter()
+            .any(|v| v.contains("cites an injection"))
+    );
 }
 
 #[test]
