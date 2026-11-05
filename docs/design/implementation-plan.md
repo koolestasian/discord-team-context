@@ -457,7 +457,8 @@ instead of guessing:
 - `cargo xtask eval` reports **recall@10** and **MRR** for `search`, `context_for` and
   the `/ask` retrieval step. CI fails if they drop below the stored baseline.
 - Embeddings (`sqlite-vec`) and ranking changes are accepted only if they raise the
-  eval meaningfully without hurting latency or binary size.
+  recall@10 or MRR rises by at least 3 points and neither falls by more than 1 point,
+  without hurting latency or binary size.
 
 ---
 
@@ -541,9 +542,9 @@ API (blog, 2026-02-20). Progressive disclosure through skills is the matching pa
 So:
 
 - **`teamctx q <context|whats-new|record|search|read> … [--json]`** calls the host's
-  JSON API. It reads `TEAMCTX_URL` and `TEAMCTX_TOKEN` from env or the OS keychain. Env vars
-  work without extra code; keychain support needs a crate outside §17's list, so it is
-  decided under ADR 0011 in M4.
+  JSON API. It reads `TEAMCTX_URL` and `TEAMCTX_TOKEN` from env vars or from a token file
+  readable only by its owner (mode 0600 on Unix). v0.1 has no OS keychain support: it would
+  need a crate outside §17's list (ADR 0011).
   Output is compact text, or JSON for piping into files. Same query layer as MCP, so
   results are identical.
 - **Agent Skill** `skills/teamctx/SKILL.md` (agentskills.io open standard; loaded by
@@ -727,7 +728,7 @@ gating) elsewhere. Every bug fix gets a regression test.
 ## 16. Delivery: CI/CD and repo hygiene
 
 - **Branches:** `main` is protected by a ruleset (PRs, CI green, linear history, no
-  force push). Work happens on short branches (`m<N>-<slug>` per milestone). A separate worktree is
+  force push). Work happens on short branches (`m<N>-<slug>` per milestone, or `build/run-<N>` for a run of parallel tasks). A separate worktree is
   used only when two sessions write at the same time.
   Conventional Commits.
 - **CI** (`.github/workflows/ci.yml`, actions pinned by SHA, top-level
@@ -814,7 +815,7 @@ they're rough.
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Rust learning curve slows delivery | medium | M1 spikes, small crates, agent pairing, clear ADRs; Go is the documented fallback (decide by the end of M1) |
+| Rust learning curve slows delivery | medium | M1 spikes, small crates, agent pairing, clear ADRs; Go is the documented fallback: if live spikes S1 and S2 are not working within 4 working days of effort, stop and reconsider Go |
 | Missed edits/deletes while offline | medium | recheck window + documented limit; host should be always-on |
 | Discord policy or intent changes | low | read-only, explicit purpose, no training; track the developer changelog |
 | Teams can't host (no always-on machine) | medium | Docker image; guides for a Pi, an old laptop and a small VPS; demo mode for trying |
@@ -829,9 +830,9 @@ they're rough.
 2. Rust experience level. It changes the M1 go/no-go threshold, not the plan.
 3. Which machine hosts the dogfood instance.
 4. Whether the first dogfooding team agrees to use it.
-5. The go/no-go bar for Rust at the end of M1 (§19; Go is the documented fallback).
+5. The go/no-go bar for Rust at the end of M1 (§19; Go is the documented fallback). **Answered (2026-11-05):** S1 and S2 working within 4 working days of effort, otherwise reconsider Go (§19).
 6. What counts as a meaningful eval gain (§9.1): a minimum recall@10 / MRR change,
-   set once the M2 baseline exists.
+   set once the M2 baseline exists. **Answered (2026-11-05):** +3 points recall@10 or MRR, neither falling more than 1 point (§9.1).
 
 ## Glossary
 
