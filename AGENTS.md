@@ -44,7 +44,7 @@ teamctx  ->  {teamctx-discord, teamctx-server, teamctx-llm}  ->  teamctx-store  
 
 | Crate | Role |
 |---|---|
-| `crates/teamctx-core` | Domain types, record rules, query parsing, ranking, citation formatting, untrusted-content framing. No I/O, no async, no dependencies. |
+| `crates/teamctx-core` | Domain types, record rules, query parsing, ranking, citation formatting, untrusted-content framing. No I/O, no async; only external dependency is `thiserror`. |
 | `crates/teamctx-store` | SQLite, migrations, repositories, FTS5 queries. The only place that runs SQL. |
 | `crates/teamctx-discord` | Gateway and REST sync, mapping to core events, slash commands. Read-only towards Discord. |
 | `crates/teamctx-llm` | Optional `/ask` pipeline and provider adapters. |

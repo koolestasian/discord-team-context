@@ -79,36 +79,24 @@ fills what. Rust doc comments hold the full contract of every item.
    T04 (see Q7).
 10. Short ids parse strictly (uppercase prefix only); see Q8.
 
-## Open questions (plan is silent or ambiguous; nothing chosen)
+## Maintainer clarifications (2026-11-05)
 
-1. **Channel delete.** What happens to a deleted channel's stored messages and threads,
-   and to record entries citing them? Apply the §6.1 deletion rule to each message?
-2. **Marker semantics.** Does `MarkerAdd` on a message that already has an entry of that
-   kind create a second entry? What does `MarkerRemove` do to the entry it created
-   (nothing, drop, delete)?
-3. **Copied titles over 200 characters.** Truncate (where, with an ellipsis?) or reject?
-   May titles contain line breaks?
-4. **Forum channels.** §6 has `forum_post` but no kind for the forum channel itself, yet
-   a forum post's `parent_id` must reference a `channels` row. Add a `forum` kind?
-5. **Mentions.** `whats_new` and `/catchup` list "messages that mention the caller", but
-   §6 stores content with mentions resolved to names and has no mention column. Add a
-   mentions table or column? (No repository method exists for this yet.)
-6. **Retention and `source_deleted`.** §6.1 says purged messages' copied titles follow
-   the deletion rule. Is `source_deleted` also set on purge, and is a
-   `source_deleted` audit event appended?
-7. **Query semantics (T04).** Do repeated `from:` or `in:` clauses combine with AND or
-   OR? Are `before:` and `after:` inclusive? Is a date midnight UTC or midnight in
-   `server.timezone`?
-8. **Short-id input.** Should `d-12` (lowercase) be accepted from people?
-9. **Token scopes.** §6 defaults `scopes` to `'read'`. What other values exist (for
-   example for `POST /api/v1/ask`), and is the list space-separated?
-10. **Connector trait home.** The §5.3 `Connector` trait is async and uses a
-    cancellation token, so it cannot live in core. Which crate owns it (and
-    `EventSink`, `CursorStore`)?
-11. **Channels excluded later.** When a channel moves to the denylist, are its stored
-    messages purged or only hidden?
-12. **`record` tool `since`.** Does it filter on creation or on last change? The
-    contract offers `EntryFilter::updated_since` only.
-13. **Member events.** §7.2 lists no member gateway event (`GUILD_MEMBER_UPDATE` needs a
-    privileged intent). Is `MemberUpsert` only emitted from message authors and
-    interaction users?
+All thirteen draft questions were answered in the build continuation:
+
+- Channel deletion purges messages and child threads using the message deletion rule.
+- Reaction capture is unique per message/kind; removing the reaction keeps the entry.
+- Copied titles normalize whitespace to one line and truncate at 200 Unicode scalars.
+- Forum parents use kind `forum`; mentioned user IDs are stored separately from text.
+- Retention and newly excluded channels purge history using the same deletion rule,
+  setting `source_deleted` and appending its audit event. Deletion cleanup must run
+  even when the channel is already excluded.
+- Query clauses combine with AND. Dates mean midnight in `server.timezone`, with
+  inclusive `after:` and exclusive `before:`; timezone conversion stays outside core.
+- Human short-id input accepts lowercase prefixes; canonical display/storage is uppercase.
+- v0.1 tokens have only the `read` scope, including access to `/ask`.
+- `Connector`, `EventSink` and `CursorStore` belong in `teamctx-discord`.
+- `record`'s `since` means last update.
+- Member upserts come from message authors and interaction users, without a member intent.
+
+These answers supersede draft decisions 9 and 10 above where applicable. Changes to
+message mention fields land with mapping/storage; contracts alone do not implement them.

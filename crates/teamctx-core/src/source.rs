@@ -34,6 +34,8 @@ text_enum! {
         Text => "text",
         /// A thread under a text or announcement channel.
         Thread => "thread",
+        /// A top-level forum containing forum posts.
+        Forum => "forum",
         /// A post (thread) in a forum channel.
         ForumPost => "forum_post",
         /// An announcement channel.
@@ -43,7 +45,7 @@ text_enum! {
 
 impl ChannelKind {
     /// Whether this kind lives under a parent channel. Threads and forum posts do;
-    /// text and announcement channels do not.
+    /// text, forum and announcement channels do not.
     #[must_use]
     pub const fn has_parent(self) -> bool {
         matches!(self, Self::Thread | Self::ForumPost)
@@ -303,7 +305,10 @@ mod tests {
     #[test]
     fn text_enums_round_trip_with_schema_values() {
         let kinds: Vec<_> = ChannelKind::ALL.iter().map(|k| k.as_str()).collect();
-        assert_eq!(kinds, ["text", "thread", "forum_post", "announcement"]);
+        assert_eq!(
+            kinds,
+            ["text", "thread", "forum", "forum_post", "announcement"]
+        );
         for kind in ChannelKind::ALL {
             assert_eq!(kind.as_str().parse::<ChannelKind>().unwrap(), *kind);
         }
@@ -312,7 +317,7 @@ mod tests {
             SourceKind::Discord
         );
         assert!("Discord".parse::<SourceKind>().is_err());
-        assert!("forum".parse::<ChannelKind>().is_err());
+        assert_eq!("forum".parse::<ChannelKind>(), Ok(ChannelKind::Forum));
     }
 
     #[test]
