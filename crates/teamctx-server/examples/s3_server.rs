@@ -1,4 +1,4 @@
-//! Runs the spike S3 server so a real MCP client (Claude Code, T03b) can connect to it.
+//! Runs the spike S3 server so a real MCP client (for example Claude Code) can connect to it.
 //!
 //! ```sh
 //! TEAMCTX_S3_TOKEN=tctx_test_local_only cargo run -p teamctx-server --example s3_server

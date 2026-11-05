@@ -1,7 +1,7 @@
 //! Bearer-token middleware for the MCP endpoint (ADR 0006).
 //!
 //! Spike scope: one static token, compared in constant time. The real token store
-//! (hashed per-person tokens, `last_used_at`, revocation, failure rate limit) is T11.
+//! (hashed per-person tokens, `last_used_at`, revocation, failure rate limit) arrives with the token store (M4).
 //!
 //! Challenge format: the MCP authorization spec (2026-07-28) says a protected server
 //! answers `401` with a `WWW-Authenticate: Bearer ...` header and SHOULD add a

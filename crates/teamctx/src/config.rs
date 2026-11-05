@@ -681,7 +681,7 @@ pub(crate) fn execute(
     )?;
     writeln!(
         out,
-        "This build does not load secrets.env automatically. Use process environment variables. Live init/doctor checks arrive after the Discord test gate."
+        "This build does not load secrets.env automatically. Use process environment variables. Live init/doctor checks arrive with Discord sync (milestone M3)."
     )?;
     Ok(token_set && permissions_ok)
 }

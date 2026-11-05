@@ -21,7 +21,7 @@ use crate::{auth::BearerAuth, mcp::PingServer, secret::Secret};
 /// Settings for [`router`].
 #[derive(Debug)]
 pub struct HttpConfig {
-    /// The one accepted bearer token (spike scope; T11 replaces it with a token store).
+    /// The one accepted bearer token (spike scope; the M4 token store replaces it).
     pub token: Secret<String>,
     /// `Host` values the MCP endpoint accepts, as `host` or `host:port`. rmcp rejects any
     /// other `Host` with 403 to stop DNS-rebinding attacks. The default list is loopback

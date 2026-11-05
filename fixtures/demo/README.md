@@ -74,7 +74,7 @@ parent relationships, lifecycle transitions and the decision reversals, plus the
 properties listed above: message and entry counts, thread structure, author spread,
 share of short messages, links, code block, meeting-notes count, injection-style
 messages and the task and question lifecycles. It does not claim to import a database:
-T07/T10 supply that path.
+The store and the M2 `teamctx demo` command supply that path.
 
 ## Evaluation set
 

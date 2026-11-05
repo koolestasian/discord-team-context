@@ -1,5 +1,5 @@
 //! The MCP service mounted at `/mcp`. Spike S3 ships one read-only tool, `ping`; the five
-//! real tools arrive in T12.
+//! real tools arrive in M4.
 
 use rmcp::{
     ServerHandler,
