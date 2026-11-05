@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft for review |
+| Status | Accepted for v0.1 (2026-11-04); later changes go through an ADR |
 | Date | 2026-11-04 |
 | Working name | `teamctx` (placeholder; rename before the first public release) |
 | Scope | v0.1: Discord only, self-hosted, single binary |
@@ -526,7 +526,11 @@ instead of guessing:
 ### 10.3 CLI
 
 Host commands: `teamctx init` · `run` · `demo` · `doctor` · `token create|list|revoke` ·
-`export --format okf|md <dir>` · `purge` · `version`.
+`export --format okf|md <dir>` · `purge` · `version`. The `md` layout is defined in M5
+with the OKF export (ADR 0013).
+
+Client and agent commands: `q <context|whats-new|record|search|read>` (§10.4) ·
+`skill install` (§10.4) · `mcp --stdio` (§10.1).
 
 ### 10.4 CLI client and Agent Skill (for coding agents)
 
@@ -537,7 +541,9 @@ API (blog, 2026-02-20). Progressive disclosure through skills is the matching pa
 So:
 
 - **`teamctx q <context|whats-new|record|search|read> … [--json]`** calls the host's
-  JSON API. It reads `TEAMCTX_URL` and `TEAMCTX_TOKEN` from env or the OS keychain.
+  JSON API. It reads `TEAMCTX_URL` and `TEAMCTX_TOKEN` from env or the OS keychain. Env vars
+  work without extra code; keychain support needs a crate outside §17's list, so it is
+  decided under ADR 0011 in M4.
   Output is compact text, or JSON for piping into files. Same query layer as MCP, so
   results are identical.
 - **Agent Skill** `skills/teamctx/SKILL.md` (agentskills.io open standard; loaded by
@@ -721,7 +727,8 @@ gating) elsewhere. Every bug fix gets a regression test.
 ## 16. Delivery: CI/CD and repo hygiene
 
 - **Branches:** `main` is protected by a ruleset (PRs, CI green, linear history, no
-  force push). Work happens on short branches in separate worktrees.
+  force push). Work happens on short branches (`m<N>-<slug>` per milestone). A separate worktree is
+  used only when two sessions write at the same time.
   Conventional Commits.
 - **CI** (`.github/workflows/ci.yml`, actions pinned by SHA, top-level
   `permissions: {}` with per-job grants such as `contents: read`):
@@ -822,6 +829,9 @@ they're rough.
 2. Rust experience level. It changes the M1 go/no-go threshold, not the plan.
 3. Which machine hosts the dogfood instance.
 4. Whether the first dogfooding team agrees to use it.
+5. The go/no-go bar for Rust at the end of M1 (§19; Go is the documented fallback).
+6. What counts as a meaningful eval gain (§9.1): a minimum recall@10 / MRR change,
+   set once the M2 baseline exists.
 
 ## Glossary
 
