@@ -12,6 +12,10 @@ release.
 
 ### Added
 
+- Query parsing and literal FTS5 expression compilation, deterministic ranking,
+  citation formatting and escaped untrusted-chat framing in core.
+- Fictional demo data (300 messages) and 50 grounded retrieval evaluation questions,
+  with fixture validation. Retrieval scoring and its baseline are not implemented yet.
 - Core domain types, record lifecycle rules, query AST and repository contracts,
   with invariant tests and a contract map in `docs/design/contracts.md`.
 - Spike S4: `teamctx-store` links the bundled SQLite (`rusqlite`) and tests an FTS5
