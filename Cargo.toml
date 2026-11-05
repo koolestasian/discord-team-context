@@ -18,6 +18,12 @@ teamctx-discord = { path = "crates/teamctx-discord" }
 teamctx-llm = { path = "crates/teamctx-llm" }
 teamctx-server = { path = "crates/teamctx-server" }
 
+# External dependencies (ADR 0011).
+# rusqlite: bundled SQLite with FTS5 (ADR 0003, spike S4). Default features are off:
+# they only add the statement cache and a wasm backend we do not use.
+rusqlite = { version = "0.41.1", default-features = false, features = ["bundled"] }
+tempfile = "3.27.0"
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 rust_2018_idioms = { level = "warn", priority = -1 }
