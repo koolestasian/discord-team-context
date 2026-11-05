@@ -6,5 +6,7 @@ Self-hosted Rust program that turns a team's Discord into a searchable team reco
 
 ## Status
 
-M0 Foundation complete (2026-11-04). Next: M1 spikes S3/S4 and the offline parts of
-M2-M4 (plan section 18); S1/S2 need a Discord test server.
+Build run 1 has core/query/framing contracts, fictional fixtures and eval questions,
+SQLite repositories/writer, S3/S4 spikes, and offline configuration/permissions. Continue from the local build
+state; M2 retrieval evaluation/demo CLI and later interfaces remain. S1/S2 need a
+Discord test server; see docs/guides/discord-bot.md.
