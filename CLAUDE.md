@@ -6,7 +6,7 @@ Self-hosted Rust program that turns a team's Discord into a searchable team reco
 
 ## Status
 
-Build run 1 has core/query/framing contracts, fictional fixtures and eval questions,
-SQLite repositories/writer, S3/S4 spikes, and offline configuration/permissions. Continue from the local build
-state; M2 retrieval evaluation/demo CLI and later interfaces remain. S1/S2 need a
-Discord test server; see docs/guides/discord-bot.md.
+Done: M0, spikes S3/S4, core contracts (query, ranking, framing, citations), the
+fictional demo dataset and eval questions, SQLite repositories and writer, and offline
+configuration and permission checks. Next: the M2 eval runner and `demo`/`search` CLI.
+S1/S2 need a Discord test server; see docs/guides/discord-bot.md.
