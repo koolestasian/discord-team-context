@@ -12,6 +12,9 @@ release.
 
 ### Added
 
+- Spike S4: `teamctx-store` links the bundled SQLite (`rusqlite`) and tests an FTS5
+  external-content index on in-memory and file databases; CI builds and tests for
+  `x86_64-unknown-linux-musl`. Result in `docs/research/S4.md`.
 - Implementation plan (`docs/design/implementation-plan.md`).
 - Architecture decisions ADR 0001 to 0014.
 - Community files: MIT and Apache-2.0 licences, code of conduct, contributing guide,
