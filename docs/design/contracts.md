@@ -69,15 +69,14 @@ fills what. Rust doc comments hold the full contract of every item.
    (§7.2 step 1); the store only records it.
 5. `Marker` carries the `EntryKind`: the connector maps the configured emoji and drops
    every other reaction, so unrelated reactions never reach the store.
-6. Message events for an excluded channel are dropped (`ApplyOutcome::Excluded`) and
-   reads hide excluded channels, as a privacy-conservative default.
+6. New/updated messages for excluded channels are dropped (`ApplyOutcome::Excluded`).
+   Deletions still clean up, and reads hide excluded channels.
 7. `StatusChange::Answer` requires the answering message, because `/answer` takes a
    required `message_link` (§7.3).
 8. The store returns raw `bm25()` candidates (`MessageHit`, `EntryHit`); ranking runs in
    core (§9 puts the formula in `core::rank`).
-9. The query tree is a flat, ordered list of clauses; how clauses combine is left to
-   T04 (see Q7).
-10. Short ids parse strictly (uppercase prefix only); see Q8.
+9. The query tree is a flat, ordered list of AND clauses (including repeated filters).
+10. Canonical short ids parse strictly; `ShortId::parse_user` accepts lowercase input.
 
 ## Maintainer clarifications (2026-11-05)
 
@@ -98,5 +97,5 @@ All thirteen draft questions were answered in the build continuation:
 - `record`'s `since` means last update.
 - Member upserts come from message authors and interaction users, without a member intent.
 
-These answers supersede draft decisions 9 and 10 above where applicable. Changes to
-message mention fields land with mapping/storage; contracts alone do not implement them.
+Message contracts carry mention IDs separately; mapping populates them and storage
+persists them. Contract types alone do not implement ingestion or retrieval.

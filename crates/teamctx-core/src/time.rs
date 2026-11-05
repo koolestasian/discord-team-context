@@ -31,8 +31,7 @@ impl UnixMillis {
 /// A calendar date in the proleptic Gregorian calendar, without a time zone.
 ///
 /// Used by the search syntax `before:YYYY-MM-DD` / `after:YYYY-MM-DD` (plan section 9).
-/// Which time zone turns a date into an instant is not decided here; see
-/// `docs/design/contracts.md`, open questions.
+/// The query service resolves midnight in `server.timezone`; core retains the date.
 ///
 /// Invariants: `1 <= year <= 9999` (four digits), `1 <= month <= 12`, and `day` exists
 /// in that month (leap years included). The text form is exactly `YYYY-MM-DD`, and
