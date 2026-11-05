@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest a change or addition
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the non-goals in plan section 1 first. Many ideas are deliberately out of
+        scope for v0.1. Changing a decision in plan section 3 needs an ADR.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What do you need to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should teamctx do? Keep it to behaviour, not implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways to solve the problem, including doing nothing.

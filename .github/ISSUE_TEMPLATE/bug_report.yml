@@ -1,0 +1,52 @@
+name: Bug report
+description: Something does not work the way the plan or the docs say it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security vulnerabilities here. Use the private link in SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The release version, or the commit hash if you built from source.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "for example Windows 11, macOS 15, Ubuntu 24.04"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps, starting from a clean state if possible.
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        Remove bot tokens, access tokens, API keys and any private chat content before
+        you paste anything. Use fictional example text if you can.
+      render: text
