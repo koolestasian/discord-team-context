@@ -6,507 +6,630 @@
 # penalize message-only search for not returning entries. T09 defines baselines.
 # answer_contains is an evidence fragment checked by the fixture validator, not model grading.
 # expected_status applies to the cited entries in the dataset snapshot.
+# Categories: paraphrase (no content word of the query appears in answer_contains),
+# reversed (the question is about a decision that was later superseded), name, date,
+# thread-context (the answer needs neighbouring messages in the same conversation).
 schema_version = 1
 dataset = "dataset.json"
 cutoff = 10
 metrics = ["recall_at_10", "mrr"]
 
 [[cases]]
-id = "current-01"
+id = "para-01"
 category = "paraphrase"
-question = "What database did we finally pick?"
-query = "What database did we finally pick?"
-expected_messages = ["1477606322995200006"]
-expected_entries = ["D-3"]
-answer_contains = "SQLite"
-expected_status = "active"
-
-[[cases]]
-id = "current-02"
-category = "paraphrase"
-question = "How do we index full text now?"
-query = "How do we index full text now?"
-expected_messages = ["1477968710860800016"]
+question = "Which typeface do we use for the main reading text?"
+query = "Which typeface do we use for the main reading text?"
+expected_messages = ["1478693996665635008", "1478731524147904774"]
 expected_entries = ["D-7"]
-answer_contains = "SQLite FTS5"
+answer_contains = "Fenwick Serif"
 expected_status = "active"
 
 [[cases]]
-id = "current-03"
+id = "para-02"
 category = "paraphrase"
-question = "Do archived discussions get independent synchronization positions?"
-query = "Do archived discussions get independent synchronization positions?"
-expected_messages = ["1478331098726400026"]
-expected_entries = ["D-11"]
-answer_contains = "one cursor per thread"
-expected_status = "active"
-
-[[cases]]
-id = "current-04"
-category = "paraphrase"
-question = "Are attachment contents kept or just file names?"
-query = "Are attachment contents kept or just file names?"
-expected_messages = ["1478693486592000036"]
-expected_entries = ["D-15"]
-answer_contains = "attachment filenames only"
-expected_status = "active"
-
-[[cases]]
-id = "current-05"
-category = "paraphrase"
-question = "How often do we save backups, and at what UTC time?"
-query = "How often do we save backups, and at what UTC time?"
-expected_messages = ["1479055874457600046"]
-expected_entries = ["D-19"]
-answer_contains = "daily backups at 02:00 UTC"
-expected_status = "active"
-
-[[cases]]
-id = "current-06"
-category = "paraphrase"
-question = "Which portable format holds the exported record?"
-query = "Which portable format holds the exported record?"
-expected_messages = ["1479418262323200056"]
-expected_entries = ["D-23"]
-answer_contains = "cross-linked Markdown"
-expected_status = "active"
-
-[[cases]]
-id = "current-07"
-category = "paraphrase"
-question = "How are chapter sections represented in the contents panel?"
-query = "How are chapter sections represented in the contents panel?"
-expected_messages = ["1479780650188800066"]
-expected_entries = ["D-27"]
-answer_contains = "a nested chapter tree"
-expected_status = "active"
-
-[[cases]]
-id = "current-08"
-category = "paraphrase"
-question = "Does the app follow the device color scheme by default?"
-query = "Does the app follow the device color scheme by default?"
-expected_messages = ["1480143038054400076"]
-expected_entries = ["D-31"]
-answer_contains = "system preference"
-expected_status = "active"
-
-[[cases]]
-id = "current-09"
-category = "paraphrase"
-question = "What markup does the note editor accept?"
-query = "What markup does the note editor accept?"
-expected_messages = ["1480505425920000086"]
-expected_entries = ["D-35"]
-answer_contains = "plain Markdown"
-expected_status = "active"
-
-[[cases]]
-id = "current-10"
-category = "paraphrase"
-question = "How many days does a login session last?"
-query = "How many days does a login session last?"
-expected_messages = ["1480867813785600096"]
-expected_entries = ["D-39"]
-answer_contains = "seven days"
-expected_status = "active"
-
-[[cases]]
-id = "current-11"
-category = "paraphrase"
-question = "Where will the pilot application be hosted?"
-query = "Where will the pilot application be hosted?"
-expected_messages = ["1481230201651200106"]
-expected_entries = ["D-43"]
-answer_contains = "one Linux host"
-expected_status = "active"
-
-[[cases]]
-id = "current-12"
-category = "paraphrase"
-question = "Can pilot users install the app without system privileges?"
-query = "Can pilot users install the app without system privileges?"
-expected_messages = ["1481592589516800116"]
-expected_entries = ["D-47"]
-answer_contains = "a portable archive"
-expected_status = "active"
-
-[[cases]]
-id = "current-13"
-category = "paraphrase"
-question = "Which languages are included in the interface?"
-query = "Which languages are included in the interface?"
-expected_messages = ["1481954977382400126"]
-expected_entries = ["D-51"]
-answer_contains = "English and Spanish"
-expected_status = "active"
-
-[[cases]]
-id = "current-14"
-category = "paraphrase"
-question = "Whose time zone controls displayed deadlines?"
-query = "Whose time zone controls displayed deadlines?"
-expected_messages = ["1482317365248000136"]
-expected_entries = ["D-55"]
-answer_contains = "reader-local dates"
-expected_status = "active"
-
-[[cases]]
-id = "current-15"
-category = "paraphrase"
-question = "How many matches are shown on each search page?"
-query = "How many matches are shown on each search page?"
-expected_messages = ["1482679753113600146"]
-expected_entries = ["D-59"]
-answer_contains = "twenty results"
-expected_status = "active"
-
-[[cases]]
-id = "current-16"
-category = "paraphrase"
-question = "What determines the order of books in the library?"
-query = "What determines the order of books in the library?"
-expected_messages = ["1483042140979200156"]
-expected_entries = ["D-63"]
-answer_contains = "last opened time"
-expected_status = "active"
-
-[[cases]]
-id = "current-17"
-category = "paraphrase"
-question = "Can someone try the app before creating an account?"
-query = "Can someone try the app before creating an account?"
-expected_messages = ["1483404528844800166"]
-expected_entries = ["D-67"]
-answer_contains = "a fictional demo library"
-expected_status = "active"
-
-[[cases]]
-id = "current-18"
-category = "paraphrase"
-question = "Does usage data leave the device?"
-query = "Does usage data leave the device?"
-expected_messages = ["1483766916710400176"]
-expected_entries = ["D-71"]
-answer_contains = "local aggregate counters"
-expected_status = "active"
-
-[[cases]]
-id = "current-19"
-category = "paraphrase"
-question = "Do library covers use originals or resized previews?"
-query = "Do library covers use originals or resized previews?"
-expected_messages = ["1484129304576000186"]
-expected_entries = ["D-75"]
-answer_contains = "small local thumbnails"
-expected_status = "active"
-
-[[cases]]
-id = "current-20"
-category = "paraphrase"
-question = "What prevents shortcuts from firing while writing notes?"
-query = "What prevents shortcuts from firing while writing notes?"
-expected_messages = ["1484491692441600196"]
-expected_entries = ["D-79"]
-answer_contains = "modifier-key shortcuts"
-expected_status = "active"
-
-[[cases]]
-id = "current-21"
-category = "paraphrase"
-question = "How does the client retry a failed network request?"
-query = "How does the client retry a failed network request?"
-expected_messages = ["1484854080307200206"]
-expected_entries = ["D-83"]
-answer_contains = "bounded exponential retries"
-expected_status = "active"
-
-[[cases]]
-id = "current-22"
-category = "paraphrase"
-question = "How long are chat messages kept?"
-query = "How long are chat messages kept?"
-expected_messages = ["1485216468172800216"]
-expected_entries = ["D-87"]
-answer_contains = "ninety days"
-expected_status = "active"
-
-[[cases]]
-id = "current-23"
-category = "paraphrase"
-question = "What information belongs in request logs?"
-query = "What information belongs in request logs?"
-expected_messages = ["1485578856038400226"]
-expected_entries = ["D-91"]
-answer_contains = "request IDs and status codes"
-expected_status = "active"
-
-[[cases]]
-id = "current-24"
-category = "paraphrase"
-question = "On which weekday will the pilot launch?"
-query = "On which weekday will the pilot launch?"
-expected_messages = ["1485941243904000236"]
-expected_entries = ["D-95"]
-answer_contains = "Tuesday"
-expected_status = "active"
-
-[[cases]]
-id = "current-25"
-category = "paraphrase"
-question = "How should keyboard focus be made visible?"
-query = "How should keyboard focus be made visible?"
-expected_messages = ["1486303631769600246"]
-expected_entries = ["D-99"]
-answer_contains = "a visible blue outline"
-expected_status = "active"
-
-[[cases]]
-id = "current-26"
-category = "paraphrase"
-question = "How do we validate an imported book file?"
-query = "How do we validate an imported book file?"
-expected_messages = ["1486666019635200256"]
-expected_entries = ["D-103"]
-answer_contains = "checking the archive structure"
-expected_status = "active"
-
-[[cases]]
-id = "current-27"
-category = "paraphrase"
-question = "What is the cold startup time budget?"
-query = "What is the cold startup time budget?"
-expected_messages = ["1487028407500800266"]
-expected_entries = ["D-107"]
-answer_contains = "two seconds"
-expected_status = "active"
-
-[[cases]]
-id = "current-28"
-category = "paraphrase"
-question = "What remains usable when the train loses internet?"
-query = "What remains usable when the train loses internet?"
-expected_messages = ["1487390795366400276"]
-expected_entries = ["D-111"]
-answer_contains = "cached books and notes"
-expected_status = "active"
-
-[[cases]]
-id = "current-29"
-category = "paraphrase"
-question = "What happens when two devices edit the same note?"
-query = "What happens when two devices edit the same note?"
-expected_messages = ["1487753183232000286"]
-expected_entries = ["D-115"]
-answer_contains = "keep both versions"
-expected_status = "active"
-
-[[cases]]
-id = "current-30"
-category = "paraphrase"
-question = "How are overdue reminders presented to readers?"
-query = "How are overdue reminders presented to readers?"
-expected_messages = ["1488115571097600296"]
-expected_entries = ["D-119"]
-answer_contains = "an in-app due list"
-expected_status = "active"
-
-[[cases]]
-id = "history-01"
-category = "reversed"
-question = "Before the reversal, what was the initial choice for database?"
-query = "Before the reversal, what was the initial choice for database?"
-expected_messages = ["1477596256665600002"]
-expected_entries = ["D-2"]
-answer_contains = "PostgreSQL"
-expected_status = "superseded"
-
-[[cases]]
-id = "history-03"
-category = "reversed"
-question = "Before the reversal, what was the initial choice for sync cursor?"
-query = "Before the reversal, what was the initial choice for sync cursor?"
-expected_messages = ["1478321032396800022"]
-expected_entries = ["D-10"]
-answer_contains = "one cursor per server"
-expected_status = "superseded"
-
-[[cases]]
-id = "history-05"
-category = "reversed"
-question = "Before the reversal, what was the initial choice for backup cadence?"
-query = "Before the reversal, what was the initial choice for backup cadence?"
-expected_messages = ["1479045808128000042"]
-expected_entries = ["D-18"]
-answer_contains = "weekly backups"
-expected_status = "superseded"
-
-[[cases]]
-id = "history-09"
-category = "reversed"
-question = "Before the reversal, what was the initial choice for note editor?"
-query = "Before the reversal, what was the initial choice for note editor?"
-expected_messages = ["1480495359590400082"]
-expected_entries = ["D-34"]
-answer_contains = "rich text"
-expected_status = "superseded"
-
-[[cases]]
-id = "history-12"
-category = "reversed"
-question = "Before the reversal, what was the initial choice for package format?"
-query = "Before the reversal, what was the initial choice for package format?"
-expected_messages = ["1481582523187200112"]
+question = "What is the oldest Android release the app still runs on?"
+query = "What is the oldest Android release the app still runs on?"
+expected_messages = ["1488120156088567156", "1488120887684236667"]
 expected_entries = ["D-46"]
-answer_contains = "a system installer"
+answer_contains = "API 24"
+expected_status = "active"
+
+[[cases]]
+id = "para-03"
+category = "paraphrase"
+question = "How much will the full app cost?"
+query = "How much will the full app cost?"
+expected_messages = ["1485656921158583430"]
+expected_entries = ["D-36"]
+answer_contains = "$7.99"
+expected_status = "active"
+
+[[cases]]
+id = "para-04"
+category = "paraphrase"
+question = "How long can people try it before paying?"
+query = "How long can people try it before paying?"
+expected_messages = ["1495733570554169392", "1495729513391327259"]
+expected_entries = ["D-74"]
+answer_contains = "7 days"
+expected_status = "active"
+
+[[cases]]
+id = "para-05"
+category = "paraphrase"
+question = "What happens when two devices disagree about where I stopped reading?"
+query = "What happens when two devices disagree about where I stopped reading?"
+expected_messages = ["1485916079220982967", "1485739443561301168"]
+expected_entries = ["D-39"]
+answer_contains = "furthest page"
+expected_status = "active"
+
+[[cases]]
+id = "para-06"
+category = "paraphrase"
+question = "Do readers have to register before opening a book?"
+query = "Do readers have to register before opening a book?"
+expected_messages = ["1481698790154044032"]
+expected_entries = ["D-16"]
+answer_contains = "optional"
+expected_status = "active"
+
+[[cases]]
+id = "para-07"
+category = "paraphrase"
+question = "What kind of damaged files made the old open-source package fail?"
+query = "What kind of damaged files made the old open-source package fail?"
+expected_messages = ["1481322117256577573", "1483056235002594060"]
+expected_entries = ["D-23"]
+answer_contains = "junk bytes"
+expected_status = "active"
+
+[[cases]]
+id = "para-08"
+category = "paraphrase"
+question = "How big can pictures inside a chapter get before the reader gives up?"
+query = "How big can pictures inside a chapter get before the reader gives up?"
+expected_messages = ["1489225419008902663", "1489226651802928654"]
+expected_entries = ["D-51"]
+answer_contains = "96 MB"
+expected_status = "active"
+
+[[cases]]
+id = "para-09"
+category = "paraphrase"
+question = "Can people grab books while on cellular?"
+query = "Can people grab books while on cellular?"
+expected_messages = ["1490648558880294470"]
+expected_entries = ["D-54"]
+answer_contains = "25 MB"
+expected_status = "active"
+
+[[cases]]
+id = "para-10"
+category = "paraphrase"
+question = "Is there a flip animation that looks like turning paper?"
+query = "Is there a flip animation that looks like turning paper?"
+expected_messages = ["1491802408454588121"]
+expected_entries = ["D-59"]
+answer_contains = "page curl"
+expected_status = "active"
+
+[[cases]]
+id = "para-11"
+category = "paraphrase"
+question = "Will the app read books aloud at launch?"
+query = "Will the app read books aloud at launch?"
+expected_messages = ["1494392206692321258"]
+expected_entries = ["D-71"]
+answer_contains = "no text-to-speech"
+expected_status = "active"
+
+[[cases]]
+id = "para-12"
+category = "paraphrase"
+question = "Can I load my scanned papers?"
+query = "Can I load my scanned papers?"
+expected_messages = ["1480495394617164220"]
+expected_entries = ["D-12"]
+answer_contains = "PDF"
+expected_status = "active"
+
+[[cases]]
+id = "para-13"
+category = "paraphrase"
+question = "What about locked books bought from other stores?"
+query = "What about locked books bought from other stores?"
+expected_messages = ["1480496413442965955"]
+expected_entries = ["D-13"]
+answer_contains = "DRM"
+expected_status = "active"
+
+[[cases]]
+id = "para-14"
+category = "paraphrase"
+question = "Do we collect usage statistics?"
+query = "Do we collect usage statistics?"
+expected_messages = ["1481714918389580444"]
+expected_entries = ["D-22"]
+answer_contains = "third-party analytics"
+expected_status = "active"
+
+[[cases]]
+id = "para-15"
+category = "paraphrase"
+question = "How do we combine notes written on two phones at the same time?"
+query = "How do we combine notes written on two phones at the same time?"
+expected_messages = ["1483402063340766020", "1483404849931486034"]
+expected_entries = ["D-28"]
+answer_contains = "union"
+expected_status = "active"
+
+[[cases]]
+id = "para-16"
+category = "paraphrase"
+question = "When does the team go over bugs reported by the bot?"
+query = "When does the team go over bugs reported by the bot?"
+expected_messages = ["1493899986289690567"]
+expected_entries = ["D-68"]
+answer_contains = "Tuesdays"
+expected_status = "active"
+
+[[cases]]
+id = "para-17"
+category = "paraphrase"
+question = "How many titles may transfer at once?"
+query = "How many titles may transfer at once?"
+expected_messages = ["1483501466802062267"]
+expected_entries = ["D-30"]
+answer_contains = "2 at a time"
+expected_status = "active"
+
+[[cases]]
+id = "para-18"
+category = "paraphrase"
+question = "What is the smallest size for tappable buttons?"
+query = "What is the smallest size for tappable buttons?"
+expected_messages = ["1488160891823326594", "1488169731927180688"]
+expected_entries = ["D-48"]
+answer_contains = "48dp"
+expected_status = "active"
+
+[[cases]]
+id = "para-19"
+category = "paraphrase"
+question = "What format do highlights leave the app in?"
+query = "What format do highlights leave the app in?"
+expected_messages = ["1483498675165594520", "1483500969621849005"]
+expected_entries = ["D-31"]
+answer_contains = "Markdown"
+expected_status = "active"
+
+[[cases]]
+id = "para-20"
+category = "paraphrase"
+question = "What is the plan for dyslexia support in the first release?"
+query = "What is the plan for dyslexia support in the first release?"
+expected_messages = ["1493274588170290975"]
+expected_entries = ["D-63"]
+answer_contains = "spacing sliders"
+expected_status = "active"
+
+[[cases]]
+id = "para-21"
+category = "paraphrase"
+question = "Where do book covers come from?"
+query = "Where do book covers come from?"
+expected_messages = ["1486297644333663520", "1486299637148157230"]
+expected_entries = ["D-43"]
+answer_contains = "extracted from the EPUB"
+expected_status = "active"
+
+[[cases]]
+id = "para-22"
+category = "paraphrase"
+question = "How do we decide which crashes are urgent?"
+query = "How do we decide which crashes are urgent?"
+expected_messages = ["1493896201840494521"]
+expected_entries = ["D-67"]
+answer_contains = "1% of sessions"
+expected_status = "active"
+
+[[cases]]
+id = "rev-01"
+category = "reversed"
+question = "Before we changed course, which library were we going to use to parse EPUBs?"
+query = "Before we changed course, which library were we going to use to parse EPUBs?"
+expected_messages = ["1478332379545337992"]
+expected_entries = ["D-3"]
+answer_contains = "libspine"
 expected_status = "superseded"
 
 [[cases]]
-id = "history-18"
+id = "rev-02"
 category = "reversed"
-question = "Before the reversal, what was the initial choice for usage measurement?"
-query = "Before the reversal, what was the initial choice for usage measurement?"
-expected_messages = ["1483756850380800172"]
-expected_entries = ["D-70"]
-answer_contains = "remote event collection"
-expected_status = "superseded"
-
-[[cases]]
-id = "history-23"
-category = "reversed"
-question = "Before the reversal, what was the initial choice for log content?"
-query = "Before the reversal, what was the initial choice for log content?"
-expected_messages = ["1485568789708800222"]
-expected_entries = ["D-90"]
-answer_contains = "full request bodies"
-expected_status = "superseded"
-
-[[cases]]
-id = "history-29"
-category = "reversed"
-question = "Before the reversal, what was the initial choice for note conflict handling?"
-query = "Before the reversal, what was the initial choice for note conflict handling?"
-expected_messages = ["1487743116902400282"]
-expected_entries = ["D-114"]
+question = "What was the first rule for resolving reading-position conflicts?"
+query = "What was the first rule for resolving reading-position conflicts?"
+expected_messages = ["1483087478243066650", "1483095561283437366"]
+expected_entries = ["D-27"]
 answer_contains = "last write wins"
 expected_status = "superseded"
 
 [[cases]]
-id = "owner-02"
+id = "rev-03"
+category = "reversed"
+question = "What did onboarding require before the sign-up screen was dropped?"
+query = "What did onboarding require before the sign-up screen was dropped?"
+expected_messages = ["1479126360084578664"]
+expected_entries = ["D-8"]
+answer_contains = "account at first launch"
+expected_status = "superseded"
+
+[[cases]]
+id = "rev-04"
+category = "reversed"
+question = "What was the original plan for a dyslexia font in 1.0?"
+query = "What was the original plan for a dyslexia font in 1.0?"
+expected_messages = ["1488169731927180688", "1488160891823326594"]
+expected_entries = ["D-47"]
+answer_contains = "Easeread"
+expected_status = "superseded"
+
+[[cases]]
+id = "rev-05"
+category = "reversed"
+question = "What was the first date set for beta 1?"
+query = "What was the first date set for beta 1?"
+expected_messages = ["1477970509244268610"]
+expected_entries = ["D-1"]
+answer_contains = "3 April"
+expected_status = "superseded"
+
+[[cases]]
+id = "rev-06"
+category = "reversed"
+question = "Where did the beta date move to first, before the Tuesday release?"
+query = "Where did the beta date move to first, before the Tuesday release?"
+expected_messages = ["1488836597662221796"]
+expected_entries = ["D-50"]
+answer_contains = "10 April"
+expected_status = "superseded"
+
+[[cases]]
+id = "rev-07"
+category = "reversed"
+question = "What price did we originally plan for the app?"
+query = "What price did we originally plan for the app?"
+expected_messages = ["1481714918389580444"]
+expected_entries = ["D-18"]
+answer_contains = "$4.99"
+expected_status = "superseded"
+
+[[cases]]
+id = "rev-08"
+category = "reversed"
+question = "How long was the free trial originally going to be?"
+query = "How long was the free trial originally going to be?"
+expected_messages = ["1481714918389580444"]
+expected_entries = ["D-20"]
+answer_contains = "14-day"
+expected_status = "superseded"
+
+[[cases]]
+id = "rev-09"
+category = "reversed"
+question = "What was the old rule for downloads on mobile data?"
+query = "What was the old rule for downloads on mobile data?"
+expected_messages = ["1484160784845112349"]
+expected_entries = ["D-35"]
+answer_contains = "Wi-Fi only"
+expected_status = "superseded"
+
+[[cases]]
+id = "rev-10"
+category = "reversed"
+question = "Was the page curl animation ever ruled out?"
+query = "Was the page curl animation ever ruled out?"
+expected_messages = ["1485945051711407336"]
+expected_entries = ["D-41"]
+answer_contains = "No page-curl"
+expected_status = "superseded"
+
+[[cases]]
+id = "rev-11"
+category = "reversed"
+question = "What was the first Android API level we picked as the minimum?"
+query = "What was the first Android API level we picked as the minimum?"
+expected_messages = ["1480525625239405030", "1480526112026132973"]
+expected_entries = ["D-14"]
+answer_contains = "API 26"
+expected_status = "superseded"
+
+[[cases]]
+id = "rev-12"
+category = "reversed"
+question = "What limit did we first put on image sizes?"
+query = "What limit did we first put on image sizes?"
+expected_messages = ["1483472980800570215", "1483477050147865461"]
+expected_entries = ["D-29"]
+answer_contains = "2048 px"
+expected_status = "superseded"
+
+[[cases]]
+id = "rev-13"
+category = "reversed"
+question = "Which weekday did the team originally reserve for reviewing crashes?"
+query = "Which weekday did the team originally reserve for reviewing crashes?"
+expected_messages = ["1481714918389580444"]
+expected_entries = ["D-21"]
+answer_contains = "Thursday"
+expected_status = "superseded"
+
+[[cases]]
+id = "name-01"
 category = "name"
-question = "Who owns the task to test punctuation in search queries?"
-query = "Who owns the task to test punctuation in search queries?"
-expected_messages = ["1477971227443200017"]
-expected_entries = ["T-8"]
-answer_contains = "Bram Fern"
+question = "Who is responsible for the privacy policy page?"
+query = "Who is responsible for the privacy policy page?"
+expected_messages = ["1494392206692321258"]
+expected_entries = ["T-72"]
+answer_contains = "Tavish"
 expected_status = "open"
 
 [[cases]]
-id = "owner-06"
+id = "name-02"
 category = "name"
-question = "Who owns the task to validate exported source footnotes?"
-query = "Who owns the task to validate exported source footnotes?"
-expected_messages = ["1479420778905600057"]
-expected_entries = ["T-24"]
-answer_contains = "Fenn Birch"
+question = "Who owns the store screenshots?"
+query = "Who owns the store screenshots?"
+expected_messages = ["1494392206692321258"]
+expected_entries = ["T-73"]
+answer_contains = "Pell"
 expected_status = "open"
 
 [[cases]]
-id = "owner-10"
+id = "name-03"
 category = "name"
-question = "Who owns the task to test expired sessions?"
-query = "Who owns the task to test expired sessions?"
-expected_messages = ["1480870330368000097"]
-expected_entries = ["T-40"]
-answer_contains = "Dara Wren"
+question = "Who is writing up the dyslexia font evaluation?"
+query = "Who is writing up the dyslexia font evaluation?"
+expected_messages = ["1493275862299182893"]
+expected_entries = ["T-64"]
+answer_contains = "Nadia"
 expected_status = "open"
 
 [[cases]]
-id = "owner-14"
+id = "name-04"
 category = "name"
-question = "Who owns the task to test a date near midnight?"
-query = "Who owns the task to test a date near midnight?"
-expected_messages = ["1482319881830400137"]
-expected_entries = ["T-56"]
-answer_contains = "Bram Fern"
+question = "Who was asked to grow the awkward-EPUB test corpus?"
+query = "Who was asked to grow the awkward-EPUB test corpus?"
+expected_messages = ["1483056235002594060"]
+expected_entries = ["T-25"]
+answer_contains = "Pell"
+expected_status = "done"
+
+[[cases]]
+id = "name-05"
+category = "name"
+question = "Who is doing the screen-reader audit?"
+query = "Who is doing the screen-reader audit?"
+expected_messages = ["1493539343879505751", "1493539606778480478"]
+expected_entries = ["T-65"]
+answer_contains = "Imke"
 expected_status = "open"
 
 [[cases]]
-id = "owner-20"
+id = "name-06"
 category = "name"
-question = "Who owns the task to test shortcuts inside text fields?"
-query = "Who owns the task to test shortcuts inside text fields?"
-expected_messages = ["1484494209024000197"]
-expected_entries = ["T-80"]
-answer_contains = "Bram Fern"
+question = "Who took on resumable downloads?"
+query = "Who took on resumable downloads?"
+expected_messages = ["1483501692438840258"]
+expected_entries = ["T-32"]
+answer_contains = "Tav"
+expected_status = "done"
+
+[[cases]]
+id = "name-07"
+category = "name"
+question = "Who is designing the trial reminder banner?"
+query = "Who is designing the trial reminder banner?"
+expected_messages = ["1495733570554169392"]
+expected_entries = ["T-75"]
+answer_contains = "Nadia"
 expected_status = "open"
 
 [[cases]]
-id = "owner-30"
+id = "name-08"
 category = "name"
-question = "Who owns the task to test the due list with overdue notes?"
-query = "Who owns the task to test the due list with overdue notes?"
-expected_messages = ["1488118087680000297"]
-expected_entries = ["T-120"]
-answer_contains = "Fenn Birch"
-expected_status = "open"
+question = "Who has to measure the page curl battery cost on the old tablet?"
+query = "Who has to measure the page curl battery cost on the old tablet?"
+expected_messages = ["1491803436247811815"]
+expected_entries = ["T-60"]
+answer_contains = "Imke"
+expected_status = "done"
+
+[[cases]]
+id = "name-09"
+category = "name"
+question = "Who was going to look into CDN options for covers?"
+query = "Who was going to look into CDN options for covers?"
+expected_messages = ["1486296122497565970"]
+expected_entries = ["T-42"]
+answer_contains = "Tavish"
+expected_status = "dropped"
 
 [[cases]]
 id = "date-01"
 category = "date"
-question = "When is the task to measure full-text query latency due?"
-query = "When is the task to measure full-text query latency due?"
-expected_messages = ["1477608839577600007"]
-expected_entries = ["T-4"]
-answer_contains = "2026-03-04"
+question = "When is the privacy policy due?"
+query = "When is the privacy policy due?"
+expected_messages = ["1494392206692321258"]
+expected_entries = ["T-72"]
+answer_contains = "Fri 1 May"
+expected_status = "open"
+
+[[cases]]
+id = "date-02"
+category = "date"
+question = "When do the store screenshots have to be ready?"
+query = "When do the store screenshots have to be ready?"
+expected_messages = ["1494392206692321258"]
+expected_entries = ["T-73"]
+answer_contains = "Fri 8 May"
+expected_status = "open"
+
+[[cases]]
+id = "date-03"
+category = "date"
+question = "By when should the dyslexia font evaluation be written up?"
+query = "By when should the dyslexia font evaluation be written up?"
+expected_messages = ["1493275862299182893"]
+expected_entries = ["T-64"]
+answer_contains = "May 15"
+expected_status = "open"
+
+[[cases]]
+id = "date-04"
+category = "date"
+question = "What day does the trial banner mock need to be done?"
+query = "What day does the trial banner mock need to be done?"
+expected_messages = ["1495733570554169392"]
+expected_entries = ["T-75"]
+answer_contains = "Apr 28"
 expected_status = "open"
 
 [[cases]]
 id = "date-05"
 category = "date"
-question = "When is the task to write the restore checklist due?"
-query = "When is the task to write the restore checklist due?"
-expected_messages = ["1479058391040000047"]
-expected_entries = ["T-20"]
-answer_contains = "2026-03-08"
+question = "When is the TalkBack and VoiceOver audit due?"
+query = "When is the TalkBack and VoiceOver audit due?"
+expected_messages = ["1493539343879505751", "1493539606778480478"]
+expected_entries = ["T-65"]
+answer_contains = "Apr 17"
 expected_status = "open"
 
 [[cases]]
-id = "date-11"
+id = "date-06"
 category = "date"
-question = "When is the task to document systemd restart behavior due?"
-query = "When is the task to document systemd restart behavior due?"
-expected_messages = ["1481232718233600107"]
-expected_entries = ["T-44"]
-answer_contains = "2026-03-14"
-expected_status = "open"
+question = "When is the 1.0 store submission now planned?"
+query = "When is the 1.0 store submission now planned?"
+expected_messages = ["1496500878272759926"]
+expected_entries = ["D-76"]
+answer_contains = "2 June"
+expected_status = "active"
 
 [[cases]]
-id = "date-17"
+id = "date-07"
 category = "date"
-question = "When is the task to write the demo welcome note due?"
-query = "When is the task to write the demo welcome note due?"
-expected_messages = ["1483407045427200167"]
-expected_entries = ["T-68"]
-answer_contains = "2026-03-20"
-expected_status = "open"
+question = "When does beta 1 go out now?"
+query = "When does beta 1 go out now?"
+expected_messages = ["1490670457064654434"]
+expected_entries = ["D-56"]
+answer_contains = "14 April"
+expected_status = "active"
 
 [[cases]]
-id = "date-24"
+id = "date-08"
 category = "date"
-question = "When is the task to prepare the Tuesday pilot checklist due?"
-query = "When is the task to prepare the Tuesday pilot checklist due?"
-expected_messages = ["1485943760486400237"]
-expected_entries = ["T-96"]
-answer_contains = "2026-03-27"
-expected_status = "open"
+question = "What was the deadline for confirming the beta testers?"
+query = "What was the deadline for confirming the beta testers?"
+expected_messages = ["1477971746027077705"]
+expected_entries = ["T-2"]
+answer_contains = "Mar 31"
+expected_status = "done"
 
 [[cases]]
-id = "date-27"
+id = "date-09"
 category = "date"
-question = "When is the task to measure cold startup on the demo library due?"
-query = "When is the task to measure cold startup on the demo library due?"
-expected_messages = ["1487030924083200267"]
-expected_entries = ["T-108"]
-answer_contains = "2026-03-30"
-expected_status = "open"
+question = "By when did the Android EPUB reader have to replace the old package?"
+query = "By when did the Android EPUB reader have to replace the old package?"
+expected_messages = ["1483056235002594060"]
+expected_entries = ["T-24"]
+answer_contains = "Apr 1"
+expected_status = "done"
+
+[[cases]]
+id = "ctx-01"
+category = "thread-context"
+question = "Which font direction did the team settle on after Nadia posted her three options?"
+query = "Which font direction did the team settle on after Nadia posted her three options?"
+expected_messages = ["1478693996665635008", "1478731524147904774"]
+expected_entries = ["D-7"]
+answer_contains = "Fenwick Serif"
+expected_status = "active"
+
+[[cases]]
+id = "ctx-02"
+category = "thread-context"
+question = "What did the team agree about a highlight deleted on one phone and edited on another device?"
+query = "What did the team agree about a highlight deleted on one phone and edited on another device?"
+expected_messages = ["1483785819939537879", "1483792133608571884", "1483794654754374650"]
+expected_entries = ["D-34"]
+answer_contains = "edit wins"
+expected_status = "active"
+
+[[cases]]
+id = "ctx-03"
+category = "thread-context"
+question = "After the pricing debate, which number did they land on?"
+query = "After the pricing debate, which number did they land on?"
+expected_messages = ["1485647621858133091", "1485655621796758655", "1485656921158583430"]
+expected_entries = ["D-36"]
+answer_contains = "$7.99"
+expected_status = "active"
+
+[[cases]]
+id = "ctx-04"
+category = "thread-context"
+question = "Why did tester feedback change the first-launch flow?"
+query = "Why did tester feedback change the first-launch flow?"
+expected_messages = ["1481688272857072228", "1481698790154044032"]
+expected_entries = ["D-16"]
+answer_contains = "just want to read my book"
+expected_status = "active"
+
+[[cases]]
+id = "ctx-05"
+category = "thread-context"
+question = "What was the problem with the map picture in the sample atlas?"
+query = "What was the problem with the map picture in the sample atlas?"
+expected_messages = ["1483467503991653209", "1483472516474340192", "1483477050147865461"]
+expected_entries = ["D-29"]
+answer_contains = "216 MB"
+expected_status = "superseded"
+
+[[cases]]
+id = "ctx-06"
+category = "thread-context"
+question = "Why did the beta slip past the 10th?"
+query = "Why did the beta slip past the 10th?"
+expected_messages = ["1490667445319501403", "1490670457064654434"]
+expected_entries = ["D-56"]
+answer_contains = "debugging it on a Saturday"
+expected_status = "active"
+
+[[cases]]
+id = "ctx-07"
+category = "thread-context"
+question = "Why did the page curl come back after being rejected?"
+query = "Why did the page curl come back after being rejected?"
+expected_messages = ["1491799903909840594", "1491802408454588121"]
+expected_entries = ["D-59"]
+answer_contains = "1.1%"
+expected_status = "active"
+
+[[cases]]
+id = "ctx-08"
+category = "thread-context"
+question = "Why was the dyslexia font pulled from 1.0?"
+query = "Why was the dyslexia font pulled from 1.0?"
+expected_messages = ["1493264565172045585", "1493274588170290975"]
+expected_entries = ["D-63"]
+answer_contains = "rag badly"
+expected_status = "active"
+
+[[cases]]
+id = "ctx-09"
+category = "thread-context"
+question = "What made the team drop last-write-wins for reading position?"
+query = "What made the team drop last-write-wins for reading position?"
+expected_messages = ["1485732399210955931", "1485739443561301168", "1485916079220982967"]
+expected_entries = ["D-39"]
+answer_contains = "jumps back to page 12"
+expected_status = "active"
