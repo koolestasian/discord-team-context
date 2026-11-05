@@ -4,6 +4,7 @@
 //! validation and sync are gated on a throwaway test server.
 
 mod config;
+mod token;
 
 use std::ffi::OsString;
 use std::fmt;
@@ -29,6 +30,7 @@ const HELP: &str = concat!(
     "\nOffline commands:\n",
     "  init          Print a config template and optional bot invite; writes no files\n",
     "  doctor        Validate config and token presence; makes no network calls\n",
+    "  token         create|list|revoke access tokens (see 'teamctx token --help')\n",
     "\nOffline options:\n",
     "  --config PATH         TOML file (default teamctx.toml if present)\n",
     "  --guild-id ID         Discord server id (required unless in file/environment)\n",
@@ -50,6 +52,7 @@ enum Command {
     Version,
     Init(config::OfflineOptions),
     Doctor(config::OfflineOptions),
+    Token(token::Command),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -57,6 +60,7 @@ enum UsageError {
     Unknown(OsString),
     Extra(OsString),
     Config(config::ConfigError),
+    Token(token::UsageError),
 }
 
 impl fmt::Display for UsageError {
@@ -66,6 +70,7 @@ impl fmt::Display for UsageError {
             Self::Unknown(arg) => write!(f, "unrecognised argument {arg:?}"),
             Self::Extra(arg) => write!(f, "unexpected extra argument {arg:?}"),
             Self::Config(error) => fmt::Display::fmt(error, f),
+            Self::Token(error) => fmt::Display::fmt(error, f),
         }
     }
 }
@@ -88,6 +93,11 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, UsageError
                     .map(Command::Doctor)
                     .map_err(UsageError::Config);
             }
+            Some("token") => {
+                return token::parse(args)
+                    .map(Command::Token)
+                    .map_err(UsageError::Token);
+            }
             _ => return Err(UsageError::Unknown(arg)),
         },
     };
@@ -104,6 +114,7 @@ fn run(args: impl IntoIterator<Item = OsString>, out: &mut impl Write, err: &mut
         Ok(Command::Version) => out.write_all(VERSION.as_bytes()),
         Ok(Command::Init(options)) => return run_offline(true, &options, out, err),
         Ok(Command::Doctor(options)) => return run_offline(false, &options, out, err),
+        Ok(Command::Token(command)) => return token::run(&command, out, err),
         Err(error) => {
             // If stderr is gone there is nowhere left to report that, so the error is dropped.
             let _ = writeln!(err, "error: {error}\nTry 'teamctx --help'.");
