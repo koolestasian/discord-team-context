@@ -270,8 +270,11 @@ pub trait IngestWrite {
     /// - `ChannelDelete`, `MarkerAdd`, `MarkerRemove`: semantics pending the open
     ///   questions in `docs/design/contracts.md`.
     ///
-    /// Message events for a channel with `included = false` return
-    /// [`ApplyOutcome::Excluded`] and store nothing. Replaying any event returns
+    /// New/updated message events for a channel with `included = false` return
+    /// [`ApplyOutcome::Excluded`] and store nothing. Deletion events always clean up
+    /// existing rows and copied titles, including excluded channels. Changing a channel
+    /// to excluded also purges its stored history using the message deletion rule.
+    /// Replaying any event returns
     /// [`ApplyOutcome::Unchanged`].
     ///
     /// # Errors
@@ -299,7 +302,7 @@ pub trait IngestWrite {
     /// Retention (plan section 6.1): deletes every message with `created_at < cutoff`.
     /// Record entries are kept; a copied title citing a purged message is replaced by
     /// [`SOURCE_DELETED_TITLE`](crate::record::SOURCE_DELETED_TITLE). Whether
-    /// `source_deleted` is also set is an open question (`docs/design/contracts.md`).
+    /// `source_deleted` is also set, with a `SourceDeleted` audit event and no actor.
     /// Returns how many messages were deleted.
     ///
     /// # Errors

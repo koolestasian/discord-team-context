@@ -215,6 +215,21 @@ dyn-compatibility limits of `async fn` in traits.
 
 ## 6. Data model (SQLite)
 
+Maintainer clarification (2026-11-05): forum parent channels use kind `forum`.
+Mentioned user IDs are stored separately from normalized message text. Deleting a
+channel purges its messages (including child threads) using the message deletion
+rule in section 6.1. Repeated reaction capture for the same message and entry kind
+creates one entry; removing the reaction keeps that entry.
+
+Additional maintainer clarifications (2026-11-05): copied titles normalize whitespace
+to one line and truncate at 200 Unicode scalar values. Retention and later channel
+exclusion use the message deletion rule, including `source_deleted` and its audit
+event. Delete events still clean up excluded channels. Human short-id input accepts
+lowercase prefixes; output is uppercase. Tokens use only scope `read` in v0.1,
+including `/ask`. `Connector`, `EventSink` and `CursorStore` live in `teamctx-discord`.
+The `record` tool's `since` filters on last update. Member data comes from message
+authors and interaction users rather than a privileged member gateway intent.
+
 Migrations are plain SQL files in `crates/teamctx-store/migrations/NNNN_name.sql`. They
 are applied in order, tracked with `PRAGMA user_version`, and each runs in a transaction.
 Pragmas: `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=5000`,
@@ -235,7 +250,7 @@ CREATE TABLE channels (
   source_id     INTEGER NOT NULL REFERENCES sources(id),
   external_id   TEXT NOT NULL,
   parent_id     INTEGER REFERENCES channels(id),   -- thread → parent channel
-  kind          TEXT NOT NULL CHECK (kind IN ('text','thread','forum_post','announcement')),
+  kind          TEXT NOT NULL CHECK (kind IN ('text','thread','forum','forum_post','announcement')),
   name          TEXT NOT NULL,
   topic         TEXT,
   is_included   INTEGER NOT NULL DEFAULT 1,        -- allowlist/denylist result
@@ -433,6 +448,10 @@ the web view is configured. Every item ends with a jump link
   text is never concatenated into SQL; FTS terms are escaped.
 - **Ranking:** `bm25()` combined with recency decay and a boost for record entries.
   The exact formula lives in `core::rank` with table-driven tests on the demo dataset.
+- **Filter semantics** (maintainer clarification, 2026-11-05): all clauses, including
+  repeated `from:` and `in:` filters, combine with AND. `after:` includes midnight
+  on the given date; `before:` excludes midnight on the given date. Dates use
+  `server.timezone`; core keeps calendar dates and the query service resolves them.
 - **`context_for(text_or_branch)`:**
   1. Split the branch name into terms (`feat/epub-reader-toc` → epub, reader, toc).
      Drop stopwords and git prefixes.

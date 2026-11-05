@@ -252,6 +252,16 @@ pub struct ShortId {
     pub id: EntryId,
 }
 
+impl ShortId {
+    /// Accepts a person's case-insensitive prefix; storage and display stay canonical.
+    ///
+    /// # Errors
+    /// Returns the same validation errors as [`ShortId::from_str`].
+    pub fn parse_user(text: &str) -> Result<Self, ParseShortIdError> {
+        text.to_ascii_uppercase().parse()
+    }
+}
+
 impl fmt::Display for ShortId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}-{}", self.kind.prefix(), self.id)
@@ -310,6 +320,15 @@ pub const SOURCE_DELETED_TITLE: &str = "(source message deleted)";
 pub struct EntryTitle(String);
 
 impl EntryTitle {
+    /// Copies message text into a single-line title, limited to 200 Unicode scalars.
+    ///
+    /// # Errors
+    /// Returns [`RecordRuleError::EmptyTitle`] for blank source text.
+    pub fn copy_from_message(text: &str) -> Result<Self, RecordRuleError> {
+        let line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        Self::new(line.chars().take(MAX_TITLE_CHARS).collect::<String>())
+    }
+
     /// Checks and wraps a title.
     ///
     /// # Errors
@@ -388,6 +407,9 @@ text_enum! {
 /// A rule broken by an entry or a status change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub enum RecordRuleError {
+    /// Copied text must retain a source reference so deletion can redact it.
+    #[error("a copied title requires a source message")]
+    CopiedTitleWithoutSource,
     /// The lifecycle forbids the status change.
     #[error(transparent)]
     Transition(#[from] TransitionError),
@@ -450,8 +472,12 @@ impl NewEntry {
     ///
     /// # Errors
     ///
-    /// [`RecordRuleError::DueOnNonTask`] or [`RecordRuleError::ReplacesOnNonDecision`].
+    /// [`RecordRuleError::DueOnNonTask`], [`RecordRuleError::ReplacesOnNonDecision`],
+    /// or [`RecordRuleError::CopiedTitleWithoutSource`].
     pub fn validate(&self) -> Result<(), RecordRuleError> {
+        if self.title_is_copied && self.source_message.is_none() {
+            return Err(RecordRuleError::CopiedTitleWithoutSource);
+        }
         if self.due_at.is_some() && self.kind != EntryKind::Task {
             return Err(RecordRuleError::DueOnNonTask);
         }
@@ -825,6 +851,14 @@ mod tests {
 
     #[test]
     fn new_entry_field_rules() {
+        assert_eq!(
+            NewEntry {
+                title_is_copied: true,
+                ..new_entry(Decision)
+            }
+            .validate(),
+            Err(RecordRuleError::CopiedTitleWithoutSource)
+        );
         for &kind in EntryKind::ALL {
             assert_eq!(new_entry(kind).validate(), Ok(()));
         }
@@ -866,6 +900,31 @@ mod tests {
                 Err(RecordRuleError::ReplacesOnNonDecision)
             );
         }
+    }
+
+    #[test]
+    fn human_ids_and_copied_titles_follow_maintainer_defaults() {
+        assert_eq!(ShortId::parse_user("d-12").unwrap().to_string(), "D-12");
+        assert!(ShortId::parse_user("d-012").is_err());
+        assert_eq!(
+            EntryTitle::copy_from_message(" first\n\tsecond ")
+                .unwrap()
+                .as_str(),
+            "first second"
+        );
+        let long = "é".repeat(201);
+        assert_eq!(
+            EntryTitle::copy_from_message(&long)
+                .unwrap()
+                .as_str()
+                .chars()
+                .count(),
+            200
+        );
+        assert_eq!(
+            EntryTitle::copy_from_message("\n\t"),
+            Err(RecordRuleError::EmptyTitle)
+        );
     }
 
     #[test]
