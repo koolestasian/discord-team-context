@@ -6,7 +6,8 @@
 //!
 //! It reads every `crates/*/Cargo.toml` and checks which workspace crates each one
 //! depends on. Adding a crate without listing it in `ALLOWED` fails the test, so the rule
-//! cannot be skipped by accident.
+//! cannot be skipped by accident. It also bounds the external dependencies of
+//! `teamctx-core` (see `CORE_EXTERNAL_ALLOWED`).
 
 use std::fs;
 use std::path::Path;
@@ -29,6 +30,12 @@ const ALLOWED: &[(&str, &[&str])] = &[
         ],
     ),
 ];
+
+/// The only dependencies `teamctx-core` may declare, in any dependency table. Any
+/// workspace crate is already forbidden by `ALLOWED`; this list also bounds external
+/// crates. `thiserror`: compile-time error derives, no I/O or async (maintainer
+/// decision, 2026-11-05).
+const CORE_EXTERNAL_ALLOWED: &[&str] = &["thiserror"];
 
 /// Names of all dependencies declared in a manifest, from `[dependencies]`,
 /// `[dev-dependencies]`, `[build-dependencies]` and their `[target.*]` forms.
@@ -107,11 +114,17 @@ fn crates_depend_only_in_the_planned_direction() {
                 );
             }
         }
-        // The core crate has no dependencies at all: no I/O, no async, nothing external.
+        // The core crate stays free of I/O, async and heavy dependencies. Its only
+        // external dependency is `thiserror`, which generates error types at compile time
+        // and adds no runtime behaviour (maintainer decision, 2026-11-05).
         if name == "teamctx-core" {
+            let external: Vec<_> = dependencies
+                .iter()
+                .filter(|d| !CORE_EXTERNAL_ALLOWED.contains(&d.as_str()))
+                .collect();
             assert!(
-                dependencies.is_empty(),
-                "teamctx-core must have no dependencies, found {dependencies:?}"
+                external.is_empty(),
+                "teamctx-core may only depend on {CORE_EXTERNAL_ALLOWED:?}, found {external:?}"
             );
         }
         found.push(name);
