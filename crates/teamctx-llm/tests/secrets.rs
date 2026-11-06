@@ -335,3 +335,19 @@ fn api_key_errors_and_debug_never_show_the_key() {
         .expect_err("control characters are refused");
     assert_free_of_secrets(&error_text(&error), "ApiKey::from_lookup error");
 }
+
+/// A key made only of letters, digits and `_` (some OpenAI-compatible providers issue
+/// keys like this) is also a valid environment variable name, so the host's config
+/// check accepts it in `llm.api_key_env`. Pasted there by mistake, it is looked up as a
+/// variable name, is not found, and must not be echoed by the error.
+const KEY_SHAPED_LIKE_A_NAME: &str = "FAKE_llm_api_key_guard_test_0000_not_a_real_credential";
+
+#[test]
+#[ignore = "defect: LlmError::MissingApiKey prints the configured variable name, so a key pasted into llm.api_key_env reaches the error text"]
+fn a_key_pasted_as_the_variable_name_is_not_echoed() {
+    let error = ApiKey::from_lookup(KEY_SHAPED_LIKE_A_NAME, |_| None).expect_err("not set");
+    assert!(
+        !error_text(&error).contains(KEY_SHAPED_LIKE_A_NAME),
+        "the pasted key appeared in the error text"
+    );
+}
