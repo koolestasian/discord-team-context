@@ -51,6 +51,18 @@ or milestone builds on it. Rust doc comments hold the full contract of every ite
   reads take `&self`; times are passed in; reads never return messages from excluded
   channels; `RepoError::Backend` displays a generic message so SQL and row data do not
   reach users.
+- **Channel message pages (`MessageRead::channel_messages_since(channel, since, limit,
+  cursor)`):** the messages of one channel row created at or after `since`, oldest first
+  (`created_at`, then numeric external id; the same order `neighbours` uses), at most
+  `limit`. `cursor` is a `MessageCursor` (time and external id of the last message of the
+  previous page) and the next page starts strictly after that position, so paging is a
+  keyset, not an offset: deletes between pages cannot skip or repeat a message. A page
+  shorter than `limit` is the last. A thread or forum post is a channel row of its own, so
+  a parent's pages never contain its threads' messages; excluded (directly or through the
+  parent) and unknown channels return an empty page, as does `limit` 0. The query uses the
+  `messages_channel_time` index (a unit test checks the query plan). The REST sync's
+  deletion recheck pages through this instead of anchoring on a stored message, so the
+  stored side of its window has no size cap.
 - **Core boundary:** no I/O, no async, no clock; `thiserror` is the only external
   dependency (`crates/teamctx/tests/architecture.rs` checks it).
 

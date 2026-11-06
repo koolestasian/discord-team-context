@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use serde_json::Value;
 use teamctx_core::id::{Snowflake, SourceId};
 use teamctx_core::repo::{
-    ApplyOutcome, DirectoryRead, IngestWrite, MessageRead, RepoError, SyncCursor,
+    ApplyOutcome, DirectoryRead, IngestWrite, MessageCursor, MessageRead, RepoError, SyncCursor,
 };
 use teamctx_core::source::{MessageRef, SourceEvent};
 use teamctx_core::time::UnixMillis;
@@ -17,13 +17,9 @@ use super::{
 };
 use crate::mapping::map_rest_messages;
 
-/// The most stored messages compared in one recheck. Above this the window is treated as
-/// not covered and nothing is deleted, which is the safe direction.
-const RECHECK_STORED_LIMIT: u32 = 5_000;
-
-/// The most window ids tried as an anchor after the cursor ids, so a window made only of
-/// system messages costs a bounded number of lookups.
-const ANCHOR_CANDIDATES: usize = 50;
+/// Stored messages read per page when the recheck compares the stored side of its window.
+/// The window is read page by page, so its size is not limited by this.
+const RECHECK_STORED_PAGE: u32 = 500;
 
 /// Why work on one channel stopped early.
 enum Stop {
@@ -177,7 +173,6 @@ where
             cursor.backfill_done = false;
             backfill_finished = false;
         } else {
-            let previous_newest = cursor.newest_seen;
             if self.final_catch_up && backfill_finished {
                 // Discovery already stored `archived`, so a later run no longer knows a
                 // final catch-up is owed. Record the debt in the cursor (a thread with an
@@ -192,7 +187,7 @@ where
                 self.save(channel, &mut cursor)?;
                 final_catch_up_open = false;
             }
-            self.recheck(channel, &cursor, previous_newest)?;
+            self.recheck(channel, &cursor)?;
         }
         if fresh || (!cursor.backfill_done && !final_catch_up_open) {
             self.backfill(channel, &mut cursor)?;
@@ -227,14 +222,7 @@ where
 
     /// Re-reads the last `recheck_window`, upserts changes and deletes stored messages
     /// Discord no longer has, when the whole window was read.
-    ///
-    /// `previous_newest` is the newest message id the cursor held before this run.
-    fn recheck(
-        &mut self,
-        channel: Snowflake,
-        cursor: &SyncCursor,
-        previous_newest: Option<Snowflake>,
-    ) -> Result<(), Stop> {
+    fn recheck(&mut self, channel: Snowflake, cursor: &SyncCursor) -> Result<(), Stop> {
         let window_start = window_before(self.now, self.config.recheck_window);
         let mut in_window: HashSet<Snowflake> = HashSet::new();
         let mut newest_read: Option<Snowflake> = None;
@@ -261,90 +249,63 @@ where
             position = PagePosition::Before(oldest);
         }
         if covered {
-            covered = self.delete_missing(
-                channel,
-                cursor,
-                window_start,
-                newest_read,
-                previous_newest,
-                &in_window,
-            )?;
+            self.delete_missing(channel, cursor, window_start, newest_read, &in_window)?;
         }
         self.report.recheck_covered = covered;
         Ok(())
     }
 
-    /// Deletes stored messages in the window that are not in `in_window`. Returns `false`
-    /// when there were too many stored messages to compare safely.
+    /// Deletes stored messages in the window that are not in `in_window`. The stored side
+    /// of the window is read page by page, oldest first, so its size has no limit.
     fn delete_missing(
         &mut self,
         channel: Snowflake,
         cursor: &SyncCursor,
         window_start: UnixMillis,
         newest_read: Option<Snowflake>,
-        previous_newest: Option<Snowflake>,
         in_window: &HashSet<Snowflake>,
-    ) -> Result<bool, Stop> {
+    ) -> Result<(), Stop> {
         // Anything newer than the newest message read may have arrived after the read.
         let Some(upper) = newest_read.max(cursor.newest_seen) else {
-            return Ok(true);
+            return Ok(());
         };
-        // Any stored message of the channel will do as an anchor to find the stored
-        // neighbours. The newest ids Discord returned or the cursor holds may all be
-        // system messages the store never keeps, and a message deleted on Discord is in
-        // none of the pages, so also try where the cursor stood before this run and the
-        // newest ids of the window.
-        let mut candidates: Vec<Snowflake> = [newest_read, cursor.newest_seen, previous_newest]
+        let Some(row) = self
+            .store
+            .channels(self.source)?
             .into_iter()
-            .flatten()
-            .collect();
-        let mut newest_in_window: Vec<Snowflake> = in_window.iter().copied().collect();
-        newest_in_window.sort_unstable_by(|a, b| b.cmp(a));
-        candidates.extend(newest_in_window.into_iter().take(ANCHOR_CANDIDATES));
-        let mut anchor = None;
-        for candidate in candidates {
-            let message = MessageRef {
-                channel,
-                message: candidate,
-            };
-            if let Some(found) = self.store.message_by_ref(self.source, message)? {
-                anchor = Some(found);
-                break;
-            }
-        }
-        let Some(anchor) = anchor else {
-            // No stored message to start from: the stored side of the window is unknown.
-            return Ok(false);
+            .find(|info| info.external_id == channel)
+        else {
+            return Ok(());
         };
-        let around =
-            self.store
-                .neighbours(anchor.id, RECHECK_STORED_LIMIT, RECHECK_STORED_LIMIT)?;
-        let anchor_index = around
-            .iter()
-            .position(|message| message.external_id == anchor.external_id)
-            .unwrap_or(0);
-        let limit = usize::try_from(RECHECK_STORED_LIMIT).unwrap_or(usize::MAX);
-        let after_count = around.len().saturating_sub(anchor_index + 1);
-        if anchor_index >= limit || after_count >= limit {
-            return Ok(false);
-        }
-        for stored in around {
-            if stored.created_at >= window_start
-                && stored.external_id <= upper
-                && !in_window.contains(&stored.external_id)
-            {
-                let event = SourceEvent::MessageDelete {
-                    message: MessageRef {
-                        channel,
-                        message: stored.external_id,
-                    },
-                };
-                if self.apply(&event)? == ApplyOutcome::Applied {
-                    self.report.deleted += 1;
+        let page_size = usize::try_from(RECHECK_STORED_PAGE).unwrap_or(usize::MAX);
+        // The page position is a value, so deleting the messages of a page does not move
+        // the next page.
+        let mut position = None;
+        loop {
+            let page = self.store.channel_messages_since(
+                row.id,
+                window_start,
+                RECHECK_STORED_PAGE,
+                position,
+            )?;
+            for stored in &page {
+                if stored.external_id <= upper && !in_window.contains(&stored.external_id) {
+                    let event = SourceEvent::MessageDelete {
+                        message: MessageRef {
+                            channel,
+                            message: stored.external_id,
+                        },
+                    };
+                    if self.apply(&event)? == ApplyOutcome::Applied {
+                        self.report.deleted += 1;
+                    }
                 }
             }
+            match page.last() {
+                Some(last) if page.len() >= page_size => position = Some(MessageCursor::from(last)),
+                _ => return Ok(()),
+            }
         }
-        Ok(true)
     }
 
     /// Pages `before=` the oldest message read until `backfill_days` or the channel start.

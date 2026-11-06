@@ -40,15 +40,12 @@
 //!   catch-up is marked as owed by clearing `backfill_done` in the cursor before it
 //!   starts and restoring it once catch-up reached the end, so a run that fails or hits
 //!   the catch-up page limit leaves the thread to be caught up again next run.
-//! - The recheck finds stored messages through a stored anchor: the newest stored message
-//!   among the ids it read, the newest id at the start of the run and the newest id now.
-//!   If the newest message Discord holds in the channel and the newest one stored are both
-//!   unstorable system messages, there is no anchor and deletes are skipped for that run
-//!   (`recheck_covered` is `false`).
-//! - To find stored messages in the recheck window the sync uses the stored neighbours of
-//!   the newest message it holds ([`MessageRead::neighbours`]). If more than
-//!   `RECHECK_STORED_LIMIT` stored messages would have to be compared, deletes are skipped
-//!   for that channel and the report says the window was not covered.
+//! - The recheck reads the stored side of its window with
+//!   [`MessageRead::channel_messages_since`], oldest first and page by page, so it needs
+//!   no anchor message and the number of stored messages in the window has no limit.
+//!   Deletes are skipped (`recheck_covered` is `false`) only when the REST read of the
+//!   window itself stopped at `recheck_page_limit`: a window with more messages than
+//!   `recheck_page_limit` pages hold is not covered.
 //!
 //! # Errors
 //!

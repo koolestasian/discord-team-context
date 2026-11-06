@@ -28,6 +28,10 @@ release.
   delete a stored message when the newest messages Discord returns are system messages
   the store never keeps; when no stored message can anchor the check it now reports the
   window as not covered instead of silently deleting nothing.
+- REST sync: the deletion recheck now pages through the stored messages of its window
+  with `MessageRead::channel_messages_since` instead of a neighbour window around an
+  anchor message. A channel with more than 5,000 stored messages in the recheck window no
+  longer skips deletes, and the "no stored message to anchor on" case is gone.
 
 ### Fixed
 
@@ -39,6 +43,8 @@ release.
 
 ### Added
 
+- `MessageRead::channel_messages_since`: oldest-first keyset paging of one channel's
+  stored messages since a time, served by the `messages_channel_time` index.
 - The MCP server's five read-only tools (`context_for`, `whats_new`, `record`, `search`,
   `read`) and the `catch_up` prompt, over streamable HTTP behind token auth. Results start
   with the untrusted-data notice, hold chat text only inside one framed block, cite message

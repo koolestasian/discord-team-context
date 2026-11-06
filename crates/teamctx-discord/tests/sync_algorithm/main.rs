@@ -414,6 +414,43 @@ fn a_system_message_does_not_hide_a_deleted_message_from_the_recheck() {
 }
 
 #[test]
+fn recheck_covers_more_stored_messages_than_one_read_can_hold() {
+    // More than 5,000 messages, all inside the 48 hour window, so the stored side of the
+    // window cannot be fetched in one read.
+    let fake = two_channels();
+    let ids = fill(&fake, GENERAL, 5_300, 10 * MINUTE, 1_000);
+    let mut config = config();
+    config.backfill_page_limit = 100;
+    config.recheck_page_limit = 100;
+    let mut store = Store::in_memory().unwrap();
+    let source = run(&fake, &mut store, &config, at(0)).source;
+    assert_eq!(stored_count(&store, source, GENERAL, &ids), ids.len());
+
+    // `ids` runs from the newest to the oldest. The oldest messages are more than 5,000
+    // stored messages away from the newest one.
+    let deleted = [ids[5_299], ids[5_100]];
+    for id in deleted {
+        fake.delete_message(GENERAL, id);
+    }
+    fake.edit_message(GENERAL, ids[5_200], "edited far back");
+    fake.edit_message(GENERAL, ids[1], "edited near the top");
+
+    let report = run(&fake, &mut store, &config, at(HOUR));
+    let channel = report.channel(sf(GENERAL)).unwrap();
+    assert!(channel.recheck_covered);
+    assert_eq!(channel.deleted, 2);
+    assert_eq!(channel.upserted, 2);
+    for id in deleted {
+        assert!(stored(&store, source, GENERAL, id).is_none());
+    }
+    assert_eq!(stored_count(&store, source, GENERAL, &ids), ids.len() - 2);
+    assert_eq!(
+        stored(&store, source, GENERAL, ids[5_200]).unwrap().content,
+        "edited far back"
+    );
+}
+
+#[test]
 fn a_channel_missing_from_the_listing_is_deleted_with_its_messages() {
     let fake = two_channels();
     fake.add_thread(THREAD, DEV, "Dev thread", false);
