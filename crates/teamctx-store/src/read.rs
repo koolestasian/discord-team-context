@@ -429,6 +429,37 @@ impl MessageRead for Store {
         preceding.extend(following);
         Ok(preceding)
     }
+    fn channel_messages_since(
+        &self,
+        channel: ChannelId,
+        since: UnixMillis,
+        limit: u32,
+        cursor: Option<MessageCursor>,
+    ) -> RepoResult<Vec<StoredMessage>> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let mut values: Vec<Value> = vec![channel.get().into(), since.as_millis().into()];
+        let mut after = String::new();
+        if let Some(cursor) = cursor {
+            after.push_str(
+                "\n  AND (m.created_at, length(m.external_id), m.external_id) > (?, length(?), ?)",
+            );
+            values.push(cursor.created_at.as_millis().into());
+            values.push(cursor.external_id.to_string().into());
+            values.push(cursor.external_id.to_string().into());
+        }
+        values.push(i64::from(limit).into());
+        let sql = format!(
+            "SELECT {MESSAGE_COLUMNS}
+             {VISIBLE_MESSAGES}
+               AND m.channel_id = ?
+               AND m.created_at >= ?{after}
+             ORDER BY {OLDEST_MESSAGE_FIRST}
+             LIMIT ?"
+        );
+        self.messages_sql(&sql, values)
+    }
     fn search_messages(&self, query: &Query, limit: u32) -> RepoResult<Vec<MessageHit>> {
         if query.clauses.is_empty() || limit == 0 {
             return Ok(Vec::new());
@@ -705,6 +736,29 @@ mod tests {
             .unwrap();
         let found = db.member_by_display_name("zed lateman").unwrap().unwrap();
         assert!(found.id.get() > 500, "{}", found.id);
+    }
+
+    #[test]
+    fn channel_message_pages_use_the_channel_time_index() {
+        let db = store_with_members(&[]);
+        let sql = "EXPLAIN QUERY PLAN
+             SELECT m.id
+             FROM messages m
+             JOIN channels c ON c.id = m.channel_id
+             LEFT JOIN members a ON a.id = m.author_id
+             WHERE c.is_included = 1
+               AND m.channel_id = ?
+               AND m.created_at >= ?
+               AND (m.created_at, length(m.external_id), m.external_id) > (?, length(?), ?)
+             ORDER BY m.created_at, length(m.external_id), m.external_id
+             LIMIT ?";
+        let plan: Vec<String> = query_all(&db.conn, sql, params![1, 0, 0, "1", "1", 10], |r| {
+            r.get::<_, String>("detail")
+        })
+        .unwrap();
+        let plan = plan.join("\n");
+        assert!(plan.contains("messages_channel_time"), "{plan}");
+        assert!(!plan.contains("SCAN m"), "{plan}");
     }
 
     #[test]

@@ -170,6 +170,26 @@ pub struct StoredMessage {
     pub edited_at: Option<UnixMillis>,
 }
 
+/// Where a page of [`MessageRead::channel_messages_since`] stopped: the position of the
+/// last message returned. The next page starts strictly after it, so paging stays stable
+/// while messages are added or deleted between calls.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MessageCursor {
+    /// Creation time of the last message of the previous page.
+    pub created_at: UnixMillis,
+    /// External id of the last message of the previous page.
+    pub external_id: Snowflake,
+}
+
+impl From<&StoredMessage> for MessageCursor {
+    fn from(message: &StoredMessage) -> Self {
+        Self {
+            created_at: message.created_at,
+            external_id: message.external_id,
+        }
+    }
+}
+
 /// A full-text match on a message, before ranking.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageHit {
@@ -496,6 +516,31 @@ pub trait MessageRead {
     ///
     /// [`RepoError::Backend`] only. Query validity is the parser's concern.
     fn search_messages(&self, query: &Query, limit: u32) -> RepoResult<Vec<MessageHit>>;
+
+    /// Messages of one channel, thread or forum post created at or after `since`, oldest
+    /// first (by `created_at`, then numeric external id), at most `limit` of them.
+    ///
+    /// `cursor` makes it a keyset page: `None` starts at `since`, `Some` returns only
+    /// messages strictly after that position, normally the last message of the previous
+    /// page (`MessageCursor::from(&last)`). A page shorter than `limit` is the last one.
+    /// Because the position is a value, not an offset, messages deleted or added between
+    /// calls never make a page skip or repeat a message that was stored throughout.
+    ///
+    /// A thread is a channel of its own: the messages of a thread are not returned for
+    /// its parent channel. A channel that is excluded (directly or through its parent),
+    /// unknown or empty returns an empty list, so callers cannot tell them apart and
+    /// excluded content never leaks. A `limit` of 0 returns an empty list.
+    ///
+    /// # Errors
+    ///
+    /// [`RepoError::Backend`] only.
+    fn channel_messages_since(
+        &self,
+        channel: ChannelId,
+        since: UnixMillis,
+        limit: u32,
+        cursor: Option<MessageCursor>,
+    ) -> RepoResult<Vec<StoredMessage>>;
 
     /// Channels and threads with messages created at or after `since`, most messages
     /// first (ties by channel row id), at most `limit`.
