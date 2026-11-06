@@ -285,7 +285,7 @@ fn order(a: &Ranked, b: &Ranked) -> std::cmp::Ordering {
 
 /// Searches entries and messages for `parsed` and returns the candidates ranked together,
 /// best first. Fetches more candidates than `limit` so that recency and the entry boost
-/// can reorder the store's bm25 order; the caller cuts the list at `limit`. This is the
+/// can reorder the store's bm25 order; [`top_ranked`] cuts the list at `limit`. This is the
 /// ranking `teamctx search` shows, and the eval measures it through this function.
 pub(crate) fn rank_candidates(
     store: &Store,
@@ -303,6 +303,21 @@ pub(crate) fn rank_candidates(
         ranked.push(Ranked::new(Found::Message(hit), now, scorer));
     }
     ranked.sort_by(order);
+    Ok(ranked)
+}
+
+/// The first `limit` results of the merged ranking: exactly what `teamctx search --limit
+/// <limit>` prints. Entries and messages compete for the same slots, so the cut is made
+/// before anything is split by kind. The eval measures retrieval through this function.
+pub(crate) fn top_ranked(
+    store: &Store,
+    parsed: &query::Query,
+    limit: u32,
+    now: UnixMillis,
+    scorer: Scorer,
+) -> Result<Vec<Ranked>, RepoError> {
+    let mut ranked = rank_candidates(store, parsed, limit, now, scorer)?;
+    ranked.truncate(limit as usize);
     Ok(ranked)
 }
 
@@ -441,9 +456,8 @@ fn search(options: &SearchOptions) -> Result<String, SearchError> {
     let mut store = Store::open_read_only(&db).map_err(|_| SearchError::Open)?;
     store.set_date_resolver(date_resolver(options.timezone));
 
-    let mut ranked = rank_candidates(&store, &parsed, options.limit, now(), rank::score)
+    let ranked = top_ranked(&store, &parsed, options.limit, now(), rank::score)
         .map_err(SearchError::Store)?;
-    ranked.truncate(options.limit as usize);
 
     if ranked.is_empty() {
         return Ok("No results.\n".to_owned());

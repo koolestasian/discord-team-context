@@ -17,6 +17,9 @@ release.
   `/ask` bundle (`Bundle::retrieve`, with thread neighbours). A broken ranking now fails
   `--check`. Baseline rewritten; overall combined recall@10 of `search` moved from 0.6102
   to 0.5941 because the raw store order was kinder than the production ranking.
+- The eval cuts the merged ranking at ten results in total, exactly as `teamctx search`
+  does, instead of ten per collection; `search` combined recall@10 moved from 0.5941 to
+  0.5363. Baseline rewritten; see `docs/research/M2.md`.
 
 ### Added
 

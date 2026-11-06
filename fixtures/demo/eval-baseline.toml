@@ -2,18 +2,18 @@
 # CI fails when an overall number falls below this file. Definitions: crates/teamctx/src/eval.rs.
 # Messages are scored against expected_messages and entries against expected_entries.
 # Every tool runs production retrieval (core::rank, Bundle::retrieve); ask_retrieval counts
-# the whole bundle, the others the first 10 of each collection.
+# the whole bundle, the others the first 10 results in total (as `teamctx search --limit 10`).
 schema_version = 2
 cases = 62
 
 [search.date]
 cases = 9
-messages_recall_at_10 = 0.7778
-messages_mrr = 0.4788
+messages_recall_at_10 = 0.6667
+messages_mrr = 0.463
 entries_recall_at_10 = 1.0
 entries_mrr = 0.9444
-combined_recall_at_10 = 0.8889
-combined_mrr = 0.7116
+combined_recall_at_10 = 0.8333
+combined_mrr = 0.7037
 
 [search.name]
 cases = 9
@@ -26,48 +26,48 @@ combined_mrr = 0.8611
 
 [search.overall]
 cases = 62
-messages_recall_at_10 = 0.3978
-messages_mrr = 0.2653
-entries_recall_at_10 = 0.7903
-entries_mrr = 0.5358
-combined_recall_at_10 = 0.5941
-combined_mrr = 0.4005
+messages_recall_at_10 = 0.2984
+messages_mrr = 0.2446
+entries_recall_at_10 = 0.7742
+entries_mrr = 0.5335
+combined_recall_at_10 = 0.5363
+combined_mrr = 0.3891
 
 [search.paraphrase]
 cases = 22
-messages_recall_at_10 = 0.1136
-messages_mrr = 0.0224
-entries_recall_at_10 = 0.5455
-entries_mrr = 0.23
-combined_recall_at_10 = 0.3295
-combined_mrr = 0.1262
+messages_recall_at_10 = 0.0455
+messages_mrr = 0.0114
+entries_recall_at_10 = 0.5
+entries_mrr = 0.2235
+combined_recall_at_10 = 0.2727
+combined_mrr = 0.1174
 
 [search.reversed]
 cases = 13
-messages_recall_at_10 = 0.3462
-messages_mrr = 0.1778
+messages_recall_at_10 = 0.1538
+messages_mrr = 0.1538
 entries_recall_at_10 = 1.0
 entries_mrr = 0.4546
-combined_recall_at_10 = 0.6731
-combined_mrr = 0.3162
+combined_recall_at_10 = 0.5769
+combined_mrr = 0.3042
 
 [search.thread-context]
 cases = 9
-messages_recall_at_10 = 0.2963
-messages_mrr = 0.3148
+messages_recall_at_10 = 0.1667
+messages_mrr = 0.25
 entries_recall_at_10 = 0.6667
 entries_mrr = 0.5278
-combined_recall_at_10 = 0.4815
-combined_mrr = 0.4213
+combined_recall_at_10 = 0.4167
+combined_mrr = 0.3889
 
 [context_for.date]
 cases = 9
-messages_recall_at_10 = 0.7778
-messages_mrr = 0.4788
+messages_recall_at_10 = 0.6667
+messages_mrr = 0.463
 entries_recall_at_10 = 1.0
 entries_mrr = 0.9444
-combined_recall_at_10 = 0.8889
-combined_mrr = 0.7116
+combined_recall_at_10 = 0.8333
+combined_mrr = 0.7037
 
 [context_for.name]
 cases = 9
@@ -80,39 +80,39 @@ combined_mrr = 0.8611
 
 [context_for.overall]
 cases = 62
-messages_recall_at_10 = 0.414
-messages_mrr = 0.276
-entries_recall_at_10 = 0.7903
-entries_mrr = 0.5331
-combined_recall_at_10 = 0.6022
-combined_mrr = 0.4046
+messages_recall_at_10 = 0.2984
+messages_mrr = 0.2527
+entries_recall_at_10 = 0.7742
+entries_mrr = 0.5308
+combined_recall_at_10 = 0.5363
+combined_mrr = 0.3917
 
 [context_for.paraphrase]
 cases = 22
-messages_recall_at_10 = 0.1136
-messages_mrr = 0.0224
-entries_recall_at_10 = 0.5455
-entries_mrr = 0.23
-combined_recall_at_10 = 0.3295
-combined_mrr = 0.1262
+messages_recall_at_10 = 0.0455
+messages_mrr = 0.0114
+entries_recall_at_10 = 0.5
+entries_mrr = 0.2235
+combined_recall_at_10 = 0.2727
+combined_mrr = 0.1174
 
 [context_for.reversed]
 cases = 13
-messages_recall_at_10 = 0.3846
-messages_mrr = 0.2162
+messages_recall_at_10 = 0.1538
+messages_mrr = 0.1923
 entries_recall_at_10 = 1.0
 entries_mrr = 0.4418
-combined_recall_at_10 = 0.6923
-combined_mrr = 0.329
+combined_recall_at_10 = 0.5769
+combined_mrr = 0.317
 
 [context_for.thread-context]
 cases = 9
-messages_recall_at_10 = 0.3519
-messages_mrr = 0.3333
+messages_recall_at_10 = 0.1667
+messages_mrr = 0.25
 entries_recall_at_10 = 0.6667
 entries_mrr = 0.5278
-combined_recall_at_10 = 0.5093
-combined_mrr = 0.4306
+combined_recall_at_10 = 0.4167
+combined_mrr = 0.3889
 
 [ask_retrieval.date]
 cases = 9

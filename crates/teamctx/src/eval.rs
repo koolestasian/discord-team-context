@@ -10,15 +10,17 @@
 //! Each path calls the code production uses; the eval adds no ranking of its own.
 //!
 //! - **`search`**: `core::query::parse(case.query)` (the question as typed), then
-//!   [`crate::search::rank_candidates`], the function `teamctx search` runs: entries and
+//!   [`crate::search::top_ranked`], the function `teamctx search` runs: entries and
 //!   messages are fetched, scored with `core::rank::score` (bm25, recency decay, entry
-//!   boost) and sorted together. The merged list is split by kind, keeping its order, and
-//!   each list is cut at [`CUTOFF`].
+//!   boost), sorted together and cut at [`CUTOFF`] results in total, as
+//!   `teamctx search --limit 10` prints them. Only then is the list split by kind, keeping
+//!   its order, so entries and messages compete for the same ten slots.
 //! - **`context_for`**: as `search`, but the query is
 //!   `core::query::context_query(case.query)` (lowercased words, stopwords and a leading
-//!   git prefix dropped). Within each kind the order is the `core::rank` order, entries
-//!   are reported separately from messages (entries first, plan section 9). Neighbours are
-//!   not added: they are context for a reader, not retrieval hits.
+//!   git prefix dropped). The cut is the same ten merged results; within each kind the
+//!   order is the `core::rank` order, and entries are reported separately from messages
+//!   (entries first, plan section 9). Neighbours are not added: they are context for a
+//!   reader, not retrieval hits.
 //! - **`ask_retrieval`**: `teamctx_llm::Bundle::retrieve` with the default
 //!   [`BundleLimits`], the step that feeds `/ask` (plan section 11): the all-terms query
 //!   plus up to six single-term queries, merged and ranked with `core::rank`, bounded by
@@ -38,8 +40,9 @@
 //! entries only against the entry gold, so a collection is never penalised for ids it
 //! cannot return. A collection with no gold in a case is skipped for that case.
 //!
-//! For one case and one collection, with `top` the first 10 results and `gold` the set
-//! of expected ids:
+//! For one case and one collection, with `top` the results of that collection among the
+//! first 10 results of the path (for `search` and `context_for`, 10 in total across both
+//! collections) and `gold` the set of expected ids:
 //!
 //! - **recall@10** = `|top ∩ gold| / |gold|`.
 //! - **reciprocal rank** = `1 / r`, where `r` is the 1-based position in `top` of the
@@ -79,7 +82,7 @@ use teamctx_store::{
     demo::{DemoError, DemoMap, import},
 };
 
-use crate::search::{Found, Ranked, Scorer, rank_candidates};
+use crate::search::{Found, Ranked, Scorer, top_ranked};
 
 /// The dataset, embedded at build time.
 const DATASET: &str = include_str!("../../../fixtures/demo/dataset.json");
@@ -436,7 +439,7 @@ impl Tool {
     ) -> Result<(Retrieved, usize), EvalError> {
         let store_error = |error: RepoError| EvalError::Store(error.to_string());
         let ranked = |query, scorer| {
-            rank_candidates(store, query, CUTOFF, NOW, scorer)
+            top_ranked(store, query, CUTOFF, NOW, scorer)
                 .map(|ranked| Retrieved::from_ranked(&ranked))
                 .map_err(store_error)
         };
@@ -614,7 +617,7 @@ const BASELINE_HEADER: &str = "\
 # CI fails when an overall number falls below this file. Definitions: crates/teamctx/src/eval.rs.
 # Messages are scored against expected_messages and entries against expected_entries.
 # Every tool runs production retrieval (core::rank, Bundle::retrieve); ask_retrieval counts
-# the whole bundle, the others the first 10 of each collection.
+# the whole bundle, the others the first 10 results in total (as `teamctx search --limit 10`).
 ";
 
 fn read_baseline(path: &Path) -> Result<Report, EvalError> {
@@ -695,7 +698,7 @@ mod tests {
         let query = parse("Fenwick Serif").map_err(|_| EvalError::Query {
             case: case.id.clone(),
         })?;
-        let ranked = rank_candidates(&store, &query, CUTOFF, NOW, rank::score)
+        let ranked = top_ranked(&store, &query, CUTOFF, NOW, rank::score)
             .map_err(|e| EvalError::Store(e.to_string()))?;
         let scored = Retrieved::from_ranked(&ranked).score(&gold, CUTOFF as usize);
         let messages = scored.messages.ok_or(EvalError::Cases("no message gold"))?;
@@ -705,6 +708,47 @@ mod tests {
 
     fn set(ids: &[u32]) -> BTreeSet<u32> {
         ids.iter().copied().collect()
+    }
+
+    #[test]
+    fn search_paths_return_at_most_the_cutoff_in_total() -> Result<(), EvalError> {
+        // Regression: the eval once cut each collection at ten, so it scored up to twenty
+        // results where `teamctx search --limit 10` returns ten of the merged ranking.
+        let file = load_cases()?;
+        let (store, _) = import_demo()?;
+        let mut crowded = false;
+        for case in &file.cases {
+            for tool in [Tool::Search, Tool::ContextFor] {
+                let (found, k) = tool.retrieve(&store, case, rank::score)?;
+                let total = found.messages.len() + found.entries.len();
+                assert!(total <= CUTOFF as usize, "{} returned {total}", case.id);
+                assert_eq!(k, CUTOFF as usize);
+                crowded |= total == CUTOFF as usize;
+            }
+        }
+        assert!(
+            crowded,
+            "no case fills the cutoff, so the test proves nothing"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn search_paths_return_the_production_top_of_the_merged_ranking() -> Result<(), EvalError> {
+        let file = load_cases()?;
+        let (store, _) = import_demo()?;
+        for case in &file.cases {
+            let typed = parse(&case.query).map_err(|_| EvalError::Query {
+                case: case.id.clone(),
+            })?;
+            let production = top_ranked(&store, &typed, CUTOFF, NOW, rank::score)
+                .map_err(|e| EvalError::Store(e.to_string()))?;
+            let (found, _) = Tool::Search.retrieve(&store, case, rank::score)?;
+            let expected = Retrieved::from_ranked(&production);
+            assert_eq!(found.messages, expected.messages, "{}", case.id);
+            assert_eq!(found.entries, expected.entries, "{}", case.id);
+        }
+        Ok(())
     }
 
     #[test]
