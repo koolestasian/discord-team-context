@@ -4,7 +4,9 @@
 //! validation and sync are gated on a throwaway test server.
 
 mod config;
+mod demo;
 mod eval;
+mod search;
 mod token;
 
 use std::ffi::OsString;
@@ -23,7 +25,7 @@ const HELP: &str = concat!(
     "\n",
     "Offline init and doctor; live Discord support is not available yet.\n",
     "\n",
-    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS]\n",
+    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS] | demo|search [ARGS]\n",
     "\n",
     "Options:\n",
     "  -h, --help     Print this help\n",
@@ -32,6 +34,8 @@ const HELP: &str = concat!(
     "  init          Print a config template and optional bot invite; writes no files\n",
     "  doctor        Validate config and token presence; makes no network calls\n",
     "  token         create|list|revoke access tokens (see 'teamctx token --help')\n",
+    "  demo          Load a fictional team into a SQLite file (demo [--db PATH])\n",
+    "  search        Search a database (search QUERY [--db PATH] [--limit N] [--timezone TZ])\n",
     "\nOffline options:\n",
     "  --config PATH         TOML file (default teamctx.toml if present)\n",
     "  --guild-id ID         Discord server id (required unless in file/environment)\n",
@@ -42,6 +46,13 @@ const HELP: &str = concat!(
     "  --token-env NAME      Environment variable containing bot token\n",
     "  --include-channels LIST / --exclude-channels LIST (comma-separated)\n",
     "  --backfill-days N / --recheck-window-hours N\n",
+    "\nDemo and search (no network; --db defaults to teamctx/demo.db in the OS data directory):\n",
+    "  QUERY syntax: words, \"a phrase\", from:NAME, in:#channel, before:/after:YYYY-MM-DD\n",
+    "  --timezone TZ         Midnight for before:/after:, default UTC. Only UTC and fixed\n",
+    "                        offsets such as +02:00 work; named zones (America/Toronto) are\n",
+    "                        rejected because no time zone database is built in\n",
+    "  --limit N             Results to print, 1 to 50 (default 5)\n",
+    "  Chat text is printed framed as data, so the output is safe to paste into an agent.\n",
 );
 
 /// Exit code for a command-line usage error (the same code `clap` will use later).
@@ -55,6 +66,8 @@ enum Command {
     Doctor(config::OfflineOptions),
     Token(token::Command),
     Eval(eval::Options),
+    Demo(demo::DemoOptions),
+    Search(search::SearchOptions),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -64,6 +77,7 @@ enum UsageError {
     Config(config::ConfigError),
     Token(token::UsageError),
     Eval(eval::ArgError),
+    Args(demo::ArgError),
 }
 
 impl fmt::Display for UsageError {
@@ -75,6 +89,7 @@ impl fmt::Display for UsageError {
             Self::Config(error) => fmt::Display::fmt(error, f),
             Self::Token(error) => fmt::Display::fmt(error, f),
             Self::Eval(error) => fmt::Display::fmt(error, f),
+            Self::Args(error) => fmt::Display::fmt(error, f),
         }
     }
 }
@@ -107,6 +122,16 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, UsageError
                     .map(Command::Eval)
                     .map_err(UsageError::Eval);
             }
+            Some("demo") => {
+                return demo::parse_args(args)
+                    .map(Command::Demo)
+                    .map_err(UsageError::Args);
+            }
+            Some("search") => {
+                return search::parse_args(args)
+                    .map(Command::Search)
+                    .map_err(UsageError::Args);
+            }
             _ => return Err(UsageError::Unknown(arg)),
         },
     };
@@ -125,6 +150,8 @@ fn run(args: impl IntoIterator<Item = OsString>, out: &mut impl Write, err: &mut
         Ok(Command::Doctor(options)) => return run_offline(false, &options, out, err),
         Ok(Command::Token(command)) => return token::run(&command, out, err),
         Ok(Command::Eval(options)) => return run_eval(&options, out, err),
+        Ok(Command::Demo(options)) => return demo::run(&options, out, err),
+        Ok(Command::Search(options)) => return search::run(&options, out, err),
         Err(error) => {
             // If stderr is gone there is nowhere left to report that, so the error is dropped.
             let _ = writeln!(err, "error: {error}\nTry 'teamctx --help'.");
