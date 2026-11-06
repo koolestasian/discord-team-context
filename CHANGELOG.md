@@ -20,6 +20,14 @@ release.
 
 ### Added
 
+- The MCP server's five read-only tools (`context_for`, `whats_new`, `record`, `search`,
+  `read`) and the `catch_up` prompt, over streamable HTTP behind token auth. Results start
+  with the untrusted-data notice, hold chat text only inside one framed block, cite message
+  and entry ids with jump links, and carry `structuredContent` with an `outputSchema`.
+  CI tests keep the tool definitions under 1,500 tokens and default responses under 2,000
+  (estimated as characters / 4). `teamctx_server::serve` serves the router with client
+  addresses so the failed-auth limit counts per client. Not yet in `whats_new`: messages
+  that mention the caller (tokens are not linked to members).
 - Access tokens for the MCP endpoint: `teamctx token create|list|revoke`, SHA-256-only
   storage, a failed-attempt rate limit and a `Secret` wrapper that never prints its value.
   A token revoked at any moment is rejected on the next use, and concurrent bad attempts

@@ -185,33 +185,16 @@ async fn initialize_initialized_tools_list_with_the_right_token() {
     assert_eq!(response.status(), StatusCode::OK);
     let (_, message) = rpc_message(response).await;
     let tools = message["result"]["tools"].as_array().expect("tools array");
-    assert_eq!(tools.len(), 1, "tools: {tools:?}");
-    assert_eq!(tools[0]["name"], "ping");
-    assert_eq!(tools[0]["annotations"]["readOnlyHint"], true);
-}
-
-#[tokio::test]
-async fn call_ping_returns_the_fixed_line() {
-    let (_db, server, token) = start().await;
-    let client = Client::new();
-    let response = post(
-        &client,
-        &server,
-        &json!({
-            "jsonrpc": "2.0", "id": 3, "method": "tools/call",
-            "params": { "name": "ping", "arguments": {} }
-        }),
-    )
-    .bearer_auth(&token)
-    .header("MCP-Protocol-Version", "2025-11-25")
-    .send()
-    .await
-    .expect("tools/call");
-    assert_eq!(response.status(), StatusCode::OK);
-    let (_, message) = rpc_message(response).await;
+    let mut names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+    names.sort_unstable();
     assert_eq!(
-        message["result"]["content"][0]["text"],
-        "pong from the Example Team record"
+        names,
+        ["context_for", "read", "record", "search", "whats_new"]
+    );
+    assert!(
+        tools
+            .iter()
+            .all(|t| t["annotations"]["readOnlyHint"] == true)
     );
 }
 
@@ -242,7 +225,7 @@ async fn stateless_2026_07_28_request_needs_no_initialize() {
     let (_, message) = rpc_message(response).await;
     assert_eq!(status, StatusCode::OK);
     assert!(session.is_none());
-    assert_eq!(message["result"]["tools"][0]["name"], "ping");
+    assert_eq!(message["result"]["tools"].as_array().map(Vec::len), Some(5));
 }
 
 #[tokio::test]

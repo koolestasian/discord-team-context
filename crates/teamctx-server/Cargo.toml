@@ -18,13 +18,13 @@ thiserror.workspace = true
 sha2.workspace = true
 getrandom.workspace = true
 tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 rmcp.workspace = true
 axum.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 
 [dev-dependencies]
-serde_json.workspace = true
 reqwest.workspace = true
-serde.workspace = true
 tempfile.workspace = true

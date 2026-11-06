@@ -1,6 +1,7 @@
-//! Runs the spike S3 server so a real MCP client (for example Claude Code) can connect to it.
+//! Runs the MCP server so a real MCP client (for example Claude Code) can connect to it.
 //!
 //! ```sh
+//! teamctx demo --db scratch.db                      # fictional demo record
 //! teamctx token create local-test --db scratch.db   # prints a token once
 //! TEAMCTX_DB=scratch.db cargo run -p teamctx-server --example s3_server
 //! ```
@@ -10,7 +11,7 @@
 
 use std::{env, net::SocketAddr, sync::Arc};
 
-use teamctx_server::{HttpConfig, auth::StoreTokens, router};
+use teamctx_server::{HttpConfig, auth::StoreTokens, mcp::McpConfig, router, serve};
 use teamctx_store::{Store, Writer};
 use tokio_util::sync::CancellationToken;
 
@@ -27,18 +28,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokens: Arc::new(tokens),
         allowed_hosts: vec!["127.0.0.1".to_owned(), "localhost".to_owned()],
         shutdown: shutdown.clone(),
+        mcp: McpConfig::new(Store::open_read_only(&db)?),
     });
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("MCP endpoint: http://{addr}/mcp (Ctrl+C to stop)");
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .with_graceful_shutdown(async move {
+    let stop = shutdown.clone();
+    tokio::spawn(async move {
         let _ = tokio::signal::ctrl_c().await;
-        shutdown.cancel();
-    })
-    .await?;
+        stop.cancel();
+    });
+    serve(listener, app, shutdown).await?;
     writer.shutdown()?;
     Ok(())
 }

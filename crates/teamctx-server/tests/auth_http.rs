@@ -9,6 +9,10 @@
     reason = "clippy.toml exempts #[test] functions only; this file's helpers panic on failure too"
 )]
 
+#[expect(
+    dead_code,
+    reason = "this binary does not load the demo record; mcp_tools.rs does"
+)]
 mod common;
 
 use std::{
