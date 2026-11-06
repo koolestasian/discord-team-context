@@ -33,8 +33,12 @@ release.
 - `teamctx eval` (also `cargo xtask eval`): imports the demo, runs the 62 questions through
   `search` and `context_for`, and prints recall@10 and MRR per category. The measured
   baseline is stored in `fixtures/demo/eval-baseline.toml` and CI fails when an overall
-  number drops below it. Today every number is 0.0000 because natural-language questions
-  are ANDed; see `docs/research/M2.md`.
+  number drops below it; see `docs/research/M2.md`.
+- Natural-language search: bare words now match any term (OR) and rank by `bm25`, so more
+  matched terms score higher; quoted phrases and filters stay required. A fixed stopword
+  list ("what", "did", "we", ...) is dropped from bare words in `search` as in
+  `context_for`. On the demo eval, overall recall@10 went from 0.0000 to 0.6102 and MRR
+  from 0.0000 to 0.4286 for `search` (0.6142 and 0.4326 for `context_for`).
 - Core domain types, record lifecycle rules, query AST and repository contracts,
   with invariant tests and a contract map in `docs/design/contracts.md`.
 - Spike S4: `teamctx-store` links the bundled SQLite (`rusqlite`) and tests an FTS5

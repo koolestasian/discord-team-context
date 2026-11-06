@@ -131,7 +131,8 @@ impl Bundle {
     /// Searches the store and assembles a bounded bundle.
     ///
     /// The question becomes keyword queries with [`context_query`]: one with all terms,
-    /// then one per term, because the store ANDs the terms of a query. Hits from all
+    /// then one per term. The store ORs bare words, so the first query ranks items that
+    /// match more terms higher and each single-term query adds that term's hits. Hits from all
     /// queries are merged and ranked with [`rank::score`].
     ///
     /// # Errors
@@ -585,12 +586,9 @@ mod tests {
                 .collect()
         };
         let plan = search_plan("Which typeface do we use for the reading text?");
-        assert_eq!(
-            words(&plan[0]),
-            ["which", "typeface", "do", "we", "use", "reading"]
-        );
-        assert_eq!(plan.len(), 7);
-        assert_eq!(words(&plan[1]), ["which"]);
+        assert_eq!(words(&plan[0]), ["typeface", "use", "reading", "text"]);
+        assert_eq!(plan.len(), 5);
+        assert_eq!(words(&plan[1]), ["typeface"]);
         // One term: no duplicate all-terms query.
         assert_eq!(search_plan("typeface").len(), 1);
         assert!(search_plan("the of and").is_empty());

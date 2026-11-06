@@ -6,108 +6,108 @@ cases = 62
 
 [search.date]
 cases = 9
-messages_recall_at_10 = 0.0
-messages_mrr = 0.0
-entries_recall_at_10 = 0.0
-entries_mrr = 0.0
-combined_recall_at_10 = 0.0
-combined_mrr = 0.0
+messages_recall_at_10 = 0.7778
+messages_mrr = 0.5037
+entries_recall_at_10 = 1.0
+entries_mrr = 0.9444
+combined_recall_at_10 = 0.8889
+combined_mrr = 0.7241
 
 [search.name]
 cases = 9
-messages_recall_at_10 = 0.0
-messages_mrr = 0.0
-entries_recall_at_10 = 0.0
-entries_mrr = 0.0
-combined_recall_at_10 = 0.0
-combined_mrr = 0.0
+messages_recall_at_10 = 0.8889
+messages_mrr = 0.6296
+entries_recall_at_10 = 1.0
+entries_mrr = 1.0
+combined_recall_at_10 = 0.9444
+combined_mrr = 0.8148
 
 [search.overall]
 cases = 62
-messages_recall_at_10 = 0.0
-messages_mrr = 0.0
-entries_recall_at_10 = 0.0
-entries_mrr = 0.0
-combined_recall_at_10 = 0.0
-combined_mrr = 0.0
+messages_recall_at_10 = 0.4301
+messages_mrr = 0.2831
+entries_recall_at_10 = 0.7903
+entries_mrr = 0.5741
+combined_recall_at_10 = 0.6102
+combined_mrr = 0.4286
 
 [search.paraphrase]
 cases = 22
-messages_recall_at_10 = 0.0
-messages_mrr = 0.0
-entries_recall_at_10 = 0.0
-entries_mrr = 0.0
-combined_recall_at_10 = 0.0
-combined_mrr = 0.0
+messages_recall_at_10 = 0.1136
+messages_mrr = 0.0308
+entries_recall_at_10 = 0.5
+entries_mrr = 0.2418
+combined_recall_at_10 = 0.3068
+combined_mrr = 0.1363
 
 [search.reversed]
 cases = 13
-messages_recall_at_10 = 0.0
-messages_mrr = 0.0
-entries_recall_at_10 = 0.0
-entries_mrr = 0.0
-combined_recall_at_10 = 0.0
-combined_mrr = 0.0
+messages_recall_at_10 = 0.5
+messages_mrr = 0.2353
+entries_recall_at_10 = 1.0
+entries_mrr = 0.6923
+combined_recall_at_10 = 0.75
+combined_mrr = 0.4638
 
 [search.thread-context]
 cases = 9
-messages_recall_at_10 = 0.0
-messages_mrr = 0.0
-entries_recall_at_10 = 0.0
-entries_mrr = 0.0
-combined_recall_at_10 = 0.0
-combined_mrr = 0.0
+messages_recall_at_10 = 0.2963
+messages_mrr = 0.4012
+entries_recall_at_10 = 0.7778
+entries_mrr = 0.4198
+combined_recall_at_10 = 0.537
+combined_mrr = 0.4105
 
 [context_for.date]
 cases = 9
-messages_recall_at_10 = 0.0
-messages_mrr = 0.0
-entries_recall_at_10 = 0.0
-entries_mrr = 0.0
-combined_recall_at_10 = 0.0
-combined_mrr = 0.0
+messages_recall_at_10 = 0.7778
+messages_mrr = 0.5037
+entries_recall_at_10 = 1.0
+entries_mrr = 0.9444
+combined_recall_at_10 = 0.8889
+combined_mrr = 0.7241
 
 [context_for.name]
 cases = 9
-messages_recall_at_10 = 0.0
-messages_mrr = 0.0
-entries_recall_at_10 = 0.0
-entries_mrr = 0.0
-combined_recall_at_10 = 0.0
-combined_mrr = 0.0
+messages_recall_at_10 = 0.8889
+messages_mrr = 0.6296
+entries_recall_at_10 = 1.0
+entries_mrr = 1.0
+combined_recall_at_10 = 0.9444
+combined_mrr = 0.8148
 
 [context_for.overall]
 cases = 62
-messages_recall_at_10 = 0.0
-messages_mrr = 0.0
-entries_recall_at_10 = 0.0
-entries_mrr = 0.0
-combined_recall_at_10 = 0.0
-combined_mrr = 0.0
+messages_recall_at_10 = 0.4382
+messages_mrr = 0.2911
+entries_recall_at_10 = 0.7903
+entries_mrr = 0.5741
+combined_recall_at_10 = 0.6142
+combined_mrr = 0.4326
 
 [context_for.paraphrase]
 cases = 22
-messages_recall_at_10 = 0.0
-messages_mrr = 0.0
-entries_recall_at_10 = 0.0
-entries_mrr = 0.0
-combined_recall_at_10 = 0.0
-combined_mrr = 0.0
+messages_recall_at_10 = 0.1136
+messages_mrr = 0.0308
+entries_recall_at_10 = 0.5
+entries_mrr = 0.2418
+combined_recall_at_10 = 0.3068
+combined_mrr = 0.1363
 
 [context_for.reversed]
 cases = 13
-messages_recall_at_10 = 0.0
-messages_mrr = 0.0
-entries_recall_at_10 = 0.0
-entries_mrr = 0.0
-combined_recall_at_10 = 0.0
-combined_mrr = 0.0
+messages_recall_at_10 = 0.5385
+messages_mrr = 0.2738
+entries_recall_at_10 = 1.0
+entries_mrr = 0.6923
+combined_recall_at_10 = 0.7692
+combined_mrr = 0.4831
 
 [context_for.thread-context]
 cases = 9
-messages_recall_at_10 = 0.0
-messages_mrr = 0.0
-entries_recall_at_10 = 0.0
-entries_mrr = 0.0
-combined_recall_at_10 = 0.0
-combined_mrr = 0.0
+messages_recall_at_10 = 0.2963
+messages_mrr = 0.4012
+entries_recall_at_10 = 0.7778
+entries_mrr = 0.4198
+combined_recall_at_10 = 0.537
+combined_mrr = 0.4105

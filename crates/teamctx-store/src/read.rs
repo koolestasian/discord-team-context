@@ -5,7 +5,7 @@ use rusqlite::{
 };
 use teamctx_core::{
     id::*,
-    query::{Clause, Query, fts_expression},
+    query::{Clause, Query, fts_expression, fts_expression_all},
     record::*,
     repo::*,
     source::*,
@@ -533,7 +533,8 @@ impl RecordRead for Store {
                 .split_whitespace()
                 .map(|word| Clause::Word(word.to_owned()))
                 .collect();
-            if let Some(expression) = fts_expression(&Query { clauses: words }) {
+            // A topic narrows the list, so every word is required (unlike a search).
+            if let Some(expression) = fts_expression_all(&Query { clauses: words }) {
                 conditions.push("e.id IN (SELECT rowid FROM record_fts WHERE record_fts MATCH ?)");
                 values.push(expression.into());
             }
