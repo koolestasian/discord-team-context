@@ -64,6 +64,15 @@ release.
   missing from the retrieved sources. CI fails if the corpus has fewer than 30 messages.
   Known gap, kept as an ignored test: an MCP display name with a line break can add a
   line inside the block (it cannot close the block).
+- CI guards for the two promises of plan section 13 (see `docs/testing/guards.md`). A
+  source scan fails on any Discord write call outside interaction replies: twilight-http
+  write methods and builders, unreviewed write-shaped twilight names, and HTTP write
+  methods in files that hold a Discord REST route. Log-capture tests run the sync, auth,
+  token, config and `/ask` paths with fake secrets under a TRACE subscriber and fail if a
+  secret appears in logs, `Debug`/`Display` text or error chains, raw or hex, percent or
+  base64 encoded. Two known leaks are recorded as ignored tests: an LLM key pasted into
+  `llm.api_key_env` is echoed by the "not set" error, and a malformed Discord payload value
+  is quoted into `SyncError`'s source chain.
 - The MCP server's five read-only tools (`context_for`, `whats_new`, `record`, `search`,
   `read`) and the `catch_up` prompt, over streamable HTTP behind token auth. Results start
   with the untrusted-data notice, hold chat text only inside one framed block, cite message
