@@ -56,6 +56,14 @@ release.
   token, does not follow redirects and replaces terminal control characters in the output.
   Not yet: `POST /api/v1/ask`, sessions and the web view; `status` only proves the record
   is readable.
+- A prompt-injection corpus in CI (`fixtures/injection/`): 40 fictional hostile messages,
+  plus hostile titles, display names and a thread name, loaded through the demo importer.
+  Tests check that every MCP tool keeps all of it inside the one framed block and out of
+  `structuredContent` and the tool definitions, and that `/ask` keeps it out of the
+  system prompt, drops citations of ids outside the retrieved bundle and strips URLs
+  missing from the retrieved sources. CI fails if the corpus has fewer than 30 messages.
+  Known gap, kept as an ignored test: an MCP display name with a line break can add a
+  line inside the block (it cannot close the block).
 - The MCP server's five read-only tools (`context_for`, `whats_new`, `record`, `search`,
   `read`) and the `catch_up` prompt, over streamable HTTP behind token auth. Results start
   with the untrusted-data notice, hold chat text only inside one framed block, cite message
