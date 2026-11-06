@@ -32,7 +32,7 @@ coding agents, and a minimal web view. Everything except `/ask` works without an
 | | S1 gateway messages, S2 interaction replies | Needs a Discord test server |
 | M2 Store + search | SQLite schema and repositories, query parser, ranking, demo data, eval questions | Done |
 | | Retrieval eval runner (`cargo xtask eval`), `teamctx demo`, `teamctx search` | Done |
-| | Natural-language questions match too few results yet (the eval baseline is 0) | Next |
+| | Natural-language questions: any-word matching lifts recall@10 from 0.0 to about 0.6 | Done, still improving |
 | M3 Discord sync | Offline `init`/`doctor`, permission checks, bot setup guide | Done |
 | | Live sync, backfill, live events | Planned |
 | M4-M8 | MCP tools and tokens, record commands, `/ask`, web view, v0.1.0 release | Planned |

@@ -8,8 +8,9 @@
 //! # Retrieval paths
 //!
 //! - **`search`**: `core::query::parse(case.query)`, then `search_entries` and
-//!   `search_messages`. The query is the natural-language question as typed, so it keeps
-//!   its stopwords and every word must match (clauses combine with AND).
+//!   `search_messages`. The query is the natural-language question as typed. Bare words
+//!   match in any order and any one is enough (stopwords are dropped); quoted phrases and
+//!   `from:`/`in:`/date filters are required.
 //! - **`context_for`**: `core::query::context_query(case.query)` (lowercased words,
 //!   stopwords and a leading git prefix dropped), then `search_entries`, then
 //!   `search_messages` (entries first, plan section 9). Neighbouring messages are not
