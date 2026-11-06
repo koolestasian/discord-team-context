@@ -12,9 +12,12 @@
 //! 2. a bounded bundle is retrieved: record entries first, then messages with thread
 //!    neighbours; bot messages and excluded channels never enter ([`bundle`]);
 //! 3. all chat-derived text goes through `teamctx_core::framing::frame` ([`prompt`]);
-//! 4. one provider call, no tools ([`LlmProvider`]; the request type has no tool fields);
-//! 5. citations are checked against the bundle, unknown URLs are removed, and an answer
-//!    with no valid citation becomes "not found" ([`pipeline`]).
+//! 4. the budget for the prompt plus the output allowance is reserved atomically, then
+//!    one provider call is made, no tools ([`LlmProvider`]; the request type has no tool
+//!    fields); a cancelled call is still charged ([`budget`]);
+//! 5. citations are checked against the bundle, every link and URL not in the sources is
+//!    removed in whatever Markdown form or encoding it takes, and an answer with no
+//!    valid citation becomes "not found" ([`pipeline`]).
 //!
 //! Tests never call a real API: [`FakeProvider`] and a local mock HTTP server stand in.
 

