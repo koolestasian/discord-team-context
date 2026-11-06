@@ -12,6 +12,11 @@ release.
 
 ### Added
 
+- `teamctx demo` loads the bundled fictional team into a SQLite file (OS data directory
+  by default; repeatable; refuses a database that is not the demo), and `teamctx search`
+  searches messages and record entries from the command line with short ids, citations
+  and chat text framed as untrusted data. `--timezone` accepts `UTC` and fixed offsets;
+  named zones are rejected until a time zone database is approved.
 - SQLite migration, repository implementations, FTS triggers, mention storage and a
   dedicated writer thread; deletion, exclusion and retention redact copied titles
   and update the audit log transactionally. Date queries require host timezone wiring.
