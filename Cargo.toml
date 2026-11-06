@@ -42,6 +42,9 @@ sha2 = { version = "0.11.1", default-features = false }
 getrandom = "0.4.3"
 # Auth failure and rate-limit events (plan section 17); already in the tree via rmcp.
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }
+# Dev-only: the log-capture guards (docs/testing/guards.md) format events at TRACE
+# through the real `fmt` layer. No ANSI, `log` bridge, env filter or JSON.
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
