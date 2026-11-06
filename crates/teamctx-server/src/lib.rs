@@ -4,6 +4,7 @@
 //! Boundary: serves the record from `teamctx-store`. It does not talk to Discord or to an
 //! LLM provider directly.
 
+mod api;
 pub mod auth;
 pub mod mcp;
 pub mod secret;
@@ -45,13 +46,16 @@ impl std::fmt::Debug for HttpConfig {
     }
 }
 
-/// Builds the application router: `/mcp` behind bearer auth.
+/// Builds the application router: `/mcp` and `/api/v1/*` behind bearer auth, and the
+/// unauthenticated `/healthz`.
 ///
 /// Serve it with [`serve`] (or `into_make_service_with_connect_info::<SocketAddr>()`) so
 /// the auth failure limit counts per client address; without connection info every
 /// client shares one bucket.
 pub fn router(config: HttpConfig) -> Router {
     let auth = Auth::new(config.tokens);
+    // One read connection serves both the MCP tools and the JSON API, so they cannot
+    // disagree about the record.
     let state = Arc::new(config.mcp.into_state());
     let mcp_config = StreamableHttpServerConfig::default()
         // 2026-07-28 removed protocol-level sessions. With this off, an `initialize` from an
@@ -63,6 +67,7 @@ pub fn router(config: HttpConfig) -> Router {
         // browsers always do, so an empty allow-list means "no browser origin is welcome".
         .enforce_origin_validation()
         .with_cancellation_token(config.shutdown);
+    let api = api::routes(Arc::clone(&state));
     let mcp = StreamableHttpService::new(
         move || Ok(McpServer::new(Arc::clone(&state))),
         Arc::new(LocalSessionManager::default()),
@@ -72,8 +77,9 @@ pub fn router(config: HttpConfig) -> Router {
     // are not accidentally put behind, or left outside, the MCP auth.
     let protected = Router::new()
         .nest_service("/mcp", mcp)
+        .merge(api)
         .layer(middleware::from_fn_with_state(auth, auth::require_bearer));
-    Router::new().merge(protected)
+    Router::new().merge(api::health()).merge(protected)
 }
 
 /// Serves `app` on `listener` until `shutdown` is cancelled.

@@ -5,9 +5,9 @@
 //! connection, on the blocking pool. Results are framed as untrusted chat data and kept
 //! inside the context budgets in [`view`]. The tool definitions never contain chat text.
 
-mod input;
-mod retrieve;
-mod view;
+pub(crate) mod input;
+pub(crate) mod retrieve;
+pub(crate) mod view;
 
 use std::{
     fmt,
@@ -105,9 +105,9 @@ fn system_now() -> UnixMillis {
 
 /// Shared by every request: one read connection behind a lock.
 pub(crate) struct McpState {
-    store: Mutex<Store>,
-    clock: Clock,
-    utc_offset_seconds: i32,
+    pub(crate) store: Mutex<Store>,
+    pub(crate) clock: Clock,
+    pub(crate) utc_offset_seconds: i32,
 }
 
 impl fmt::Debug for McpState {
