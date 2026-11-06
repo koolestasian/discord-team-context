@@ -38,6 +38,8 @@ use teamctx_core::{
 };
 use thiserror::Error;
 
+use crate::Store;
+
 /// The dataset schema this importer reads.
 const SCHEMA_VERSION: i64 = 1;
 /// Page size when listing the entries already stored.
@@ -646,6 +648,41 @@ fn prevalidate(parsed: &Parsed) -> Result<(), DemoError> {
         }
     }
     Ok(())
+}
+
+/// True if the database holds exactly one source, the given one, and nothing tied to any
+/// other source.
+///
+/// This is how `teamctx demo` decides that an existing file is safe to load into: every
+/// source row is looked at (ids need not be consecutive), and no member, channel or
+/// message may belong to a source other than that one. Rows in the other tables hang off
+/// members, channels or messages, so they are covered through those.
+///
+/// # Errors
+///
+/// [`RepoError::Backend`] when the database cannot be read.
+pub fn holds_only_source(
+    store: &Store,
+    kind: SourceKind,
+    external_id: Snowflake,
+    name: &str,
+) -> Result<bool, RepoError> {
+    store
+        .conn
+        .query_row(
+            "SELECT (SELECT count(*) FROM sources) = 1
+                AND EXISTS (SELECT 1 FROM sources
+                            WHERE kind = ?1 AND external_id = ?2 AND name = ?3)
+                AND NOT EXISTS (SELECT 1 FROM members
+                                WHERE source_id NOT IN (SELECT id FROM sources))
+                AND NOT EXISTS (SELECT 1 FROM channels
+                                WHERE source_id NOT IN (SELECT id FROM sources))
+                AND NOT EXISTS (SELECT 1 FROM messages
+                                WHERE channel_id NOT IN (SELECT id FROM channels))",
+            rusqlite::params![kind.as_str(), external_id.to_string(), name],
+            |row| row.get(0),
+        )
+        .map_err(crate::backend)
 }
 
 /// Loads the demo dataset into `store` and returns the id mapping.

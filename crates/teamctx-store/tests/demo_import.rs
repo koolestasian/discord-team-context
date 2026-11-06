@@ -643,3 +643,111 @@ fn lifecycle_violations_found_late_write_nothing() {
         "{error}"
     );
 }
+
+mod only_demo {
+    use super::*;
+    use teamctx_store::demo::holds_only_source;
+
+    const NAME: &str = "Lantern Shelf (fictional demo)";
+
+    fn holds(path: &std::path::Path) -> bool {
+        let store = Store::open_read_only(path).unwrap();
+        holds_only_source(&store, SourceKind::Discord, sf("1"), NAME).unwrap()
+    }
+
+    /// A file database holding the loaded demo, and its path.
+    fn demo_file() -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("demo.db");
+        let mut store = Store::open(&path).unwrap();
+        import(&mut store, DATASET).unwrap();
+        drop(store);
+        (dir, path)
+    }
+
+    /// Runs raw SQL that the store API cannot express, such as a source with an id gap.
+    fn raw(path: &std::path::Path, sql: &str) {
+        let conn = rusqlite::Connection::open(path).unwrap();
+        conn.execute_batch(sql).unwrap();
+    }
+
+    #[test]
+    fn the_loaded_demo_and_only_the_demo_qualifies() {
+        let (_dir, path) = demo_file();
+        assert!(holds(&path));
+
+        // A teamctx database with no source at all is not "only the demo".
+        let dir = tempfile::tempdir().unwrap();
+        let empty = dir.path().join("empty.db");
+        drop(Store::open(&empty).unwrap());
+        assert!(!holds(&empty));
+    }
+
+    #[test]
+    fn a_source_with_a_non_consecutive_id_is_found() {
+        // Source ids 1 (the demo) and 3 (a real server), nothing at 2. Looking only at
+        // ids 1 and 2 would call this a plain demo.
+        let (_dir, path) = demo_file();
+        raw(
+            &path,
+            "INSERT INTO sources (id, kind, external_id, name)
+             VALUES (3, 'discord', '777', 'Somebody''s real server');",
+        );
+        assert!(!holds(&path));
+    }
+
+    #[test]
+    fn a_consecutive_second_source_is_found() {
+        let (_dir, path) = demo_file();
+        let mut store = Store::open(&path).unwrap();
+        store
+            .upsert_source(SourceKind::Discord, sf("777"), "Another server")
+            .unwrap();
+        drop(store);
+        assert!(!holds(&path));
+    }
+
+    #[test]
+    fn a_different_single_source_is_not_the_demo() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("real.db");
+        let mut store = Store::open(&path).unwrap();
+        store
+            .upsert_source(SourceKind::Discord, sf("1"), "Somebody's real server")
+            .unwrap();
+        drop(store);
+        assert!(!holds(&path), "same guild id, different name");
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("other.db");
+        let mut store = Store::open(&path).unwrap();
+        store
+            .upsert_source(SourceKind::Discord, sf("2"), NAME)
+            .unwrap();
+        drop(store);
+        assert!(!holds(&path), "same name, different guild id");
+    }
+
+    #[test]
+    fn members_channels_and_messages_of_another_source_are_found() {
+        // Rows tied to a source that is not the demo, with foreign keys off so they can
+        // exist without a source row (a damaged or hand-edited file).
+        for sql in [
+            "INSERT INTO members (source_id, external_id, display_name, is_bot)
+             VALUES (9, '5', 'Stranger', 0);",
+            "INSERT INTO channels (source_id, external_id, parent_id, kind, name, topic,
+                                   is_included, archived, requested_included)
+             VALUES (9, '5', NULL, 'text', 'elsewhere', NULL, 1, 0, 1);",
+            "INSERT INTO channels (id, source_id, external_id, parent_id, kind, name, topic,
+                                   is_included, archived, requested_included)
+             VALUES (50, 9, '6', NULL, 'text', 'elsewhere', NULL, 1, 0, 1);
+             INSERT INTO messages (channel_id, external_id, author_id, content, reply_to_ext,
+                                   has_attachments, attachment_names, created_at, edited_at)
+             VALUES (50, '7', NULL, 'hello', NULL, 0, '[]', 1, NULL);",
+        ] {
+            let (_dir, path) = demo_file();
+            raw(&path, &format!("PRAGMA foreign_keys=OFF; {sql}"));
+            assert!(!holds(&path), "{sql}");
+        }
+    }
+}

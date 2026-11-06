@@ -17,12 +17,11 @@ use std::fmt;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use teamctx_core::{
-    id::SourceId,
-    repo::{DirectoryRead, RepoError},
-    source::SourceKind,
+use teamctx_core::{id::Snowflake, repo::RepoError, source::SourceKind};
+use teamctx_store::{
+    Store,
+    demo::{DemoError, holds_only_source},
 };
-use teamctx_store::{Store, demo::DemoError};
 
 /// The bundled dataset (fixtures/demo/dataset.json).
 const DATASET: &str = include_str!("../../../fixtures/demo/dataset.json");
@@ -146,16 +145,15 @@ fn holds_only_demo(path: &Path) -> bool {
     let Ok(store) = Store::open_read_only(path) else {
         return false;
     };
-    let source = |row: i64| SourceId::new(row).map(|id| store.source(id));
-    let first_is_demo = matches!(
-        source(1),
-        Some(Ok(Some(info)))
-            if info.kind == SourceKind::Discord
-                && info.external_id.get() == DEMO_GUILD_ID
-                && info.name == DEMO_SOURCE_NAME
-    );
-    let no_second = matches!(source(2), Some(Ok(None)));
-    first_is_demo && no_second
+    let Some(guild) = Snowflake::new(DEMO_GUILD_ID) else {
+        return false;
+    };
+    // Every source is checked, not just the first ids: a real source stored under any
+    // id, or any member, channel or message of one, makes the file not a plain demo.
+    matches!(
+        holds_only_source(&store, SourceKind::Discord, guild, DEMO_SOURCE_NAME),
+        Ok(true)
+    )
 }
 
 /// Loads the demo into `db` and returns the message and entry counts.
@@ -237,6 +235,7 @@ pub(crate) fn run(options: &DemoOptions, out: &mut impl Write, err: &mut impl Wr
 #[cfg(test)]
 mod tests {
     use super::*;
+    use teamctx_core::{id::SourceId, repo::DirectoryRead};
 
     fn args(list: &[&str]) -> Vec<OsString> {
         list.iter().map(OsString::from).collect()
