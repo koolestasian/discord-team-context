@@ -10,6 +10,14 @@ release.
 
 ## [Unreleased]
 
+### Changed
+
+- The retrieval eval now measures what users get: `search` and `context_for` go through
+  `core::rank` (the merge `teamctx search` runs), and a new `ask_retrieval` row runs the
+  `/ask` bundle (`Bundle::retrieve`, with thread neighbours). A broken ranking now fails
+  `--check`. Baseline rewritten; overall combined recall@10 of `search` moved from 0.6102
+  to 0.5941 because the raw store order was kinder than the production ranking.
+
 ### Added
 
 - Access tokens for the MCP endpoint: `teamctx token create|list|revoke`, SHA-256-only

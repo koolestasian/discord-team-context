@@ -1,23 +1,34 @@
 //! `teamctx eval`: retrieval quality over the fictional demo (plan sections 9.1 and 14).
 //!
 //! The runner imports `fixtures/demo/dataset.json` into an in-memory store, runs every
-//! case of `fixtures/demo/eval.toml` through two retrieval paths and scores them. The
+//! case of `fixtures/demo/eval.toml` through three retrieval paths and scores them. The
 //! dataset and the case file are embedded at build time, so a run needs no files and is
 //! deterministic: the same build always prints the same report.
 //!
 //! # Retrieval paths
 //!
-//! - **`search`**: `core::query::parse(case.query)`, then `search_entries` and
-//!   `search_messages`. The query is the natural-language question as typed. Bare words
-//!   match in any order and any one is enough (stopwords are dropped); quoted phrases and
-//!   `from:`/`in:`/date filters are required.
-//! - **`context_for`**: `core::query::context_query(case.query)` (lowercased words,
-//!   stopwords and a leading git prefix dropped), then `search_entries`, then
-//!   `search_messages` (entries first, plan section 9). Neighbouring messages are not
-//!   added: they are context for a reader, not retrieval hits.
+//! Each path calls the code production uses; the eval adds no ranking of its own.
 //!
-//! Each collection returns its own list in the store's order (best `bm25` first), cut at
-//! [`CUTOFF`] items. The recency and entry-boost ranking of `core::rank` is not applied.
+//! - **`search`**: `core::query::parse(case.query)` (the question as typed), then
+//!   [`crate::search::rank_candidates`], the function `teamctx search` runs: entries and
+//!   messages are fetched, scored with `core::rank::score` (bm25, recency decay, entry
+//!   boost) and sorted together. The merged list is split by kind, keeping its order, and
+//!   each list is cut at [`CUTOFF`].
+//! - **`context_for`**: as `search`, but the query is
+//!   `core::query::context_query(case.query)` (lowercased words, stopwords and a leading
+//!   git prefix dropped). Within each kind the order is the `core::rank` order, entries
+//!   are reported separately from messages (entries first, plan section 9). Neighbours are
+//!   not added: they are context for a reader, not retrieval hits.
+//! - **`ask_retrieval`**: `teamctx_llm::Bundle::retrieve` with the default
+//!   [`BundleLimits`], the step that feeds `/ask` (plan section 11): the all-terms query
+//!   plus up to six single-term queries, merged and ranked with `core::rank`, bounded by
+//!   item count and size, and expanded with thread neighbours. The bundle has no cutoff of
+//!   its own (at most 24 items), so its whole content counts: recall is the share of gold
+//!   ids anywhere in the bundle, and the reciprocal rank uses the prompt position inside
+//!   the entry list (rank order) or the message list (conversation and time order, so it
+//!   is a weak signal). Bot messages and excluded channels never enter a bundle.
+//!
+//! The clock is fixed ([`NOW`]) so recency decay, and with it the report, is reproducible.
 //!
 //! # Metric definitions
 //!
@@ -43,7 +54,7 @@
 //! # Baseline
 //!
 //! `fixtures/demo/eval-baseline.toml` stores the report. `--check` fails when any of the
-//! six overall numbers of either tool is below the stored one (tolerance 0; the data is
+//! six overall numbers of any tool is below the stored one (tolerance 0; the data is
 //! deterministic, so a drop is a real change). `--write-baseline` rewrites the file.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -54,15 +65,21 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use teamctx_core::{
+    citation::CitationId,
     id::{MessageId, Snowflake},
-    query::{Query, context_query, parse},
+    query::{context_query, parse},
+    rank,
     record::ShortId,
-    repo::{MessageRead, RecordRead},
+    repo::RepoError,
+    time::UnixMillis,
 };
+use teamctx_llm::{Bundle, BundleLimits};
 use teamctx_store::{
     Store,
     demo::{DemoError, DemoMap, import},
 };
+
+use crate::search::{Found, Ranked, Scorer, rank_candidates};
 
 /// The dataset, embedded at build time.
 const DATASET: &str = include_str!("../../../fixtures/demo/dataset.json");
@@ -76,7 +93,12 @@ const DEFAULT_BASELINE: &str = concat!(
 /// The result cutoff of recall@10 and MRR.
 const CUTOFF: u32 = 10;
 /// The case file and baseline schema this runner reads and writes.
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
+/// The case file schema (unchanged by the baseline's `ask_retrieval` table).
+const CASES_SCHEMA_VERSION: u32 = 1;
+/// The fixed clock of every run: 2026-05-05T16:53:20Z, after the newest demo message, so
+/// recency decay is the same on every machine and day.
+const NOW: UnixMillis = UnixMillis::from_millis(1_778_000_000_000);
 /// Key of the all-cases row in a tool's table.
 const OVERALL: &str = "overall";
 
@@ -251,8 +273,7 @@ struct Scores {
     rr: f64,
 }
 
-fn score<T: Ord>(ranked: &[T], gold: &BTreeSet<T>) -> Option<Scores> {
-    let k = CUTOFF as usize;
+fn score<T: Ord>(ranked: &[T], gold: &BTreeSet<T>, k: usize) -> Option<Scores> {
     Some(Scores {
         recall: recall_at(ranked, gold, k)?,
         rr: reciprocal_rank(ranked, gold, k)?,
@@ -335,6 +356,7 @@ pub(crate) struct Report {
     cases: usize,
     search: ToolReport,
     context_for: ToolReport,
+    ask_retrieval: ToolReport,
 }
 
 fn group(per_case: &[(&str, CaseScore)]) -> ToolReport {
@@ -351,34 +373,89 @@ fn group(per_case: &[(&str, CaseScore)]) -> ToolReport {
     report
 }
 
-/// Runs one text-query retrieval path and scores it against the case's gold ids.
-fn run_tool(
-    store: &Store,
-    query: &Query,
-    gold_messages: &BTreeSet<MessageId>,
-    gold_entries: &BTreeSet<ShortId>,
-) -> Result<CaseScore, EvalError> {
-    let store_error = |error: teamctx_core::repo::RepoError| EvalError::Store(error.to_string());
-    // Entries are searched first, as `context_for` does (plan section 9).
-    let entries: Vec<ShortId> = store
-        .search_entries(query, CUTOFF)
-        .map_err(store_error)?
-        .into_iter()
-        .map(|hit| ShortId {
-            kind: hit.entry.kind,
-            id: hit.entry.id,
-        })
-        .collect();
-    let messages: Vec<MessageId> = store
-        .search_messages(query, CUTOFF)
-        .map_err(store_error)?
-        .into_iter()
-        .map(|hit| hit.message.id)
-        .collect();
-    Ok(CaseScore {
-        messages: score(&messages, gold_messages),
-        entries: score(&entries, gold_entries),
-    })
+/// The two ranked id lists a retrieval path returned for one case.
+struct Retrieved {
+    messages: Vec<MessageId>,
+    entries: Vec<ShortId>,
+}
+
+impl Retrieved {
+    /// Splits a merged ranking by kind, keeping its order.
+    fn from_ranked(ranked: &[Ranked]) -> Self {
+        let mut found = Self {
+            messages: Vec::new(),
+            entries: Vec::new(),
+        };
+        for item in ranked {
+            match &item.found {
+                Found::Entry(hit) => found.entries.push(hit.entry.short_id()),
+                Found::Message(hit) => found.messages.push(hit.message.id),
+            }
+        }
+        found
+    }
+
+    /// The bundle's sources, in prompt order.
+    fn from_bundle(bundle: &Bundle) -> Self {
+        let mut found = Self {
+            messages: Vec::new(),
+            entries: Vec::new(),
+        };
+        for source in bundle.sources() {
+            match source.id() {
+                CitationId::Message(id) => found.messages.push(id),
+                CitationId::Entry(id) => found.entries.push(id),
+            }
+        }
+        found
+    }
+
+    /// Scores each list against the gold of its collection, counting the first `k`.
+    fn score(&self, gold: &Resolved, k: usize) -> CaseScore {
+        CaseScore {
+            messages: score(&self.messages, &gold.gold_messages, k),
+            entries: score(&self.entries, &gold.gold_entries, k),
+        }
+    }
+}
+
+/// The three retrieval paths, all through production code (see the module docs).
+#[derive(Debug, Clone, Copy)]
+enum Tool {
+    Search,
+    ContextFor,
+    AskRetrieval,
+}
+
+impl Tool {
+    fn retrieve(
+        self,
+        store: &Store,
+        case: &Case,
+        scorer: Scorer,
+    ) -> Result<(Retrieved, usize), EvalError> {
+        let store_error = |error: RepoError| EvalError::Store(error.to_string());
+        let ranked = |query, scorer| {
+            rank_candidates(store, query, CUTOFF, NOW, scorer)
+                .map(|ranked| Retrieved::from_ranked(&ranked))
+                .map_err(store_error)
+        };
+        match self {
+            Self::Search => {
+                let typed = parse(&case.query).map_err(|_| EvalError::Query {
+                    case: case.id.clone(),
+                })?;
+                Ok((ranked(&typed, scorer)?, CUTOFF as usize))
+            }
+            Self::ContextFor => Ok((ranked(&context_query(&case.query), scorer)?, CUTOFF as usize)),
+            Self::AskRetrieval => {
+                let bundle = Bundle::retrieve(store, &case.query, NOW, &BundleLimits::default())
+                    .map_err(store_error)?;
+                // The bundle is bounded by its own limits, so everything in it counts.
+                Ok((Retrieved::from_bundle(&bundle), usize::MAX))
+            }
+        }
+    }
 }
 
 /// A case with its gold ids mapped to the stored rows.
@@ -413,7 +490,7 @@ fn resolve(case: &Case, map: &DemoMap) -> Result<Resolved, EvalError> {
 fn load_cases() -> Result<CaseFile, EvalError> {
     let file: CaseFile = toml::from_str(CASES)
         .map_err(|_| EvalError::Cases("not valid TOML of the expected shape"))?;
-    if file.schema_version != SCHEMA_VERSION {
+    if file.schema_version != CASES_SCHEMA_VERSION {
         return Err(EvalError::Cases("unsupported schema version"));
     }
     if file.cutoff != CUTOFF {
@@ -428,27 +505,32 @@ fn import_demo() -> Result<(Store, DemoMap), EvalError> {
     Ok((store, map))
 }
 
-/// Imports the demo and measures both tools over every case.
-pub(crate) fn measure() -> Result<Report, EvalError> {
+/// Imports the demo and measures the three tools over every case. `scorer` ranks `search`
+/// and `context_for`; production passes `core::rank::score`, and the tests replace it
+/// with a deliberately broken one to prove the baseline check notices. (`ask_retrieval`
+/// ranks inside `Bundle::retrieve`, so it always uses `core::rank`.)
+fn measure_with(scorer: Scorer) -> Result<Report, EvalError> {
     let file = load_cases()?;
     let (store, map) = import_demo()?;
-    let (mut search, mut context_for) = (Vec::new(), Vec::new());
+    let (mut search, mut context_for, mut ask) = (Vec::new(), Vec::new(), Vec::new());
     for case in &file.cases {
         let gold = resolve(case, &map)?;
-        let typed = parse(&case.query).map_err(|_| EvalError::Query {
-            case: case.id.clone(),
-        })?;
-        let keywords = context_query(&case.query);
         let category = case.category.as_str();
-        let (m, e) = (&gold.gold_messages, &gold.gold_entries);
-        search.push((category, run_tool(&store, &typed, m, e)?));
-        context_for.push((category, run_tool(&store, &keywords, m, e)?));
+        for (tool, scores) in [
+            (Tool::Search, &mut search),
+            (Tool::ContextFor, &mut context_for),
+            (Tool::AskRetrieval, &mut ask),
+        ] {
+            let (found, k) = tool.retrieve(&store, case, scorer)?;
+            scores.push((category, found.score(&gold, k)));
+        }
     }
     Ok(Report {
         schema_version: SCHEMA_VERSION,
         cases: file.cases.len(),
         search: group(&search),
         context_for: group(&context_for),
+        ask_retrieval: group(&ask),
     })
 }
 
@@ -486,7 +568,8 @@ pub(crate) fn print_report(out: &mut impl Write, report: &Report) -> io::Result<
         report.cases
     )?;
     print_tool(out, "search", &report.search)?;
-    print_tool(out, "context_for", &report.context_for)
+    print_tool(out, "context_for", &report.context_for)?;
+    print_tool(out, "ask_retrieval", &report.ask_retrieval)
 }
 
 /// Integer ten-thousandths, so equal rounded values compare equal exactly.
@@ -501,6 +584,11 @@ pub(crate) fn regressions(baseline: &Report, current: &Report) -> Vec<String> {
     let tools = [
         ("search", &baseline.search, &current.search),
         ("context_for", &baseline.context_for, &current.context_for),
+        (
+            "ask_retrieval",
+            &baseline.ask_retrieval,
+            &current.ask_retrieval,
+        ),
     ];
     for (tool, base, now) in tools {
         let (Some(base), Some(now)) = (base.get(OVERALL), now.get(OVERALL)) else {
@@ -522,6 +610,8 @@ const BASELINE_HEADER: &str = "\
 # Retrieval baseline for the fictional demo, written by `cargo xtask eval -- --write-baseline`.
 # CI fails when an overall number falls below this file. Definitions: crates/teamctx/src/eval.rs.
 # Messages are scored against expected_messages and entries against expected_entries.
+# Every tool runs production retrieval (core::rank, Bundle::retrieve); ask_retrieval counts
+# the whole bundle, the others the first 10 of each collection.
 ";
 
 fn read_baseline(path: &Path) -> Result<Report, EvalError> {
@@ -544,7 +634,15 @@ fn write_baseline(path: &Path, report: &Report) -> Result<(), EvalError> {
 
 /// Runs `teamctx eval`. `Ok(false)` means a regression against the baseline (exit 1).
 pub(crate) fn execute(options: &Options, out: &mut impl Write) -> Result<bool, EvalError> {
-    let report = measure()?;
+    execute_with(options, out, rank::score)
+}
+
+fn execute_with(
+    options: &Options,
+    out: &mut impl Write,
+    scorer: Scorer,
+) -> Result<bool, EvalError> {
+    let report = measure_with(scorer)?;
     print_report(out, &report)?;
     match options.mode {
         Mode::Report => Ok(true),
@@ -594,7 +692,9 @@ mod tests {
         let query = parse("Fenwick Serif").map_err(|_| EvalError::Query {
             case: case.id.clone(),
         })?;
-        let scored = run_tool(&store, &query, &gold.gold_messages, &gold.gold_entries)?;
+        let ranked = rank_candidates(&store, &query, CUTOFF, NOW, rank::score)
+            .map_err(|e| EvalError::Store(e.to_string()))?;
+        let scored = Retrieved::from_ranked(&ranked).score(&gold, CUTOFF as usize);
         let messages = scored.messages.ok_or(EvalError::Cases("no message gold"))?;
         assert!(messages.recall > 0.0 && messages.rr > 0.0, "{messages:?}");
         Ok(())
@@ -667,7 +767,8 @@ mod tests {
             schema_version: SCHEMA_VERSION,
             cases: 1,
             search: tool.clone(),
-            context_for: tool,
+            context_for: tool.clone(),
+            ask_retrieval: tool,
         }
     }
 
@@ -677,8 +778,8 @@ mod tests {
         assert!(regressions(&base, &report_with(0.5)).is_empty());
         assert!(regressions(&base, &report_with(0.6)).is_empty());
         let found = regressions(&base, &report_with(0.4999));
-        // Both tools carry the dropped number.
-        assert_eq!(found.len(), 2, "{found:?}");
+        // All three tools carry the dropped number.
+        assert_eq!(found.len(), 3, "{found:?}");
         assert!(found[0].starts_with("search messages_mrr"), "{found:?}");
     }
 
@@ -707,5 +808,86 @@ mod tests {
             args(&["--baseline", "x.toml"]).map(|o| o.baseline),
             Ok(PathBuf::from("x.toml"))
         );
+    }
+}
+
+#[cfg(test)]
+mod production_path_tests {
+    use super::*;
+
+    /// A ranking that puts the worst match first: every score negated.
+    fn reversed(bm25: f64, created_at: UnixMillis, now: UnixMillis, is_record: bool) -> f64 {
+        -rank::score(bm25, created_at, now, is_record)
+    }
+
+    fn options(mode: Mode, baseline: &Path) -> Options {
+        Options {
+            mode,
+            baseline: baseline.to_path_buf(),
+        }
+    }
+
+    #[test]
+    fn a_reversed_ranking_fails_the_baseline_check() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("baseline.toml");
+        let mut sink = Vec::new();
+        assert!(execute_with(
+            &options(Mode::WriteBaseline, &path),
+            &mut sink,
+            rank::score
+        )?);
+
+        // The same ranking passes the check, a reversed one does not.
+        let check = options(Mode::Check, &path);
+        let mut good = Vec::new();
+        assert!(execute_with(&check, &mut good, rank::score)?);
+        let mut bad = Vec::new();
+        assert!(!execute_with(&check, &mut bad, reversed)?);
+        let report = String::from_utf8(bad)?;
+        assert!(report.contains("FAIL"), "{report}");
+        assert!(report.contains("\n  search "), "names search: {report}");
+        assert!(
+            report.contains("\n  context_for "),
+            "names context_for: {report}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn ask_retrieval_returns_the_bundle_with_neighbours() -> Result<(), EvalError> {
+        let file = load_cases()?;
+        let (store, map) = import_demo()?;
+        let case = file
+            .cases
+            .iter()
+            .find(|case| !case.expected_messages.is_empty())
+            .ok_or(EvalError::Cases("no case with message gold"))?;
+        let gold = resolve(case, &map)?;
+        let (found, k) = Tool::AskRetrieval.retrieve(&store, case, rank::score)?;
+        assert_eq!(k, usize::MAX);
+        assert!(found.messages.len() + found.entries.len() <= BundleLimits::default().max_items);
+        // A bundle adds thread neighbours, so it holds messages the ranked search does not.
+        let search = Tool::ContextFor.retrieve(&store, case, rank::score)?.0;
+        let extra = found
+            .messages
+            .iter()
+            .filter(|id| !search.messages.contains(id))
+            .count();
+        assert!(extra > 0, "no neighbour or extra message in the bundle");
+        assert!(found.score(&gold, k).messages.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn the_report_has_a_row_for_every_tool() -> Result<(), EvalError> {
+        let report = measure_with(rank::score)?;
+        for tool in [&report.search, &report.context_for, &report.ask_retrieval] {
+            assert_eq!(tool.get(OVERALL).map(|m| m.cases), Some(report.cases));
+        }
+        let mut out = Vec::new();
+        print_report(&mut out, &report)?;
+        assert!(String::from_utf8_lossy(&out).contains("ask_retrieval"));
+        Ok(())
     }
 }

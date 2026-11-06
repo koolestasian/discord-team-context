@@ -29,7 +29,14 @@ fn two_runs_print_identical_reports() -> TestResult {
     assert!(first.status.success(), "{}", text(&first.stderr));
     assert_eq!(first.stdout, second.stdout);
     let report = text(&first.stdout);
-    for expected in ["62 cases", "search", "context_for", "overall", "paraphrase"] {
+    for expected in [
+        "62 cases",
+        "search",
+        "context_for",
+        "ask_retrieval",
+        "overall",
+        "paraphrase",
+    ] {
         assert!(report.contains(expected), "missing {expected:?}: {report}");
     }
     assert!(first.stderr.is_empty());
