@@ -376,6 +376,8 @@ enum FakeDiscord {
     Hostile,
     /// The guild listing is not a list.
     GarbledDiscovery,
+    /// The guild listing holds a channel whose id is a string that is not a snowflake.
+    TypeConfusedDiscovery,
     /// Every call fails with this error.
     Failing(fn() -> RestError),
 }
@@ -390,6 +392,7 @@ impl DiscordRest for FakeDiscord {
                 channel_json(PRIVATE, "private", &pasted),
             ])),
             Self::GarbledDiscovery => Ok(json!({ "message": pasted, "code": 0 })),
+            Self::TypeConfusedDiscovery => Ok(json!([{ "id": BOT_TOKEN, "type": 0, "name": "x" }])),
             Self::Failing(error) => Err(error()),
         }
     }
@@ -506,4 +509,22 @@ fn sync_path_never_reveals_secrets_from_chat_or_failures() {
     );
     assert_free_of_secrets(&logs, "the captured sync logs");
     assert_free_of_secrets(&shown, "sync reports and errors");
+}
+
+/// A payload value of the wrong shape must not be quoted into an error: the live sync
+/// will log `SyncError` with its sources, and the value is untrusted text.
+#[test]
+#[ignore = "defect: MapError copies serde_json's message, which quotes the offending payload value, into SyncError's source chain"]
+fn malformed_payload_values_are_not_quoted_in_errors() {
+    let config = SyncConfig::new(sf(GUILD), "Lantern Shelf (fictional)");
+    let mut store = Store::in_memory().expect("store");
+    let now = UnixMillis::from_millis(NOW_MS);
+    let error = sync_guild(
+        &FakeDiscord::TypeConfusedDiscovery,
+        &mut store,
+        &config,
+        now,
+    )
+    .expect_err("discovery fails");
+    assert_free_of_secrets(&error_text(&error), "SyncError for a type-confused channel");
 }
