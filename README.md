@@ -31,7 +31,8 @@ coding agents, and a minimal web view. Everything except `/ask` works without an
 | M1 Spikes | S3 MCP over HTTP with bearer auth, S4 bundled SQLite FTS5 | Done |
 | | S1 gateway messages, S2 interaction replies | Needs a Discord test server |
 | M2 Store + search | SQLite schema and repositories, query parser, ranking, demo data, eval questions | Done |
-| | Retrieval eval runner, `teamctx demo` and `teamctx search` | Next |
+| | Retrieval eval runner (`cargo xtask eval`), `teamctx demo`, `teamctx search` | Done |
+| | Natural-language questions match too few results yet (the eval baseline is 0) | Next |
 | M3 Discord sync | Offline `init`/`doctor`, permission checks, bot setup guide | Done |
 | | Live sync, backfill, live events | Planned |
 | M4-M8 | MCP tools and tokens, record commands, `/ask`, web view, v0.1.0 release | Planned |
@@ -72,7 +73,7 @@ because no time zone database is built in.
 
 To prepare a throwaway test server and bot, follow the
 [Discord test bot guide](docs/guides/discord-bot.md). The fictional dataset that the
-tests and the future `teamctx demo` use is described in
+tests, `teamctx demo` and the eval runner use is described in
 [fixtures/demo/README.md](fixtures/demo/README.md).
 
 ## Repository layout
