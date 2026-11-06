@@ -24,7 +24,9 @@ use teamctx_store::Store;
 
 use super::{
     input::{self, MAX_CURSOR_OFFSET},
-    view::{Item, ItemKind, MAX_CONTEXT_CHARS, MAX_LINE_CHARS, Paging, Summary, clip},
+    view::{
+        Item, ItemKind, MAX_CONTEXT_CHARS, MAX_LINE_CHARS, MAX_NAME_CHARS, Paging, Summary, clip,
+    },
 };
 
 /// Entries and messages shown per group by `context_for` unless `limit` says otherwise.
@@ -97,10 +99,10 @@ impl<'a> Ctx<'a> {
         if let Some(name) = self.members.get(&id) {
             return Ok(name.clone());
         }
-        let name = self
-            .store
-            .member(id)?
-            .map_or_else(|| "unknown".to_owned(), |m| m.display_name);
+        let name = self.store.member(id)?.map_or_else(
+            || "unknown".to_owned(),
+            |m| clip(&m.display_name, MAX_NAME_CHARS),
+        );
         self.members.insert(id, name.clone());
         Ok(name)
     }
@@ -113,7 +115,7 @@ impl<'a> Ctx<'a> {
             Some(channel) => {
                 let guild = self.store.source(channel.source)?.map(|s| s.external_id);
                 Some(ChannelFacts {
-                    name: channel.name,
+                    name: clip(&channel.name, MAX_NAME_CHARS),
                     external: channel.external_id,
                     guild,
                 })

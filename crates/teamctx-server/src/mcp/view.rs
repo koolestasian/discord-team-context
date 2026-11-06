@@ -27,6 +27,9 @@ use super::input::{self, MAX_CURSOR_OFFSET};
 pub(crate) const MAX_RESULT_CHARS: usize = 7_600;
 /// Longest chat text kept per line before it is cut with `…`.
 pub(crate) const MAX_LINE_CHARS: usize = 280;
+/// Longest member or channel name kept in a result line. Names are chat-controlled, so they
+/// are flattened to one line like message text.
+pub(crate) const MAX_NAME_CHARS: usize = 64;
 /// Longest chat text kept per neighbouring (context) message.
 pub(crate) const MAX_CONTEXT_CHARS: usize = 160;
 

@@ -493,13 +493,12 @@ async fn record_and_whats_new_keep_titles_owners_and_channel_names_framed() {
 /// `Item::line` and `clip` promise one item per line inside the block, so a reader can
 /// tie every line to the id it starts with. Chat must not be able to add a line.
 ///
-/// Fails today: `clip` flattens message text and titles, but `message_item` and
-/// `entry_item` in `mcp/retrieve.rs` insert author, owner and channel names as stored. A
-/// display name holding a line break (corpus member 805) adds a line that starts with
-/// `SYSTEM:` and no id. The block boundary still holds; only the one-line-per-item layout
-/// inside it breaks.
+/// Regression: `clip` flattened message text and titles, but `message_item` and
+/// `entry_item` in `mcp/retrieve.rs` inserted author, owner and channel names as stored. A
+/// display name holding a line break (corpus member 805) added a line that starts with
+/// `SYSTEM:` and no id. The block boundary held; only the one-line-per-item layout
+/// inside it broke. Names are now clipped to one line when loaded.
 #[tokio::test]
-#[ignore = "defect: MCP author/owner/channel names are not flattened, so a newline in a display name adds an id-less line inside the block"]
 async fn every_line_in_the_block_belongs_to_one_item() {
     let h = start().await;
     let corpus = corpus();
