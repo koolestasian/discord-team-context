@@ -3,6 +3,23 @@
 //! The pipeline talks to the table through [`UsageLedger`]. The store crate implements
 //! the trait over `llm_usage` when the host is wired; this crate ships an in-memory
 //! ledger for tests and demos.
+//!
+//! # Reserve, call, settle
+//!
+//! A question is paid for before the provider is called, never after:
+//!
+//! 1. [`UsageLedger::reserve`] checks the budget and holds one question plus the most
+//!    tokens the call can use (the prompt estimate plus the output allowance) in one
+//!    atomic step. Concurrent questions see each other's reservations, so with a limit
+//!    of one, exactly one of them reaches the provider.
+//! 2. The provider is called.
+//! 3. [`UsageLedger::settle`] swaps the reservation for the real `llm_usage` row.
+//!
+//! If the request is dropped while the call is in flight (a timeout, a closed
+//! interaction, a cancelled task), the provider may still do and bill the work, so the
+//! reservation is settled as a failed call at its full reserved size. Cancellation
+//! therefore never makes a call free. A reservation that cannot be settled at all keeps
+//! counting at its reserved size, which errs on the side of refusing.
 
 use std::error::Error as StdError;
 use std::fmt;
@@ -108,10 +125,87 @@ impl LedgerError {
     }
 }
 
-/// Reads and writes `llm_usage`. Both methods are synchronous like the other store
+/// Why a reservation was not granted.
+#[derive(Debug, Error)]
+pub enum ReserveError {
+    /// The question would exceed a limit.
+    #[error("{0}")]
+    Refused(BudgetLimit),
+    /// The ledger failed.
+    #[error(transparent)]
+    Ledger(#[from] LedgerError),
+}
+
+impl From<ReserveError> for AskError {
+    fn from(error: ReserveError) -> Self {
+        match error {
+            ReserveError::Refused(limit) => Self::BudgetExceeded(limit),
+            ReserveError::Ledger(error) => Self::Ledger(error),
+        }
+    }
+}
+
+/// A held reservation, as handed out by [`UsageLedger::reserve`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ReservationId(u64);
+
+impl ReservationId {
+    /// Wraps a ledger's own handle, such as a row id.
+    #[must_use]
+    pub const fn new(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    /// The ledger's handle.
+    #[must_use]
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
+impl Budget {
+    /// Whether one more question that may use up to `tokens` (prompt plus output
+    /// allowance) fits. `usage_since` reports a member's usage from a window start to
+    /// `now`, including outstanding reservations. A ledger calls this inside the same
+    /// lock or transaction that stores the reservation.
+    ///
+    /// # Errors
+    ///
+    /// [`ReserveError::Refused`] naming the first limit hit, or the error of
+    /// `usage_since`.
+    pub fn admit(
+        &self,
+        now: UnixMillis,
+        tokens: u64,
+        mut usage_since: impl FnMut(UnixMillis) -> Result<WindowUsage, LedgerError>,
+    ) -> Result<(), ReserveError> {
+        let hour = usage_since(UnixMillis::from_millis(
+            now.as_millis().saturating_sub(HOUR_MS),
+        ))?;
+        if hour.questions >= self.max_questions_per_hour {
+            return Err(ReserveError::Refused(BudgetLimit::QuestionsPerHour));
+        }
+        if hour.tokens.saturating_add(tokens) > self.max_tokens_per_hour {
+            return Err(ReserveError::Refused(BudgetLimit::TokensPerHour));
+        }
+        let day = usage_since(UnixMillis::from_millis(
+            now.as_millis().saturating_sub(DAY_MS),
+        ))?;
+        if day.tokens.saturating_add(tokens) > self.max_tokens_per_day {
+            return Err(ReserveError::Refused(BudgetLimit::TokensPerDay));
+        }
+        Ok(())
+    }
+}
+
+/// Reads and writes `llm_usage`. All methods are synchronous like the other store
 /// traits; a host runs them off the async threads.
+///
+/// See the [module docs](self) for how reservations keep concurrent and cancelled
+/// questions inside the budget.
 pub trait UsageLedger {
-    /// Calls and tokens by `member` with `at >= since`.
+    /// Calls and tokens by `member` with `at >= since`, counting outstanding
+    /// reservations at their reserved size.
     ///
     /// # Errors
     ///
@@ -124,12 +218,76 @@ pub trait UsageLedger {
     ///
     /// [`LedgerError`] if the backend fails.
     fn record(&self, entry: &UsageEntry) -> Result<(), LedgerError>;
+
+    /// Atomically checks `budget` with [`Budget::admit`] and, if the question fits,
+    /// holds one question and `tokens` tokens for `member` at `now`. No other
+    /// `reserve` for the member may interleave between the check and the hold.
+    ///
+    /// Until it is settled, the reservation counts in [`usage_since`](Self::usage_since)
+    /// exactly like a row at `now` with `tokens` tokens.
+    ///
+    /// # Errors
+    ///
+    /// [`ReserveError::Refused`] if a limit would be exceeded (nothing is held), or
+    /// [`ReserveError::Ledger`] if the backend fails.
+    fn reserve(
+        &self,
+        member: MemberId,
+        now: UnixMillis,
+        budget: &Budget,
+        tokens: u64,
+    ) -> Result<ReservationId, ReserveError>;
+
+    /// Atomically replaces the reservation with `entry`. `entry` is appended even if
+    /// the reservation is unknown, so a call is never lost.
+    ///
+    /// # Errors
+    ///
+    /// [`LedgerError`] if the backend fails; the reservation then keeps counting.
+    fn settle(&self, reservation: ReservationId, entry: &UsageEntry) -> Result<(), LedgerError>;
 }
 
-/// A ledger that keeps rows in memory.
+/// One outstanding reservation in [`InMemoryLedger`].
+#[derive(Debug)]
+struct Held {
+    id: ReservationId,
+    member: MemberId,
+    at: UnixMillis,
+    tokens: u64,
+}
+
+#[derive(Debug, Default)]
+struct LedgerState {
+    rows: Vec<UsageEntry>,
+    held: Vec<Held>,
+    next_id: u64,
+}
+
+impl LedgerState {
+    fn usage_since(&self, member: MemberId, since: UnixMillis) -> WindowUsage {
+        let rows = self
+            .rows
+            .iter()
+            .filter(|r| r.member == member && r.at >= since)
+            .map(|r| r.input_tokens.saturating_add(r.output_tokens));
+        let held = self
+            .held
+            .iter()
+            .filter(|h| h.member == member && h.at >= since)
+            .map(|h| h.tokens);
+        let mut usage = WindowUsage::default();
+        for tokens in rows.chain(held) {
+            usage.questions = usage.questions.saturating_add(1);
+            usage.tokens = usage.tokens.saturating_add(tokens);
+        }
+        usage
+    }
+}
+
+/// A ledger that keeps rows and reservations in memory, behind one lock.
 #[derive(Debug, Default)]
 pub struct InMemoryLedger {
-    rows: Mutex<Vec<UsageEntry>>,
+    state: Mutex<LedgerState>,
 }
 
 impl InMemoryLedger {
@@ -139,66 +297,125 @@ impl InMemoryLedger {
         Self::default()
     }
 
-    /// All rows recorded so far, oldest first.
+    fn state(&self) -> std::sync::MutexGuard<'_, LedgerState> {
+        self.state.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// All rows recorded so far, oldest first. Outstanding reservations are not rows.
     #[must_use]
     pub fn entries(&self) -> Vec<UsageEntry> {
-        self.rows
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
+        self.state().rows.clone()
+    }
+
+    /// How many reservations are held and not yet settled.
+    #[must_use]
+    pub fn outstanding(&self) -> usize {
+        self.state().held.len()
     }
 }
 
 impl UsageLedger for InMemoryLedger {
     fn usage_since(&self, member: MemberId, since: UnixMillis) -> Result<WindowUsage, LedgerError> {
-        let rows = self.rows.lock().unwrap_or_else(PoisonError::into_inner);
-        let mut usage = WindowUsage::default();
-        for row in rows.iter().filter(|r| r.member == member && r.at >= since) {
-            usage.questions = usage.questions.saturating_add(1);
-            usage.tokens = usage
-                .tokens
-                .saturating_add(row.input_tokens)
-                .saturating_add(row.output_tokens);
-        }
-        Ok(usage)
+        Ok(self.state().usage_since(member, since))
     }
 
     fn record(&self, entry: &UsageEntry) -> Result<(), LedgerError> {
-        self.rows
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .push(entry.clone());
+        self.state().rows.push(entry.clone());
+        Ok(())
+    }
+
+    fn reserve(
+        &self,
+        member: MemberId,
+        now: UnixMillis,
+        budget: &Budget,
+        tokens: u64,
+    ) -> Result<ReservationId, ReserveError> {
+        // One lock covers the check and the hold, so reservations cannot interleave.
+        let mut state = self.state();
+        budget.admit(now, tokens, |since| Ok(state.usage_since(member, since)))?;
+        let id = ReservationId::new(state.next_id);
+        state.next_id = state.next_id.wrapping_add(1);
+        state.held.push(Held {
+            id,
+            member,
+            at: now,
+            tokens,
+        });
+        Ok(id)
+    }
+
+    fn settle(&self, reservation: ReservationId, entry: &UsageEntry) -> Result<(), LedgerError> {
+        let mut state = self.state();
+        state.held.retain(|h| h.id != reservation);
+        state.rows.push(entry.clone());
         Ok(())
     }
 }
 
-/// Refuses the question if it would exceed a limit. `estimated_input` is the size of the
-/// prompt that would be sent, so one huge prompt cannot slip under a nearly full budget.
+/// Refuses the question if it would exceed a limit, without holding anything: an early,
+/// cheap refusal before retrieval. `tokens` is the most the call could use (prompt
+/// estimate plus output allowance). [`Reservation::take`] repeats the check atomically.
 pub(crate) fn check<L: UsageLedger + ?Sized>(
     ledger: &L,
     budget: &Budget,
     member: MemberId,
     now: UnixMillis,
-    estimated_input: u64,
+    tokens: u64,
 ) -> Result<(), AskError> {
-    let hour = ledger.usage_since(
-        member,
-        UnixMillis::from_millis(now.as_millis().saturating_sub(HOUR_MS)),
-    )?;
-    if hour.questions >= budget.max_questions_per_hour {
-        return Err(AskError::BudgetExceeded(BudgetLimit::QuestionsPerHour));
+    budget
+        .admit(now, tokens, |since| ledger.usage_since(member, since))
+        .map_err(AskError::from)
+}
+
+/// A reservation held for the length of one provider call.
+///
+/// Settle it with the real usage via [`settle`](Self::settle). If it is dropped instead
+/// (the future running the call was cancelled), it is settled with the row given to
+/// [`take`](Self::take): a failed call charged at the full reserved size.
+pub(crate) struct Reservation<'l, L: UsageLedger + ?Sized> {
+    ledger: &'l L,
+    id: Option<ReservationId>,
+    if_dropped: UsageEntry,
+}
+
+impl<'l, L: UsageLedger + ?Sized> Reservation<'l, L> {
+    /// Reserves one question and `if_dropped`'s tokens for `if_dropped.member` at
+    /// `if_dropped.at`.
+    pub(crate) fn take(
+        ledger: &'l L,
+        budget: &Budget,
+        if_dropped: UsageEntry,
+    ) -> Result<Self, AskError> {
+        let tokens = if_dropped
+            .input_tokens
+            .saturating_add(if_dropped.output_tokens);
+        let id = ledger.reserve(if_dropped.member, if_dropped.at, budget, tokens)?;
+        Ok(Self {
+            ledger,
+            id: Some(id),
+            if_dropped,
+        })
     }
-    if hour.tokens.saturating_add(estimated_input) > budget.max_tokens_per_hour {
-        return Err(AskError::BudgetExceeded(BudgetLimit::TokensPerHour));
+
+    /// Replaces the reservation with `entry`.
+    pub(crate) fn settle(mut self, entry: &UsageEntry) -> Result<(), LedgerError> {
+        match self.id.take() {
+            Some(id) => self.ledger.settle(id, entry),
+            None => Ok(()),
+        }
     }
-    let day = ledger.usage_since(
-        member,
-        UnixMillis::from_millis(now.as_millis().saturating_sub(DAY_MS)),
-    )?;
-    if day.tokens.saturating_add(estimated_input) > budget.max_tokens_per_day {
-        return Err(AskError::BudgetExceeded(BudgetLimit::TokensPerDay));
+}
+
+impl<L: UsageLedger + ?Sized> Drop for Reservation<'_, L> {
+    fn drop(&mut self) {
+        if let Some(id) = self.id.take() {
+            // Nowhere to report an error from `drop`. If settling fails the reservation
+            // stays held and keeps counting at its full size, so the failure still
+            // refuses rather than gives a free call.
+            let _ = self.ledger.settle(id, &self.if_dropped);
+        }
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -300,6 +517,76 @@ mod tests {
             check(&InMemoryLedger::new(), &zero, member(1), now(), 0),
             Err(AskError::BudgetExceeded(BudgetLimit::QuestionsPerHour))
         ));
+    }
+
+    #[test]
+    fn racing_threads_get_exactly_the_budget() {
+        let ledger = InMemoryLedger::new();
+        let one = Budget {
+            max_questions_per_hour: 1,
+            ..budget()
+        };
+        let granted = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..16)
+                .map(|_| scope.spawn(|| ledger.reserve(member(1), now(), &one, 10).is_ok()))
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().unwrap())
+                .filter(|&ok| ok)
+                .count()
+        });
+        assert_eq!(granted, 1);
+        assert_eq!(ledger.outstanding(), 1);
+    }
+
+    #[test]
+    fn reservations_count_until_settled_with_the_real_usage() {
+        let ledger = InMemoryLedger::new();
+        let id = ledger.reserve(member(1), now(), &budget(), 900).unwrap();
+        // Held: one question and 900 tokens, though no row exists yet.
+        let hour_ago = UnixMillis::from_millis(NOW - HOUR_MS);
+        assert!(ledger.entries().is_empty());
+        assert_eq!(
+            ledger.usage_since(member(1), hour_ago).unwrap(),
+            WindowUsage {
+                questions: 1,
+                tokens: 900
+            }
+        );
+        assert!(matches!(
+            ledger.reserve(member(1), now(), &budget(), 101),
+            Err(ReserveError::Refused(BudgetLimit::TokensPerHour))
+        ));
+        // A refusal holds nothing.
+        assert_eq!(ledger.outstanding(), 1);
+        ledger.settle(id, &row(1, NOW, 40)).unwrap();
+        assert_eq!(ledger.outstanding(), 0);
+        assert_eq!(
+            ledger.usage_since(member(1), hour_ago).unwrap(),
+            WindowUsage {
+                questions: 1,
+                tokens: 40
+            }
+        );
+    }
+
+    #[test]
+    fn a_dropped_reservation_is_charged_in_full() {
+        let ledger = InMemoryLedger::new();
+        let if_dropped = UsageEntry {
+            output_tokens: 800,
+            ok: false,
+            ..row(1, NOW, 200)
+        };
+        drop(Reservation::take(&ledger, &budget(), if_dropped.clone()).unwrap());
+        assert_eq!(ledger.outstanding(), 0);
+        assert_eq!(ledger.entries(), [if_dropped]);
+        // Settling explicitly records the real row instead, once.
+        let ledger = InMemoryLedger::new();
+        let held = Reservation::take(&ledger, &budget(), row(1, NOW, 1_000)).unwrap();
+        held.settle(&row(1, NOW, 7)).unwrap();
+        assert_eq!(ledger.entries(), [row(1, NOW, 7)]);
     }
 
     #[test]

@@ -34,7 +34,8 @@ mod validate;
 
 pub use anthropic::{AnthropicConfig, AnthropicMessages};
 pub use budget::{
-    Budget, BudgetLimit, InMemoryLedger, LedgerError, UsageEntry, UsageLedger, WindowUsage,
+    Budget, BudgetLimit, InMemoryLedger, LedgerError, ReservationId, ReserveError, UsageEntry,
+    UsageLedger, WindowUsage,
 };
 pub use bundle::{Bundle, BundleLimits, Retrieval, Source};
 pub use error::{AskError, LlmError};

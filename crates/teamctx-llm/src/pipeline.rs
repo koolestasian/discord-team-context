@@ -6,8 +6,14 @@
 //!
 //! 1. [`AskPipeline::prepare`] (sync): validates the question, checks the member's
 //!    budget, searches the store and assembles the framed prompt.
-//! 2. [`AskPipeline::run`] (async): calls the provider, records the usage, validates the
-//!    answer and renders it.
+//! 2. [`AskPipeline::run`] (async): reserves the budget, calls the provider, settles the
+//!    reservation with the real usage, validates the answer and renders it.
+//!
+//! Budget: a call may use its prompt plus up to [`AskConfig::max_output_tokens`], so
+//! both steps check that sum, not the prompt alone. `prepare` only checks, to refuse
+//! early; `run` reserves atomically right before the provider call, so questions
+//! prepared at the same time cannot all spend the same remaining budget, and a `run`
+//! future dropped mid-call is still charged in full (see [`crate::budget`]).
 //!
 //! Discord rendering is the caller's job: turn each [`Citation`] with a link into a jump
 //! link, and send the text with mentions disabled.
@@ -16,7 +22,7 @@ use teamctx_core::citation::{CitationId, DiscordMessageLink};
 use teamctx_core::id::MemberId;
 use teamctx_core::time::UnixMillis;
 
-use crate::budget::{self, Budget, UsageEntry, UsageLedger};
+use crate::budget::{self, Budget, Reservation, UsageEntry, UsageLedger};
 use crate::bundle::{Bundle, BundleLimits, Retrieval};
 use crate::error::AskError;
 use crate::prompt::{self, NOT_FOUND_TOKEN, SYSTEM_PROMPT};
@@ -36,7 +42,8 @@ pub struct AskConfig {
     pub budget: Budget,
     /// Longest question in characters, after cleaning.
     pub max_question_chars: usize,
-    /// Most tokens the model may generate.
+    /// Most tokens the model may generate. The token budget must have room for this
+    /// many on top of the prompt before a question is sent.
     pub max_output_tokens: u32,
     /// How many top search hits a "not found" answer lists.
     pub top_hits: usize,
@@ -151,6 +158,8 @@ pub struct Prepared {
     now: UnixMillis,
     bundle: Bundle,
     request: CompletionRequest,
+    /// Estimated prompt tokens, reserved along with the output allowance.
+    prompt_tokens: u64,
 }
 
 impl std::fmt::Debug for Prepared {
@@ -223,16 +232,20 @@ impl<P: LlmProvider> AskPipeline<P> {
         } else {
             prompt::user_message(&bundle, &question)
         };
-        if !bundle.is_empty() {
-            let estimate = estimate_tokens(SYSTEM_PROMPT).saturating_add(estimate_tokens(&user));
+        let prompt_tokens = if bundle.is_empty() {
+            0
+        } else {
+            let prompt_tokens =
+                estimate_tokens(SYSTEM_PROMPT).saturating_add(estimate_tokens(&user));
             budget::check(
                 ledger,
                 &self.config.budget,
                 request.member,
                 request.now,
-                estimate,
+                prompt_tokens.saturating_add(u64::from(self.config.max_output_tokens)),
             )?;
-        }
+            prompt_tokens
+        };
         Ok(Prepared {
             member: request.member,
             now: request.now,
@@ -242,18 +255,26 @@ impl<P: LlmProvider> AskPipeline<P> {
                 user,
                 max_output_tokens: self.config.max_output_tokens,
             },
+            prompt_tokens,
         })
     }
 
-    /// Calls the provider once (no tools), records the usage, and validates the answer.
+    /// Reserves the budget, calls the provider once (no tools), settles the reservation
+    /// with the real usage, and validates the answer.
     ///
     /// With an empty bundle the provider is not called and nothing is recorded.
     ///
+    /// The reservation is taken atomically before the call, so of several questions
+    /// prepared at once only those that still fit reach the provider. If this future is
+    /// dropped during the call, the question is recorded as a failed call charged with
+    /// its full reservation (prompt estimate plus [`AskConfig::max_output_tokens`]).
+    ///
     /// # Errors
     ///
-    /// [`AskError::Provider`] if the call fails (the failed call is still recorded, so
-    /// it counts towards the hourly question limit), [`AskError::Ledger`] if the usage
-    /// cannot be recorded.
+    /// [`AskError::BudgetExceeded`] if the reservation does not fit any more (the
+    /// provider is not called), [`AskError::Provider`] if the call fails (the failed call
+    /// is still recorded, so it counts towards the hourly question limit),
+    /// [`AskError::Ledger`] if the usage cannot be reserved or recorded.
     pub async fn run<L>(&self, ledger: &L, prepared: Prepared) -> Result<AskResult, AskError>
     where
         L: UsageLedger + Sync + ?Sized,
@@ -263,6 +284,7 @@ impl<P: LlmProvider> AskPipeline<P> {
             now,
             bundle,
             request,
+            prompt_tokens,
         } = prepared;
         if bundle.is_empty() {
             return Ok(AskResult {
@@ -273,19 +295,25 @@ impl<P: LlmProvider> AskPipeline<P> {
                 usage: TokenUsage::default(),
             });
         }
-        let outcome = self.provider.complete(request).await;
-        let usage = outcome
-            .as_ref()
-            .map_or_else(|_| TokenUsage::default(), |c| c.usage);
-        let recorded = ledger.record(&UsageEntry {
+        let row = |input_tokens, output_tokens, ok| UsageEntry {
             at: now,
             member,
             provider: self.provider.provider_name().to_owned(),
             model: self.provider.model().to_owned(),
-            input_tokens: usage.input,
-            output_tokens: usage.output,
-            ok: outcome.is_ok(),
-        });
+            input_tokens,
+            output_tokens,
+            ok,
+        };
+        let reservation = Reservation::take(
+            ledger,
+            &self.config.budget,
+            row(prompt_tokens, u64::from(request.max_output_tokens), false),
+        )?;
+        let outcome = self.provider.complete(request).await;
+        let usage = outcome
+            .as_ref()
+            .map_or_else(|_| TokenUsage::default(), |c| c.usage);
+        let recorded = reservation.settle(&row(usage.input, usage.output, outcome.is_ok()));
         let completion = outcome?;
         recorded?;
         Ok(AskResult {

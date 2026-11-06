@@ -5,6 +5,10 @@
 #![expect(clippy::unwrap_used, reason = "test setup must fail loudly")]
 
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::task::{Context, Waker};
 
 use serde_json::Value;
 use teamctx_core::citation::CitationId;
@@ -16,10 +20,11 @@ use teamctx_core::source::{
     Channel, ChannelKind, Member, Message, MessageRef, SourceEvent, SourceKind,
 };
 use teamctx_core::time::UnixMillis;
+use teamctx_llm::provider::estimate_tokens;
 use teamctx_llm::{
     Answer, AskConfig, AskError, AskPipeline, AskRequest, Budget, BudgetLimit, BundleLimits,
-    FakeProvider, InMemoryLedger, LlmError, NOT_FOUND_TEXT, NotFoundReason, UsageEntry,
-    UsageLedger,
+    Completion, CompletionRequest, FakeProvider, InMemoryLedger, LlmError, LlmProvider,
+    NOT_FOUND_TEXT, NotFoundReason, Prepared, TokenUsage, UsageEntry, UsageLedger,
 };
 use teamctx_store::Store;
 
@@ -870,4 +875,225 @@ fn prepared_debug_output_holds_no_chat_text() {
     assert!(!shown.contains("Fenwick"));
     assert!(!shown.contains("Pell"));
     let _ = fx.store.source(fx.source);
+}
+
+// ---- budget races, the output allowance and encoded links ----
+
+/// A provider that yields to the scheduler before answering, so several `run` futures
+/// polled together all reach this point before any of them finishes.
+struct YieldingProvider {
+    calls: AtomicUsize,
+}
+
+impl LlmProvider for YieldingProvider {
+    fn provider_name(&self) -> &str {
+        "yielding"
+    }
+
+    fn model(&self) -> &str {
+        "yielding-model"
+    }
+
+    async fn complete(&self, _request: CompletionRequest) -> Result<Completion, LlmError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        tokio::task::yield_now().await;
+        Ok(Completion {
+            text: "Serif [D-1]".to_owned(),
+            usage: TokenUsage {
+                input: 10,
+                output: 5,
+                estimated: false,
+            },
+        })
+    }
+}
+
+/// A provider whose call never finishes, to model a request cancelled mid-flight.
+struct HangingProvider {
+    calls: AtomicUsize,
+}
+
+impl LlmProvider for HangingProvider {
+    fn provider_name(&self) -> &str {
+        "hanging"
+    }
+
+    fn model(&self) -> &str {
+        "hanging-model"
+    }
+
+    async fn complete(&self, _request: CompletionRequest) -> Result<Completion, LlmError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        std::future::pending().await
+    }
+}
+
+fn one_question_an_hour() -> AskConfig {
+    AskConfig {
+        budget: Budget {
+            max_questions_per_hour: 1,
+            ..Budget::default()
+        },
+        ..AskConfig::default()
+    }
+}
+
+fn prompt_tokens(prepared: &Prepared) -> u64 {
+    estimate_tokens(&prepared.request().system) + estimate_tokens(&prepared.request().user)
+}
+
+#[tokio::test]
+async fn concurrent_questions_cannot_overspend_a_limit_of_one() {
+    let fx = setup();
+    let ledger = InMemoryLedger::new();
+    let pipe = AskPipeline::new(
+        YieldingProvider {
+            calls: AtomicUsize::new(0),
+        },
+        one_question_an_hour(),
+    );
+    // All three pass the early check: nothing has been spent yet.
+    let mut prepared: Vec<Prepared> = (0..3)
+        .map(|_| {
+            pipe.prepare(&fx.store, &ledger, &request("typeface for reading"))
+                .unwrap()
+        })
+        .collect();
+    let (third, second, first) = (
+        prepared.pop().unwrap(),
+        prepared.pop().unwrap(),
+        prepared.pop().unwrap(),
+    );
+    let (a, b, c) = tokio::join!(
+        pipe.run(&ledger, first),
+        pipe.run(&ledger, second),
+        pipe.run(&ledger, third)
+    );
+    assert_eq!(
+        pipe.provider().calls.load(Ordering::SeqCst),
+        1,
+        "exactly one call may reach the provider"
+    );
+    let results = [a, b, c];
+    assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
+    for refused in results.iter().filter_map(|r| r.as_ref().err()) {
+        assert!(
+            matches!(
+                refused,
+                AskError::BudgetExceeded(BudgetLimit::QuestionsPerHour)
+            ),
+            "{refused:?}"
+        );
+    }
+    // The one call is recorded with what the provider reported, not the reservation.
+    let rows = ledger.entries();
+    assert_eq!(rows.len(), 1);
+    assert!(rows[0].ok);
+    assert_eq!((rows[0].input_tokens, rows[0].output_tokens), (10, 5));
+    let hour = ledger.usage_since(asker(), at(NOW - 60 * MINUTE)).unwrap();
+    assert_eq!((hour.questions, hour.tokens), (1, 15));
+}
+
+#[test]
+fn a_cancelled_question_still_counts() {
+    let fx = setup();
+    let ledger = InMemoryLedger::new();
+    let pipe = AskPipeline::new(
+        HangingProvider {
+            calls: AtomicUsize::new(0),
+        },
+        one_question_an_hour(),
+    );
+    let prepared = pipe
+        .prepare(&fx.store, &ledger, &request("typeface for reading"))
+        .unwrap();
+    let input = prompt_tokens(&prepared);
+    {
+        // Poll once so the call is in flight, then drop it, as a timeout or a closed
+        // interaction would.
+        let mut running = pin!(pipe.run(&ledger, prepared));
+        let mut cx = Context::from_waker(Waker::noop());
+        assert!(running.as_mut().poll(&mut cx).is_pending());
+    }
+    assert_eq!(pipe.provider().calls.load(Ordering::SeqCst), 1);
+    // The provider may have done (and billed) the work: the question is charged in full.
+    let rows = ledger.entries();
+    assert_eq!(rows.len(), 1, "a cancelled call must not be free");
+    assert!(!rows[0].ok);
+    assert_eq!(rows[0].input_tokens, input);
+    assert_eq!(
+        rows[0].output_tokens,
+        u64::from(AskConfig::default().max_output_tokens)
+    );
+    // The reservation became that row (it is not counted twice), and the limit of one
+    // is used up.
+    let hour = ledger.usage_since(asker(), at(NOW - 60 * MINUTE)).unwrap();
+    assert_eq!(hour.questions, 1);
+    let refused = pipe
+        .prepare(&fx.store, &ledger, &request("typeface for reading"))
+        .unwrap_err();
+    assert!(matches!(
+        refused,
+        AskError::BudgetExceeded(BudgetLimit::QuestionsPerHour)
+    ));
+}
+
+/// A ledger whose member has exactly `left` tokens of a `day_limit` daily budget left.
+fn ledger_with_tokens_left(day_limit: u64, left: u64) -> InMemoryLedger {
+    let ledger = InMemoryLedger::new();
+    ledger
+        .record(&UsageEntry {
+            at: at(NOW - 3 * 60 * MINUTE),
+            member: asker(),
+            provider: "fake".to_owned(),
+            model: "m".to_owned(),
+            input_tokens: day_limit - left,
+            output_tokens: 0,
+            ok: true,
+        })
+        .unwrap();
+    ledger
+}
+
+#[tokio::test]
+async fn the_token_budget_covers_the_output_allowance_too() {
+    let fx = setup();
+    let day_limit = 100_000;
+    let config = AskConfig {
+        budget: Budget {
+            max_questions_per_hour: 100,
+            max_tokens_per_hour: 1_000_000,
+            max_tokens_per_day: day_limit,
+        },
+        ..AskConfig::default()
+    };
+    let output = u64::from(config.max_output_tokens);
+    let pipe = AskPipeline::new(FakeProvider::fixed("Serif [D-1]"), config);
+    let probe = pipe
+        .prepare(
+            &fx.store,
+            &InMemoryLedger::new(),
+            &request("typeface for reading"),
+        )
+        .unwrap();
+    let input = prompt_tokens(&probe);
+
+    // Room for the prompt but not for the whole answer: refused.
+    for left in [input, input + output - 1] {
+        let ledger = ledger_with_tokens_left(day_limit, left);
+        let refused = pipe
+            .prepare(&fx.store, &ledger, &request("typeface for reading"))
+            .unwrap_err();
+        assert!(
+            matches!(refused, AskError::BudgetExceeded(BudgetLimit::TokensPerDay)),
+            "{left}: {refused:?}"
+        );
+    }
+    // Room for the prompt and the whole answer: accepted, and the call goes through.
+    let ledger = ledger_with_tokens_left(day_limit, input + output);
+    let prepared = pipe
+        .prepare(&fx.store, &ledger, &request("typeface for reading"))
+        .unwrap();
+    pipe.run(&ledger, prepared).await.unwrap();
+    assert_eq!(pipe.provider().call_count(), 1);
 }
