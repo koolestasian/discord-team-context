@@ -1,0 +1,15 @@
+{
+  "op": 0,
+  "s": 13,
+  "t": "CHANNEL_CREATE",
+  "d": {
+    "id": "1100000000000000102",
+    "guild_id": "1100000000000000001",
+    "type": 5,
+    "name": "announcements",
+    "position": 2,
+    "nsfw": false,
+    "permission_overwrites": [],
+    "flags": 0
+  }
+}

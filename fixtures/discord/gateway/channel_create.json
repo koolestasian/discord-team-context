@@ -1,0 +1,17 @@
+{
+  "op": 0,
+  "s": 12,
+  "t": "CHANNEL_CREATE",
+  "d": {
+    "id": "1100000000000000101",
+    "guild_id": "1100000000000000001",
+    "type": 0,
+    "name": "general",
+    "position": 1,
+    "nsfw": false,
+    "permission_overwrites": [],
+    "flags": 0,
+    "topic": "Team chat and decisions",
+    "parent_id": "1100000000000000100"
+  }
+}

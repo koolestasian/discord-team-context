@@ -1,52 +1,29 @@
 //! Spike S3: the MCP endpoint over real HTTP, behind bearer auth.
 //!
-//! Every test starts the server on `127.0.0.1:0` and talks to it with `reqwest`. Tokens
-//! are obviously fake.
+//! Every test starts the server on `127.0.0.1:0` with a temp-file token store and talks to
+//! it with `reqwest`. Tokens are generated per run and never printed.
 
 #![expect(
     clippy::expect_used,
     reason = "clippy.toml exempts #[test] functions only; this file's helpers panic on failure too"
 )]
 
+#[expect(
+    dead_code,
+    reason = "this binary does not need the revocation helpers; auth_http.rs does"
+)]
+mod common;
+
+use common::{TestDb, TestServer};
 use reqwest::{Client, Response, StatusCode};
 use serde_json::{Value, json};
-use teamctx_server::{HttpConfig, router, secret::Secret};
-use tokio_util::sync::CancellationToken;
 
-const TOKEN: &str = "tctx_test_0000000000000000000000000000";
-
-struct TestServer {
-    url: String,
-    shutdown: CancellationToken,
-}
-
-impl Drop for TestServer {
-    fn drop(&mut self) {
-        self.shutdown.cancel();
-    }
-}
-
-async fn start() -> TestServer {
-    let shutdown = CancellationToken::new();
-    let app = router(HttpConfig {
-        token: Secret::new(TOKEN.to_owned()),
-        allowed_hosts: vec!["127.0.0.1".to_owned(), "localhost".to_owned()],
-        shutdown: shutdown.clone(),
-    });
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind 127.0.0.1:0");
-    let addr = listener.local_addr().expect("local addr");
-    let stop = shutdown.clone();
-    tokio::spawn(async move {
-        let _ = axum::serve(listener, app)
-            .with_graceful_shutdown(async move { stop.cancelled_owned().await })
-            .await;
-    });
-    TestServer {
-        url: format!("http://{addr}/mcp"),
-        shutdown,
-    }
+/// A server with one real token, created through the token store.
+async fn start() -> (TestDb, TestServer, String) {
+    let db = TestDb::new();
+    let token = db.create_token("s3-test");
+    let server = common::start(&db).await;
+    (db, server, token)
 }
 
 /// POST a JSON-RPC body the way a streamable-HTTP client does.
@@ -109,20 +86,20 @@ fn assert_challenge(response: &Response) {
 
 #[tokio::test]
 async fn rejects_missing_malformed_and_wrong_tokens_with_401() {
-    let server = start().await;
+    let (_db, server, token) = start().await;
     let client = Client::new();
     let body = initialize_body("2025-11-25");
 
     let bad_headers = [
         None,
-        Some("Bearer"),
-        Some("Bearer "),
-        Some("Basic dXNlcjpwdw=="),
-        Some("Bearer tctx_test_wrong"),
-        Some("Bearer tctx_test_0000000000000000000000000000 extra"),
+        Some("Bearer".to_owned()),
+        Some("Bearer ".to_owned()),
+        Some("Basic dXNlcjpwdw==".to_owned()),
+        Some("Bearer tctx_test_wrong".to_owned()),
+        Some(format!("Bearer {token} extra")),
         // A prefix of the right token must not match.
-        Some("Bearer tctx_test_000000000000000000000000000"),
-        Some("tctx_test_0000000000000000000000000000"),
+        Some(format!("Bearer {}", &token[..token.len() - 1])),
+        Some(token.clone()),
     ];
     for header in bad_headers {
         let mut request = post(&client, &server, &body);
@@ -135,7 +112,7 @@ async fn rejects_missing_malformed_and_wrong_tokens_with_401() {
 
     // The token in the query string is not accepted (spec: MUST NOT use the URI).
     let response = client
-        .post(format!("{}?access_token={TOKEN}", server.url))
+        .post(format!("{}?access_token={token}", server.url))
         .header("Content-Type", "application/json")
         .header("Accept", "application/json, text/event-stream")
         .json(&body)
@@ -151,9 +128,9 @@ async fn rejects_missing_malformed_and_wrong_tokens_with_401() {
 
 #[tokio::test]
 async fn scheme_name_is_case_insensitive() {
-    let server = start().await;
+    let (_db, server, token) = start().await;
     let response = post(&Client::new(), &server, &initialize_body("2025-11-25"))
-        .header("Authorization", format!("bearer {TOKEN}"))
+        .header("Authorization", format!("bearer {token}"))
         .send()
         .await
         .expect("send");
@@ -162,12 +139,12 @@ async fn scheme_name_is_case_insensitive() {
 
 #[tokio::test]
 async fn initialize_initialized_tools_list_with_the_right_token() {
-    let server = start().await;
+    let (_db, server, token) = start().await;
     let client = Client::new();
 
     // 1. initialize
     let response = post(&client, &server, &initialize_body("2025-11-25"))
-        .bearer_auth(TOKEN)
+        .bearer_auth(&token)
         .send()
         .await
         .expect("initialize");
@@ -187,7 +164,7 @@ async fn initialize_initialized_tools_list_with_the_right_token() {
         &server,
         &json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }),
     )
-    .bearer_auth(TOKEN)
+    .bearer_auth(&token)
     .header("MCP-Protocol-Version", "2025-11-25")
     .send()
     .await
@@ -200,7 +177,7 @@ async fn initialize_initialized_tools_list_with_the_right_token() {
         &server,
         &json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {} }),
     )
-    .bearer_auth(TOKEN)
+    .bearer_auth(&token)
     .header("MCP-Protocol-Version", "2025-11-25")
     .send()
     .await
@@ -208,39 +185,22 @@ async fn initialize_initialized_tools_list_with_the_right_token() {
     assert_eq!(response.status(), StatusCode::OK);
     let (_, message) = rpc_message(response).await;
     let tools = message["result"]["tools"].as_array().expect("tools array");
-    assert_eq!(tools.len(), 1, "tools: {tools:?}");
-    assert_eq!(tools[0]["name"], "ping");
-    assert_eq!(tools[0]["annotations"]["readOnlyHint"], true);
-}
-
-#[tokio::test]
-async fn call_ping_returns_the_fixed_line() {
-    let server = start().await;
-    let client = Client::new();
-    let response = post(
-        &client,
-        &server,
-        &json!({
-            "jsonrpc": "2.0", "id": 3, "method": "tools/call",
-            "params": { "name": "ping", "arguments": {} }
-        }),
-    )
-    .bearer_auth(TOKEN)
-    .header("MCP-Protocol-Version", "2025-11-25")
-    .send()
-    .await
-    .expect("tools/call");
-    assert_eq!(response.status(), StatusCode::OK);
-    let (_, message) = rpc_message(response).await;
+    let mut names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+    names.sort_unstable();
     assert_eq!(
-        message["result"]["content"][0]["text"],
-        "pong from the Example Team record"
+        names,
+        ["context_for", "read", "record", "search", "whats_new"]
+    );
+    assert!(
+        tools
+            .iter()
+            .all(|t| t["annotations"]["readOnlyHint"] == true)
     );
 }
 
 #[tokio::test]
 async fn stateless_2026_07_28_request_needs_no_initialize() {
-    let server = start().await;
+    let (_db, server, token) = start().await;
     let client = Client::new();
     let response = post(
         &client,
@@ -254,7 +214,7 @@ async fn stateless_2026_07_28_request_needs_no_initialize() {
             } }
         }),
     )
-    .bearer_auth(TOKEN)
+    .bearer_auth(&token)
     .header("MCP-Protocol-Version", "2026-07-28")
     .header("Mcp-Method", "tools/list")
     .send()
@@ -265,14 +225,14 @@ async fn stateless_2026_07_28_request_needs_no_initialize() {
     let (_, message) = rpc_message(response).await;
     assert_eq!(status, StatusCode::OK);
     assert!(session.is_none());
-    assert_eq!(message["result"]["tools"][0]["name"], "ping");
+    assert_eq!(message["result"]["tools"].as_array().map(Vec::len), Some(5));
 }
 
 #[tokio::test]
 async fn browser_origin_is_refused_even_with_a_valid_token() {
-    let server = start().await;
+    let (_db, server, token) = start().await;
     let response = post(&Client::new(), &server, &initialize_body("2025-11-25"))
-        .bearer_auth(TOKEN)
+        .bearer_auth(&token)
         .header("Origin", "https://evil.example")
         .send()
         .await
@@ -282,18 +242,18 @@ async fn browser_origin_is_refused_even_with_a_valid_token() {
 
 #[tokio::test]
 async fn get_and_delete_with_a_valid_token_are_not_allowed() {
-    let server = start().await;
+    let (_db, server, token) = start().await;
     let client = Client::new();
     let get = client
         .get(&server.url)
-        .bearer_auth(TOKEN)
+        .bearer_auth(&token)
         .header("Accept", "text/event-stream")
         .send()
         .await
         .expect("get");
     let delete = client
         .delete(&server.url)
-        .bearer_auth(TOKEN)
+        .bearer_auth(&token)
         .send()
         .await
         .expect("delete");
@@ -303,9 +263,9 @@ async fn get_and_delete_with_a_valid_token_are_not_allowed() {
 
 #[tokio::test]
 async fn unlisted_host_header_is_refused_even_with_a_valid_token() {
-    let server = start().await;
+    let (_db, server, token) = start().await;
     let response = post(&Client::new(), &server, &initialize_body("2025-11-25"))
-        .bearer_auth(TOKEN)
+        .bearer_auth(&token)
         .header("Host", "evil.example")
         .send()
         .await

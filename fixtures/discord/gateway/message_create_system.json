@@ -1,0 +1,32 @@
+{
+  "op": 0,
+  "s": 6,
+  "t": "MESSAGE_CREATE",
+  "d": {
+    "id": "1100000000000001005",
+    "channel_id": "1100000000000000101",
+    "guild_id": "1100000000000000001",
+    "type": 7,
+    "content": "",
+    "author": {
+      "id": "1100000000000000203",
+      "username": "kit_demo",
+      "global_name": "Kit Demo",
+      "discriminator": "0",
+      "avatar": null,
+      "bot": false,
+      "public_flags": 0
+    },
+    "mentions": [],
+    "mention_roles": [],
+    "mention_everyone": false,
+    "attachments": [],
+    "embeds": [],
+    "pinned": false,
+    "tts": false,
+    "timestamp": "2026-03-04T10:08:00.000000+00:00",
+    "edited_timestamp": null,
+    "flags": 0,
+    "components": []
+  }
+}

@@ -75,6 +75,11 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo test --workspace --locked
+      # Retrieval quality must not fall below fixtures/demo/eval-baseline.toml (plan 9.1).
+      # One OS is enough: the data and the SQLite build are the same everywhere.
+      - name: Retrieval eval against the baseline
+        if: runner.os == 'Linux'
+        run: cargo xtask eval -- --check
 
   msrv:
     name: msrv

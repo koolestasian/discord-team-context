@@ -31,7 +31,8 @@ coding agents, and a minimal web view. Everything except `/ask` works without an
 | M1 Spikes | S3 MCP over HTTP with bearer auth, S4 bundled SQLite FTS5 | Done |
 | | S1 gateway messages, S2 interaction replies | Needs a Discord test server |
 | M2 Store + search | SQLite schema and repositories, query parser, ranking, demo data, eval questions | Done |
-| | Retrieval eval runner, `teamctx demo` and `teamctx search` | Next |
+| | Retrieval eval runner (`cargo xtask eval`), `teamctx demo`, `teamctx search` | Done |
+| | Natural-language questions: any-word matching lifts recall@10 from 0.0 to about 0.6 | Done, still improving |
 | M3 Discord sync | Offline `init`/`doctor`, permission checks, bot setup guide | Done |
 | | Live sync, backfill, live events | Planned |
 | M4-M8 | MCP tools and tokens, record commands, `/ask`, web view, v0.1.0 release | Planned |
@@ -53,11 +54,26 @@ cargo run -p teamctx -- init --guild-id <server id> --application-id <app id>
 
 # Check a config offline. Makes no network calls and never prints the token.
 cargo run -p teamctx -- doctor --config teamctx.toml
+
+# Load the fictional demo team into a SQLite file in your OS data directory
+# (or pass --db PATH). Safe to repeat; refuses to touch a database that is not the demo.
+cargo run -p teamctx -- demo
+
+# Search it. Words, "phrases", from:NAME, in:#channel, after:/before:YYYY-MM-DD.
+# Results show a short id (D-7, T-12, Q-3, m:40), a citation and the chat text
+# framed as data, so the output is safe to paste into an agent.
+cargo run -p teamctx -- search "serif"
+cargo run -p teamctx -- search "in:#engineering epub" --limit 3
+cargo run -p teamctx -- search "after:2026-04-01 crash" --timezone +02:00
 ```
+
+`--timezone` sets the midnight that `before:` and `after:` mean. Only `UTC` and fixed
+offsets such as `+02:00` work today; a named zone like `America/Toronto` is rejected
+because no time zone database is built in.
 
 To prepare a throwaway test server and bot, follow the
 [Discord test bot guide](docs/guides/discord-bot.md). The fictional dataset that the
-tests and the future `teamctx demo` use is described in
+tests, `teamctx demo` and the eval runner use is described in
 [fixtures/demo/README.md](fixtures/demo/README.md).
 
 ## Repository layout

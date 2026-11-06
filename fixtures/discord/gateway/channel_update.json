@@ -1,0 +1,17 @@
+{
+  "op": 0,
+  "s": 16,
+  "t": "CHANNEL_UPDATE",
+  "d": {
+    "id": "1100000000000000101",
+    "guild_id": "1100000000000000001",
+    "type": 0,
+    "name": "team-general",
+    "position": 1,
+    "nsfw": false,
+    "permission_overwrites": [],
+    "flags": 0,
+    "topic": "Team chat, decisions and questions",
+    "parent_id": "1100000000000000100"
+  }
+}

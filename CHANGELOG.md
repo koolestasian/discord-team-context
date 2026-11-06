@@ -10,8 +10,67 @@ release.
 
 ## [Unreleased]
 
+### Changed
+
+- The retrieval eval now measures what users get: `search` and `context_for` go through
+  `core::rank` (the merge `teamctx search` runs), and a new `ask_retrieval` row runs the
+  `/ask` bundle (`Bundle::retrieve`, with thread neighbours). A broken ranking now fails
+  `--check`. Baseline rewritten; overall combined recall@10 of `search` moved from 0.6102
+  to 0.5941 because the raw store order was kinder than the production ranking.
+- The eval cuts the merged ranking at ten results in total, exactly as `teamctx search`
+  does, instead of ten per collection; `search` combined recall@10 moved from 0.5941 to
+  0.5363. Baseline rewritten; see `docs/research/M2.md`.
+
+### Fixed
+
+- REST sync: an archived thread whose final catch-up failed or hit the page limit is
+  caught up again on the next run instead of being skipped for good. The recheck can
+  delete a stored message when the newest messages Discord returns are system messages
+  the store never keeps; when no stored message can anchor the check it now reports the
+  window as not covered instead of silently deleting nothing.
+
+### Fixed
+
+- MCP `record` and `search` paging. A page cut for size now continues right after the last
+  entry it returned, so none are skipped. `search` no longer offers a cursor past the
+  100-result limit that it would reject; its last page says the limit was reached.
+  `record`'s `owner` filter finds a member by display name through a parameterised store
+  query (`Store::member_by_display_name`) instead of probing member ids 1 to 500.
+
 ### Added
 
+- The MCP server's five read-only tools (`context_for`, `whats_new`, `record`, `search`,
+  `read`) and the `catch_up` prompt, over streamable HTTP behind token auth. Results start
+  with the untrusted-data notice, hold chat text only inside one framed block, cite message
+  and entry ids with jump links, and carry `structuredContent` with an `outputSchema`.
+  CI tests keep the tool definitions under 1,500 tokens and default responses under 2,000
+  (estimated as characters / 4). `teamctx_server::serve` serves the router with client
+  addresses so the failed-auth limit counts per client. Not yet in `whats_new`: messages
+  that mention the caller (tokens are not linked to members).
+- Access tokens for the MCP endpoint: `teamctx token create|list|revoke`, SHA-256-only
+  storage, a failed-attempt rate limit and a `Secret` wrapper that never prints its value.
+  A token revoked at any moment is rejected on the next use, and concurrent bad attempts
+  cannot exceed the limit.
+- A SQLite-backed usage ledger for `/ask` budgets (`StoreLedger`). Reserving a question
+  and settling it each run in one transaction, so concurrent requests cannot exceed the
+  hourly or daily limits, and an unsettled reservation keeps counting after a restart.
+- The `/ask` pipeline (not wired to Discord yet): Anthropic and OpenAI-compatible adapters
+  over plain HTTP, framed retrieval bundle, citation and URL validation that also removes
+  encoded and indirect Markdown links, and per-member budgets reserved before each call.
+- The Discord REST sync algorithm (not connected to Discord yet): channel and thread
+  discovery, per-channel cursors for catch-up and backfill, and a 48 hour recheck window
+  that applies missed edits and deletes. It runs against a read-only `DiscordRest` trait
+  with no write methods, saves its cursor after every page so a failed run resumes where it
+  stopped, and returns rate limits and other failures as typed errors without sleeping.
+- Mapping of Discord gateway and REST payloads to source events, with fictional recorded
+  fixtures. Nothing connects to Discord yet.
+- A retrieval eval (`cargo xtask eval`, recall@10 and MRR) with a CI baseline. Bare words in
+  a search now match in any order (any word is enough); recall@10 rose from 0.0 to about 0.6.
+- `teamctx demo` loads the bundled fictional team into a SQLite file (OS data directory
+  by default; repeatable; refuses a database that is not the demo), and `teamctx search`
+  searches messages and record entries from the command line with short ids, citations
+  and chat text framed as untrusted data. `--timezone` accepts `UTC` and fixed offsets;
+  named zones are rejected until a time zone database is approved.
 - SQLite migration, repository implementations, FTS triggers, mention storage and a
   dedicated writer thread; deletion, exclusion and retention redact copied titles
   and update the audit log transactionally. Date queries require host timezone wiring.
@@ -24,7 +83,16 @@ release.
   with reversed decisions, tasks and questions) and 62 retrieval evaluation questions.
   Fixture tests check the data's structure, that paraphrase questions share no words
   with their answers, and that no record follows the two planted prompt-injection
-  messages. Retrieval scoring and its baseline are not implemented yet.
+  messages.
+- `teamctx eval` (also `cargo xtask eval`): imports the demo, runs the 62 questions through
+  `search` and `context_for`, and prints recall@10 and MRR per category. The measured
+  baseline is stored in `fixtures/demo/eval-baseline.toml` and CI fails when an overall
+  number drops below it; see `docs/research/M2.md`.
+- Natural-language search: bare words now match any term (OR) and rank by `bm25`, so more
+  matched terms score higher; quoted phrases and filters stay required. A fixed stopword
+  list ("what", "did", "we", ...) is dropped from bare words in `search` as in
+  `context_for`. On the demo eval, overall recall@10 went from 0.0000 to 0.6102 and MRR
+  from 0.0000 to 0.4286 for `search` (0.6142 and 0.4326 for `context_for`).
 - Core domain types, record lifecycle rules, query AST and repository contracts,
   with invariant tests and a contract map in `docs/design/contracts.md`.
 - Spike S4: `teamctx-store` links the bundled SQLite (`rusqlite`) and tests an FTS5
@@ -63,3 +131,10 @@ release.
 ### Removed
 
 - `docs/guides/repo-settings.md`, a maintainer-only checklist of GitHub settings.
+
+### Security
+
+- Search queries are limited to 2,000 bytes and 32 words, phrases and filters; longer
+  ones fail with "query too long" or "too many terms" (exit code 2 in `teamctx search`).
+  Compiled full-text expressions and `context_for` terms are capped at 32 as well. Before,
+  a query of 100,000 words took seconds of CPU and built an unbounded FTS5 expression.

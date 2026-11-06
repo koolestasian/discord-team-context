@@ -1,0 +1,12 @@
+{
+  "op": 0,
+  "s": 7,
+  "t": "MESSAGE_UPDATE",
+  "d": {
+    "id": "1100000000000001001",
+    "channel_id": "1100000000000000101",
+    "guild_id": "1100000000000000001",
+    "content": "Decision: we ship the beta on Monday instead.",
+    "edited_timestamp": "2026-03-04T11:00:00.500000+00:00"
+  }
+}

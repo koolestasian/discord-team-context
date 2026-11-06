@@ -33,6 +33,15 @@ serde_json = "1"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json"] }
 serde = { version = "1.0.229", features = ["derive"] }
 toml = "1.2.0"
+# Discord payload models (D2, ADR 0002). Models only: no gateway or HTTP client yet.
+twilight-model = "0.18.0"
+# Access tokens (plan section 13): SHA-256 of each token is stored, never the token, and
+# the 32 random bytes come from the operating system. Default features are off: no
+# OID tables or alloc helpers are needed.
+sha2 = { version = "0.11.1", default-features = false }
+getrandom = "0.4.3"
+# Auth failure and rate-limit events (plan section 17); already in the tree via rmcp.
+tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

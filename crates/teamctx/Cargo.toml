@@ -12,6 +12,8 @@ publish = false
 workspace = true
 
 [dependencies]
+teamctx-core.workspace = true
+teamctx-store.workspace = true
 teamctx-discord.workspace = true
 teamctx-server.workspace = true
 teamctx-llm.workspace = true

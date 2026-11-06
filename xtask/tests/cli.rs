@@ -18,14 +18,14 @@ fn no_arguments_and_help_list_the_tasks() -> TestResult {
         let text = String::from_utf8(output.stdout)?;
         assert!(text.contains("Usage: cargo xtask"), "{args:?}: {text}");
         assert!(text.contains("help"), "{args:?}: {text}");
-        assert!(text.contains("M2"), "{args:?}: {text}");
+        assert!(text.contains("eval"), "{args:?}: {text}");
     }
     Ok(())
 }
 
 #[test]
 fn unknown_task_exits_with_code_two() -> TestResult {
-    for args in [&["eval"][..], &["nope"], &["help", "extra"]] {
+    for args in [&["nope"][..], &["help", "extra"]] {
         let output = xtask(args)?;
         assert_eq!(output.status.code(), Some(2), "{args:?}");
         assert!(output.stdout.is_empty(), "{args:?}");
