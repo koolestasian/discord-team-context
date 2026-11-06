@@ -12,6 +12,17 @@ release.
 
 ### Added
 
+- Access tokens for the MCP endpoint: `teamctx token create|list|revoke`, SHA-256-only
+  storage, a failed-attempt rate limit and a `Secret` wrapper that never prints its value.
+  A token revoked at any moment is rejected on the next use, and concurrent bad attempts
+  cannot exceed the limit.
+- The `/ask` pipeline (not wired to Discord yet): Anthropic and OpenAI-compatible adapters
+  over plain HTTP, framed retrieval bundle, citation and URL validation that also removes
+  encoded and indirect Markdown links, and per-member budgets reserved before each call.
+- Mapping of Discord gateway and REST payloads to source events, with fictional recorded
+  fixtures. Nothing connects to Discord yet.
+- A retrieval eval (`cargo xtask eval`, recall@10 and MRR) with a CI baseline. Bare words in
+  a search now match in any order (any word is enough); recall@10 rose from 0.0 to about 0.6.
 - `teamctx demo` loads the bundled fictional team into a SQLite file (OS data directory
   by default; repeatable; refuses a database that is not the demo), and `teamctx search`
   searches messages and record entries from the command line with short ids, citations
