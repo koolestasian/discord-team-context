@@ -257,15 +257,17 @@ fn importing_again_changes_nothing() {
 #[test]
 fn an_interrupted_import_is_completed_by_the_next_one() {
     // A dataset cut to its first 10 entries stands in for an import that stopped early.
-    // D-1 is superseded by a later entry, so the cut copy reports a status mismatch
-    // after having stored the first 10 entries.
+    // D-1, D-3 and D-8 are superseded by later entries that the cut removed, so they are
+    // active
+    // here; a cut copy that still said "superseded" is rejected before any write (see
+    // `lifecycle_violations_found_late_write_nothing`).
     let mut data = dataset();
     data["entries"].as_array_mut().unwrap().truncate(10);
+    for index in [0, 2, 7] {
+        data["entries"][index]["status"] = Value::from("active");
+    }
     let mut store = Store::in_memory().unwrap();
-    assert!(matches!(
-        import(&mut store, &data.to_string()),
-        Err(DemoError::StatusMismatch { index: 0 })
-    ));
+    import(&mut store, &data.to_string()).unwrap();
     assert_eq!(all_entries(&store).len(), 10);
 
     let map = import(&mut store, DATASET).unwrap();
@@ -491,7 +493,7 @@ fn malformed_records_and_datasets_are_typed_errors() {
             field: "id"
         }
     ));
-    // A superseded decision that nothing replaces is reported after loading.
+    // A superseded decision that nothing replaces is reported before anything is written.
     let mut store = Store::in_memory().unwrap();
     let text = corrupt(|d| {
         let entries = d["entries"].as_array_mut().unwrap();
@@ -502,4 +504,142 @@ fn malformed_records_and_datasets_are_typed_errors() {
         import(&mut store, &text),
         Err(DemoError::StatusMismatch { index: 0 })
     ));
+}
+
+/// Row counts of every table, plus the autoincrement counters, read straight from the
+/// file. Equal snapshots mean an import wrote nothing at all.
+fn snapshot(path: &std::path::Path) -> Vec<(String, i64)> {
+    let conn = rusqlite::Connection::open(path).unwrap();
+    let names: Vec<String> = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT name FROM sqlite_master
+                 WHERE type = 'table' AND name <> 'sqlite_sequence'
+                 ORDER BY name",
+            )
+            .unwrap();
+        stmt.query_map([], |row| row.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    };
+    let mut rows: Vec<(String, i64)> = names
+        .iter()
+        .map(|name| {
+            let count = conn
+                .query_row(&format!("SELECT count(*) FROM \"{name}\""), [], |row| {
+                    row.get(0)
+                })
+                .unwrap();
+            (name.clone(), count)
+        })
+        .collect();
+    let mut stmt = conn
+        .prepare("SELECT name, seq FROM sqlite_sequence ORDER BY name")
+        .unwrap();
+    rows.extend(
+        stmt.query_map([], |row| {
+            Ok((format!("seq:{}", row.get::<_, String>(0)?), row.get(1)?))
+        })
+        .unwrap()
+        .map(Result::unwrap),
+    );
+    rows
+}
+
+/// Imports `text` into a fresh file database and requires that it fails without having
+/// written a single row. Returns the error.
+fn rejected_without_writing(text: &str) -> DemoError {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("demo.db");
+    let mut store = Store::open(&path).unwrap();
+    let before = snapshot(&path);
+    let error = import(&mut store, text).unwrap_err();
+    assert_eq!(
+        snapshot(&path),
+        before,
+        "a rejected dataset wrote rows: {error}"
+    );
+    error
+}
+
+#[test]
+fn a_record_rule_violation_found_late_writes_nothing() {
+    // A due date on a decision parses fine, but the record rules reject it. Before the
+    // fix this was only noticed while writing entry 0, after every member, channel and
+    // message had been committed.
+    let error = rejected_without_writing(&corrupt(|d| {
+        d["entries"][0]["due_at"] = Value::from(1_774_976_400_000_i64);
+    }));
+    assert!(
+        matches!(
+            error,
+            DemoError::Malformed {
+                section: "entries",
+                index: 0,
+                field: "due_at"
+            }
+        ),
+        "{error}"
+    );
+
+    // Entry 1 is a task; only decisions may replace another entry.
+    let error = rejected_without_writing(&corrupt(|d| {
+        d["entries"][1]["replaces"] = Value::from(1);
+    }));
+    assert!(
+        matches!(
+            error,
+            DemoError::Malformed {
+                section: "entries",
+                index: 1,
+                field: "replaces"
+            }
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn lifecycle_violations_found_late_write_nothing() {
+    // D-1 is already replaced by entry 49; replacing it a second time is not allowed.
+    let error = rejected_without_writing(&corrupt(|d| {
+        d["entries"][75]["replaces"] = Value::from(1);
+    }));
+    assert!(
+        matches!(
+            error,
+            DemoError::Malformed {
+                section: "entries",
+                index: 75,
+                field: "replaces"
+            }
+        ),
+        "{error}"
+    );
+
+    // A superseded decision that nothing replaces.
+    let error = rejected_without_writing(&corrupt(|d| {
+        let entries = d["entries"].as_array_mut().unwrap();
+        let replacer = entries.iter().position(|e| e["replaces"] == 1).unwrap();
+        entries[replacer]["replaces"] = Value::Null;
+    }));
+    assert!(
+        matches!(error, DemoError::StatusMismatch { index: 0 }),
+        "{error}"
+    );
+
+    // A message in a channel the store would not keep.
+    let mut data = dataset();
+    let channel = data["channels"][0]["id"].clone();
+    let index = items(&data, "messages")
+        .iter()
+        .position(|m| m["channel_id"] == channel)
+        .unwrap();
+    data["channels"][0]["included"] = Value::from(false);
+    let error = rejected_without_writing(&data.to_string());
+    assert!(
+        matches!(error, DemoError::NotStored { section: "messages", index: i } if i == index),
+        "{error}"
+    );
 }

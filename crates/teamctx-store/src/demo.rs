@@ -15,9 +15,10 @@
 //! looks up what is already stored). The runtime's `WriterClient` implements writes only,
 //! so import with the `Store` directly before moving it into a `Writer`.
 //!
-//! The whole dataset is parsed and cross-checked before the first write, so malformed
-//! input never leaves a half-loaded database behind. Errors name the section and the
-//! record's array index, never its content.
+//! The whole dataset is parsed, cross-checked and checked against the record and lifecycle
+//! rules before the first write (`prevalidate`), so malformed input never leaves a
+//! half-loaded database behind. Errors name the section and the record's array index,
+//! never its content.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -25,7 +26,8 @@ use serde_json::Value;
 use teamctx_core::{
     id::{EntryId, MemberId, MessageId, Snowflake, SourceId},
     record::{
-        CreatedVia, EntryKind, EntryStatus, EntryTitle, NewEntry, ShortId, StatusChange, Tag,
+        CreatedVia, EntryKind, EntryStatus, EntryTitle, NewEntry, RecordRuleError, ShortId,
+        StatusChange, Tag, check_transition,
     },
     repo::{
         ApplyOutcome, DirectoryRead, EntryFilter, IngestWrite, MessageRead, PageRequest,
@@ -542,6 +544,110 @@ fn entry_key(
     )
 }
 
+/// Checks everything the store would reject while writing, before the first write.
+///
+/// The repository traits that [`import`] is generic over have no transaction, so a
+/// failure after the first write would leave a half-loaded database. This mirrors the
+/// store's own rules on the parsed dataset instead:
+/// - record rules for each entry ([`NewEntry::validate`]: a due date only on a task,
+///   `replaces` only on a decision, a copied title needs a source);
+/// - lifecycle rules in loading order: each decision is replaced at most once, each
+///   `done`, `dropped` or `answered` status is a legal step from the initial status, and
+///   the final statuses equal the dataset's snapshot;
+/// - messages (and so every entry citing one) must sit in a channel the store keeps.
+///
+/// What cannot be checked here is state that only a write shows (a store I/O failure, or
+/// rows an earlier run left behind). Those failures leave a partial but consistent load,
+/// and running the import again completes it.
+fn prevalidate(parsed: &Parsed) -> Result<(), DemoError> {
+    // A channel is kept only if it and every ancestor are included. Parents come first.
+    let mut kept: BTreeMap<Snowflake, bool> = BTreeMap::new();
+    for (_, channel) in &parsed.channels {
+        let parent_kept = channel
+            .parent
+            .is_none_or(|parent| kept.get(&parent).copied().unwrap_or(false));
+        kept.insert(channel.id, channel.included && parent_kept);
+    }
+    for message in &parsed.messages {
+        if !kept
+            .get(&message.message.id.channel)
+            .copied()
+            .unwrap_or(false)
+        {
+            return Err(DemoError::NotStored {
+                section: "messages",
+                index: message.index,
+            });
+        }
+    }
+
+    // Stand-ins for the row ids the store will assign; only the rules are checked here.
+    let (Some(member), Some(message)) = (MemberId::new(1), MessageId::new(1)) else {
+        return Err(DemoError::NotJson);
+    };
+    let mut statuses: BTreeMap<ShortId, EntryStatus> = BTreeMap::new();
+    // Two dataset entries with one key are one stored entry, which would make the id
+    // map ambiguous.
+    let mut keys = BTreeSet::new();
+    for entry in &parsed.entries {
+        let index = entry.index;
+        let malformed = |field| DemoError::Malformed {
+            section: "entries",
+            index,
+            field,
+        };
+        let request = NewEntry {
+            kind: entry.kind,
+            title: entry.title.clone(),
+            title_is_copied: entry.title_is_copied,
+            owner: entry.owner.map(|_| member),
+            due_at: entry.due_at,
+            source_message: Some(message),
+            created_by: member,
+            created_via: entry.created_via,
+            tags: entry.tags.clone(),
+            replaces: entry.replaces.map(|fixture| fixture.id),
+            created_at: entry.created_at,
+        };
+        request.validate().map_err(|error| match error {
+            RecordRuleError::DueOnNonTask => malformed("due_at"),
+            RecordRuleError::ReplacesOnNonDecision => malformed("replaces"),
+            _ => malformed("title"),
+        })?;
+        let key = (
+            entry.kind.as_str(),
+            entry.title.as_str().to_owned(),
+            entry.source_message,
+            entry.created_at.as_millis(),
+        );
+        if !keys.insert(key) {
+            return Err(malformed("id"));
+        }
+
+        if let Some(old) = entry.replaces {
+            let from = statuses.get(&old).copied().unwrap_or(EntryStatus::Active);
+            check_transition(EntryKind::Decision, from, EntryStatus::Superseded)
+                .map_err(|_| malformed("replaces"))?;
+            statuses.insert(old, EntryStatus::Superseded);
+        }
+        // `superseded` is only ever reached through a later `replaces`.
+        let initial = entry.kind.initial_status();
+        let reached = if entry.status == initial || entry.status == EntryStatus::Superseded {
+            initial
+        } else {
+            check_transition(entry.kind, initial, entry.status).map_err(|_| malformed("status"))?;
+            entry.status
+        };
+        statuses.insert(entry.fixture, reached);
+    }
+    for entry in &parsed.entries {
+        if statuses.get(&entry.fixture) != Some(&entry.status) {
+            return Err(DemoError::StatusMismatch { index: entry.index });
+        }
+    }
+    Ok(())
+}
+
 /// Loads the demo dataset into `store` and returns the id mapping.
 ///
 /// Importing the same dataset again changes nothing: members, channels and messages are
@@ -557,6 +663,7 @@ where
     S: IngestWrite + RecordWrite + DirectoryRead + MessageRead + RecordRead + ?Sized,
 {
     let parsed = parse(dataset)?;
+    prevalidate(&parsed)?;
     // Only deletion events use this stamp, and the import sends none.
     let now = parsed
         .entries
