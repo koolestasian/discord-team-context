@@ -6,6 +6,7 @@
 
 pub mod demo;
 mod read;
+pub mod usage;
 mod write;
 mod writer;
 
