@@ -394,6 +394,26 @@ fn recheck_keeps_messages_newer_than_anything_it_read() {
 }
 
 #[test]
+fn a_system_message_does_not_hide_a_deleted_message_from_the_recheck() {
+    let fake = two_channels();
+    let ids = fill(&fake, GENERAL, 2, 2 * HOUR, HOUR);
+    let mut store = Store::in_memory().unwrap();
+    let source = run(&fake, &mut store, &config(), at(0)).source;
+    assert_eq!(stored_count(&store, source, GENERAL, &ids), 2);
+
+    // The newest stored message is deleted and a join message arrives. Neither the newest
+    // message Discord returns nor the catch-up cursor is a stored message any more.
+    fake.delete_message(GENERAL, ids[1]);
+    fake.add_system_message(GENERAL, id_at(-MINUTE));
+    let report = run(&fake, &mut store, &config(), at(HOUR));
+    let channel = report.channel(sf(GENERAL)).unwrap();
+    assert!(channel.recheck_covered);
+    assert_eq!(channel.deleted, 1);
+    assert!(stored(&store, source, GENERAL, ids[1]).is_none());
+    assert!(stored(&store, source, GENERAL, ids[0]).is_some());
+}
+
+#[test]
 fn a_channel_missing_from_the_listing_is_deleted_with_its_messages() {
     let fake = two_channels();
     fake.add_thread(THREAD, DEV, "Dev thread", false);
@@ -474,6 +494,68 @@ fn an_archived_thread_gets_one_last_catch_up_then_is_left_alone() {
     run(&fake, &mut store, &config(), at(3 * HOUR));
     assert!(fake.requests(THREAD).is_empty());
     assert!(!fake.requests(GENERAL).is_empty());
+}
+
+/// A thread that was synced while active and then archived, with `late` messages posted
+/// in between. The recheck window is one minute and the second run is hours later, so
+/// only catch-up can find the late messages.
+fn archived_with_late_messages(late: i64) -> (FakeDiscord, Store, SourceId, Vec<u64>) {
+    let fake = two_channels();
+    fake.add_thread(THREAD, GENERAL, "Release plan", false);
+    fill(&fake, THREAD, 2, 20 * HOUR, MINUTE);
+    let mut store = Store::in_memory().unwrap();
+    let source = run(&fake, &mut store, &quiet_recheck(), at(0)).source;
+    let ids = fill(&fake, THREAD, late, -MINUTE, -MINUTE);
+    fake.archive_thread(THREAD);
+    (fake, store, source, ids)
+}
+
+fn quiet_recheck() -> SyncConfig {
+    let mut config = config();
+    config.recheck_window = Duration::from_secs(60);
+    config
+}
+
+#[test]
+fn an_archived_thread_whose_last_catch_up_failed_is_caught_up_next_run() {
+    let (fake, mut store, source, late) = archived_with_late_messages(3);
+
+    // Discovery stores `archived = true`, then the thread's first page fails.
+    fake.fail_after(THREAD, 0, Fail::Server);
+    let error = sync_guild(&fake, &mut store, &quiet_recheck(), at(10 * HOUR)).unwrap_err();
+    assert!(error.is_retryable());
+    assert!(channel_info(&store, source, THREAD).unwrap().archived);
+    assert_eq!(stored_count(&store, source, THREAD, &late), 0);
+
+    // The thread is already archived in the store, but its final catch-up never finished.
+    fake.clear_failures();
+    run(&fake, &mut store, &quiet_recheck(), at(11 * HOUR));
+    assert_eq!(stored_count(&store, source, THREAD, &late), 3);
+
+    // Once it finished, the thread is left alone again.
+    fake.reset_log();
+    run(&fake, &mut store, &quiet_recheck(), at(12 * HOUR));
+    assert!(fake.requests(THREAD).is_empty());
+}
+
+#[test]
+fn an_archived_thread_whose_last_catch_up_hit_the_page_limit_is_continued() {
+    let (fake, mut store, source, late) = archived_with_late_messages(150);
+    let mut config = quiet_recheck();
+    config.catchup_page_limit = 1;
+
+    let second = run(&fake, &mut store, &config, at(10 * HOUR));
+    assert!(!second.channel(sf(THREAD)).unwrap().catchup_complete);
+    assert_eq!(stored_count(&store, source, THREAD, &late), 100);
+
+    // Still archived in the store, but the remaining 50 messages must be read.
+    let third = run(&fake, &mut store, &config, at(11 * HOUR));
+    assert!(third.channel(sf(THREAD)).unwrap().catchup_complete);
+    assert_eq!(stored_count(&store, source, THREAD, &late), 150);
+
+    fake.reset_log();
+    run(&fake, &mut store, &config, at(12 * HOUR));
+    assert!(fake.requests(THREAD).is_empty());
 }
 
 #[test]

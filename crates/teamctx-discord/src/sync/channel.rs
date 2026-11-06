@@ -21,6 +21,10 @@ use crate::mapping::map_rest_messages;
 /// not covered and nothing is deleted, which is the safe direction.
 const RECHECK_STORED_LIMIT: u32 = 5_000;
 
+/// The most window ids tried as an anchor after the cursor ids, so a window made only of
+/// system messages costs a bounded number of lookups.
+const ANCHOR_CANDIDATES: usize = 50;
+
 /// Why work on one channel stopped early.
 enum Stop {
     /// 404: deleted on Discord.
@@ -105,6 +109,8 @@ pub(super) struct ChannelSync<'a, R: ?Sized, S: ?Sized> {
     config: &'a SyncConfig,
     now: UnixMillis,
     channel: Snowflake,
+    /// The thread was archived since the last run and is owed a final catch-up.
+    final_catch_up: bool,
     report: ChannelReport,
 }
 
@@ -120,6 +126,7 @@ where
         config: &'a SyncConfig,
         now: UnixMillis,
         channel: Snowflake,
+        final_catch_up: bool,
     ) -> Self {
         Self {
             rest,
@@ -128,6 +135,7 @@ where
             config,
             now,
             channel,
+            final_catch_up,
             report: ChannelReport::new(channel),
         }
     }
@@ -161,18 +169,36 @@ where
             updated_at: self.now,
         });
         let fresh = cursor.newest_seen.is_none();
+        let mut backfill_finished = cursor.backfill_done;
+        let mut final_catch_up_open = false;
         if fresh {
             // Nothing was read yet, so any earlier backfill progress means nothing.
             cursor.oldest_backfilled = None;
             cursor.backfill_done = false;
+            backfill_finished = false;
         } else {
+            let previous_newest = cursor.newest_seen;
+            if self.final_catch_up && backfill_finished {
+                // Discovery already stored `archived`, so a later run no longer knows a
+                // final catch-up is owed. Record the debt in the cursor (a thread with an
+                // unfinished backfill is always read again) and pay it off below.
+                cursor.backfill_done = false;
+                self.save(channel, &mut cursor)?;
+                final_catch_up_open = true;
+            }
             self.catch_up(channel, &mut cursor)?;
-            self.recheck(channel, &cursor)?;
+            if final_catch_up_open && self.report.catchup_complete {
+                cursor.backfill_done = true;
+                self.save(channel, &mut cursor)?;
+                final_catch_up_open = false;
+            }
+            self.recheck(channel, &cursor, previous_newest)?;
         }
-        if fresh || !cursor.backfill_done {
+        if fresh || (!cursor.backfill_done && !final_catch_up_open) {
             self.backfill(channel, &mut cursor)?;
+            backfill_finished = cursor.backfill_done;
         }
-        self.report.backfill_complete = cursor.backfill_done;
+        self.report.backfill_complete = backfill_finished;
         Ok(())
     }
 
@@ -201,7 +227,14 @@ where
 
     /// Re-reads the last `recheck_window`, upserts changes and deletes stored messages
     /// Discord no longer has, when the whole window was read.
-    fn recheck(&mut self, channel: Snowflake, cursor: &SyncCursor) -> Result<(), Stop> {
+    ///
+    /// `previous_newest` is the newest message id the cursor held before this run.
+    fn recheck(
+        &mut self,
+        channel: Snowflake,
+        cursor: &SyncCursor,
+        previous_newest: Option<Snowflake>,
+    ) -> Result<(), Stop> {
         let window_start = window_before(self.now, self.config.recheck_window);
         let mut in_window: HashSet<Snowflake> = HashSet::new();
         let mut newest_read: Option<Snowflake> = None;
@@ -228,8 +261,14 @@ where
             position = PagePosition::Before(oldest);
         }
         if covered {
-            covered =
-                self.delete_missing(channel, cursor, window_start, newest_read, &in_window)?;
+            covered = self.delete_missing(
+                channel,
+                cursor,
+                window_start,
+                newest_read,
+                previous_newest,
+                &in_window,
+            )?;
         }
         self.report.recheck_covered = covered;
         Ok(())
@@ -243,14 +282,27 @@ where
         cursor: &SyncCursor,
         window_start: UnixMillis,
         newest_read: Option<Snowflake>,
+        previous_newest: Option<Snowflake>,
         in_window: &HashSet<Snowflake>,
     ) -> Result<bool, Stop> {
         // Anything newer than the newest message read may have arrived after the read.
         let Some(upper) = newest_read.max(cursor.newest_seen) else {
             return Ok(true);
         };
+        // Any stored message of the channel will do as an anchor to find the stored
+        // neighbours. The newest ids Discord returned or the cursor holds may all be
+        // system messages the store never keeps, and a message deleted on Discord is in
+        // none of the pages, so also try where the cursor stood before this run and the
+        // newest ids of the window.
+        let mut candidates: Vec<Snowflake> = [newest_read, cursor.newest_seen, previous_newest]
+            .into_iter()
+            .flatten()
+            .collect();
+        let mut newest_in_window: Vec<Snowflake> = in_window.iter().copied().collect();
+        newest_in_window.sort_unstable_by(|a, b| b.cmp(a));
+        candidates.extend(newest_in_window.into_iter().take(ANCHOR_CANDIDATES));
         let mut anchor = None;
-        for candidate in [newest_read, cursor.newest_seen].into_iter().flatten() {
+        for candidate in candidates {
             let message = MessageRef {
                 channel,
                 message: candidate,
@@ -261,7 +313,8 @@ where
             }
         }
         let Some(anchor) = anchor else {
-            return Ok(true);
+            // No stored message to start from: the stored side of the window is unknown.
+            return Ok(false);
         };
         let around =
             self.store

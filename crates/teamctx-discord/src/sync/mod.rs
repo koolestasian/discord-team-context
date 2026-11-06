@@ -36,7 +36,15 @@
 //! - Threads inherit the include or exclude decision of their parent channel.
 //! - An archived thread is read again only if it has no cursor, its backfill is not done,
 //!   or it was archived since the last run (one final catch-up). Archived threads cannot
-//!   change without being unarchived, and that shows up as an active thread.
+//!   change without being unarchived, and that shows up as an active thread. The final
+//!   catch-up is marked as owed by clearing `backfill_done` in the cursor before it
+//!   starts and restoring it once catch-up reached the end, so a run that fails or hits
+//!   the catch-up page limit leaves the thread to be caught up again next run.
+//! - The recheck finds stored messages through a stored anchor: the newest stored message
+//!   among the ids it read, the newest id at the start of the run and the newest id now.
+//!   If the newest message Discord holds in the channel and the newest one stored are both
+//!   unstorable system messages, there is no anchor and deletes are skipped for that run
+//!   (`recheck_covered` is `false`).
 //! - To find stored messages in the recheck window the sync uses the stored neighbours of
 //!   the newest message it holds ([`MessageRead::neighbours`]). If more than
 //!   `RECHECK_STORED_LIMIT` stored messages would have to be compared, deletes are skipped
@@ -314,17 +322,29 @@ where
         if !info.included || info.kind == ChannelKind::Forum {
             continue;
         }
-        if info.archived {
-            let cursor = store.cursor(source, info.external_id)?;
-            let was_active = before
+        // An archived thread was archived since the last run (it was active then), so it
+        // is owed one final catch-up. The channel sync records that debt in the cursor
+        // and clears it only once catch-up reached the end, so a failed or page-limited
+        // final catch-up is retried even though discovery already stored `archived`.
+        let final_catch_up = info.archived
+            && before
                 .get(&info.external_id)
                 .is_some_and(|previous| !previous.archived);
-            let finished = cursor.is_some_and(|c| c.backfill_done && c.newest_seen.is_some());
-            if finished && !was_active {
+        if info.archived && !final_catch_up {
+            let cursor = store.cursor(source, info.external_id)?;
+            if cursor.is_some_and(|c| c.backfill_done && c.newest_seen.is_some()) {
                 continue;
             }
         }
-        let run = channel::ChannelSync::new(rest, store, source, config, now, info.external_id);
+        let run = channel::ChannelSync::new(
+            rest,
+            store,
+            source,
+            config,
+            now,
+            info.external_id,
+            final_catch_up,
+        );
         report.channels.push(run.run()?);
     }
     Ok(report)

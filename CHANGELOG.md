@@ -21,6 +21,14 @@ release.
   does, instead of ten per collection; `search` combined recall@10 moved from 0.5941 to
   0.5363. Baseline rewritten; see `docs/research/M2.md`.
 
+### Fixed
+
+- REST sync: an archived thread whose final catch-up failed or hit the page limit is
+  caught up again on the next run instead of being skipped for good. The recheck can
+  delete a stored message when the newest messages Discord returns are system messages
+  the store never keeps; when no stored message can anchor the check it now reports the
+  window as not covered instead of silently deleting nothing.
+
 ### Added
 
 - The MCP server's five read-only tools (`context_for`, `whats_new`, `record`, `search`,
