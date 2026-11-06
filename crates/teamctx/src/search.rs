@@ -238,25 +238,29 @@ fn now() -> UnixMillis {
 }
 
 /// One candidate, before ranking.
-enum Found {
+pub(crate) enum Found {
     Entry(EntryHit),
     Message(MessageHit),
 }
 
-struct Ranked {
+/// The scoring function of the ranking: [`rank::score`] in production. The eval swaps it
+/// to prove that a broken ranking is caught.
+pub(crate) type Scorer = fn(f64, UnixMillis, UnixMillis, bool) -> f64;
+
+pub(crate) struct Ranked {
     score: f64,
     created_at: UnixMillis,
-    found: Found,
+    pub(crate) found: Found,
 }
 
 impl Ranked {
-    fn new(found: Found, now: UnixMillis) -> Self {
+    fn new(found: Found, now: UnixMillis, scorer: Scorer) -> Self {
         let (bm25, created_at, is_record) = match &found {
             Found::Entry(hit) => (hit.bm25, hit.entry.created_at, true),
             Found::Message(hit) => (hit.bm25, hit.message.created_at, false),
         };
         Self {
-            score: rank::score(bm25, created_at, now, is_record),
+            score: scorer(bm25, created_at, now, is_record),
             created_at,
             found,
         }
@@ -277,6 +281,29 @@ fn order(a: &Ranked, b: &Ranked) -> std::cmp::Ordering {
         .total_cmp(&a.score)
         .then_with(|| b.created_at.cmp(&a.created_at))
         .then_with(|| a.tie_break().cmp(&b.tie_break()))
+}
+
+/// Searches entries and messages for `parsed` and returns the candidates ranked together,
+/// best first. Fetches more candidates than `limit` so that recency and the entry boost
+/// can reorder the store's bm25 order; the caller cuts the list at `limit`. This is the
+/// ranking `teamctx search` shows, and the eval measures it through this function.
+pub(crate) fn rank_candidates(
+    store: &Store,
+    parsed: &query::Query,
+    limit: u32,
+    now: UnixMillis,
+    scorer: Scorer,
+) -> Result<Vec<Ranked>, RepoError> {
+    let candidates = limit.saturating_mul(4).max(40);
+    let mut ranked: Vec<Ranked> = Vec::new();
+    for hit in store.search_entries(parsed, candidates)? {
+        ranked.push(Ranked::new(Found::Entry(hit), now, scorer));
+    }
+    for hit in store.search_messages(parsed, candidates)? {
+        ranked.push(Ranked::new(Found::Message(hit), now, scorer));
+    }
+    ranked.sort_by(order);
+    Ok(ranked)
 }
 
 /// Who wrote it and where, plus a link when the message is known. All chat-derived.
@@ -414,22 +441,8 @@ fn search(options: &SearchOptions) -> Result<String, SearchError> {
     let mut store = Store::open_read_only(&db).map_err(|_| SearchError::Open)?;
     store.set_date_resolver(date_resolver(options.timezone));
 
-    let now = now();
-    let candidates = options.limit.saturating_mul(4).max(40);
-    let mut ranked: Vec<Ranked> = Vec::new();
-    for hit in store
-        .search_entries(&parsed, candidates)
-        .map_err(SearchError::Store)?
-    {
-        ranked.push(Ranked::new(Found::Entry(hit), now));
-    }
-    for hit in store
-        .search_messages(&parsed, candidates)
-        .map_err(SearchError::Store)?
-    {
-        ranked.push(Ranked::new(Found::Message(hit), now));
-    }
-    ranked.sort_by(order);
+    let mut ranked = rank_candidates(&store, &parsed, options.limit, now(), rank::score)
+        .map_err(SearchError::Store)?;
     ranked.truncate(options.limit as usize);
 
     if ranked.is_empty() {
