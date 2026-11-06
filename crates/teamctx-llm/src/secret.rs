@@ -31,6 +31,10 @@ impl ApiKey {
 
     /// Reads the key from the environment variable `var`.
     ///
+    /// A mistake in `llm.api_key_env` can put the key itself where the variable name
+    /// belongs. Errors therefore name the variable only when it looks like a conventional
+    /// one (upper-case letters, digits and `_`); anything else is not echoed.
+    ///
     /// # Errors
     ///
     /// [`LlmError::MissingApiKey`] if the variable is unset, not Unicode or empty;
@@ -52,13 +56,29 @@ impl ApiKey {
         match lookup(var) {
             Some(value) if !value.trim().is_empty() => Self::new(value),
             _ => Err(LlmError::MissingApiKey {
-                var: var.to_owned(),
+                var: displayable_variable_name(var),
             }),
         }
     }
 
     pub(crate) fn expose(&self) -> &str {
         &self.0
+    }
+}
+
+/// The variable name as written, if it looks like an environment variable name; otherwise a
+/// fixed phrase, because the text may be a pasted key.
+fn displayable_variable_name(var: &str) -> String {
+    let conventional = !var.is_empty()
+        && var.len() <= 64
+        && !var.starts_with(|c: char| c.is_ascii_digit())
+        && var
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_');
+    if conventional {
+        var.to_owned()
+    } else {
+        "(the name in llm.api_key_env, not shown)".to_owned()
     }
 }
 

@@ -23,6 +23,12 @@ release.
 
 ### Fixed
 
+- Chat-controlled text no longer reaches places it should not. MCP and API result lines
+  flatten member and channel names to one line of at most 64 characters, so a display name
+  with a line break cannot add a line inside the framed block. The "not set" error for
+  `llm.api_key_env` names the variable only when it looks like an environment variable name
+  (a key pasted there is not echoed). A Discord payload of the wrong shape is reported by
+  error category and position, not by quoting the offending value.
 - REST sync: an archived thread whose final catch-up failed or hit the page limit is
   caught up again on the next run instead of being skipped for good. The recheck can
   delete a stored message when the newest messages Discord returns are system messages

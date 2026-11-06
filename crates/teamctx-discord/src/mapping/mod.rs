@@ -166,7 +166,20 @@ pub fn map_rest_messages(page: &Value) -> Result<Mapped, MapError> {
 
 /// Builds the error for a payload that does not deserialise into its twilight model.
 fn json_error(what: &'static str) -> impl FnOnce(serde_json::Error) -> MapError {
-    move |error| MapError::malformed(what, error.to_string())
+    // serde_json's message quotes the offending value, which is untrusted chat data, so
+    // only the error category and position are kept.
+    move |error| {
+        let kind = match error.classify() {
+            serde_json::error::Category::Io => "unreadable",
+            serde_json::error::Category::Syntax => "not valid JSON",
+            serde_json::error::Category::Data => "a field has the wrong type or value",
+            serde_json::error::Category::Eof => "ends too early",
+        };
+        MapError::malformed(
+            what,
+            format!("{kind} (line {}, column {})", error.line(), error.column()),
+        )
+    }
 }
 
 /// Converts a twilight id to a core [`Snowflake`]. Twilight ids are never zero, so the

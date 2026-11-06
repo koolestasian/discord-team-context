@@ -514,7 +514,6 @@ fn sync_path_never_reveals_secrets_from_chat_or_failures() {
 /// A payload value of the wrong shape must not be quoted into an error: the live sync
 /// will log `SyncError` with its sources, and the value is untrusted text.
 #[test]
-#[ignore = "defect: MapError copies serde_json's message, which quotes the offending payload value, into SyncError's source chain"]
 fn malformed_payload_values_are_not_quoted_in_errors() {
     let config = SyncConfig::new(sf(GUILD), "Lantern Shelf (fictional)");
     let mut store = Store::in_memory().expect("store");

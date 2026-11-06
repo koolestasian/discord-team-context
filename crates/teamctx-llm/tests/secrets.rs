@@ -343,7 +343,6 @@ fn api_key_errors_and_debug_never_show_the_key() {
 const KEY_SHAPED_LIKE_A_NAME: &str = "FAKE_llm_api_key_guard_test_0000_not_a_real_credential";
 
 #[test]
-#[ignore = "defect: LlmError::MissingApiKey prints the configured variable name, so a key pasted into llm.api_key_env reaches the error text"]
 fn a_key_pasted_as_the_variable_name_is_not_echoed() {
     let error = ApiKey::from_lookup(KEY_SHAPED_LIKE_A_NAME, |_| None).expect_err("not set");
     assert!(
