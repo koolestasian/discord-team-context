@@ -447,7 +447,10 @@ impl Tool {
                 })?;
                 Ok((ranked(&typed, scorer)?, CUTOFF as usize))
             }
-            Self::ContextFor => Ok((ranked(&context_query(&case.query), scorer)?, CUTOFF as usize)),
+            Self::ContextFor => Ok((
+                ranked(&context_query(&case.query), scorer)?,
+                CUTOFF as usize,
+            )),
             Self::AskRetrieval => {
                 let bundle = Bundle::retrieve(store, &case.query, NOW, &BundleLimits::default())
                     .map_err(store_error)?;
