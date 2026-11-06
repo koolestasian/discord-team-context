@@ -918,11 +918,14 @@ impl TokenWrite for Store {
     }
     fn touch_token(&mut self, id: TokenId, at: UnixMillis) -> RepoResult<()> {
         self.transaction(|conn| {
+            // One statement checks and records, so a revocation committed after the
+            // caller's lookup makes this fail instead of being overwritten by a use.
             let touched = conn
                 .execute(
                     "UPDATE access_tokens
                      SET last_used_at = ?
-                     WHERE id = ?",
+                     WHERE id = ?
+                       AND revoked_at IS NULL",
                     params![at.as_millis(), id.get()],
                 )
                 .map_err(backend)?;

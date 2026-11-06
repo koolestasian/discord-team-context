@@ -4,7 +4,10 @@
 //! Every protected request must carry `Authorization: Bearer tctx_...`. The middleware
 //! hashes what was presented with SHA-256 and looks the digest up in `access_tokens`,
 //! where only digests are stored and revoked rows never match. There is no cache, so a
-//! revocation applies to the very next request (US-10).
+//! revocation applies to the very next request (US-10). A request is authorised only
+//! when recording the token's use succeeds, and that write itself checks `revoked_at`,
+//! so a revocation that commits between the lookup and the authorisation still wins.
+//! Any storage failure rejects the request (fail closed).
 //!
 //! Timing and error shape:
 //! - A malformed header, a token of the wrong shape, an unknown token and a revoked token
@@ -52,7 +55,7 @@ use teamctx_core::{
 };
 use teamctx_store::{Store, WriterClient};
 
-use self::limiter::ClientKey;
+use self::limiter::{Attempt, ClientKey};
 
 const CHALLENGE_MISSING: &str = r#"Bearer realm="teamctx""#;
 const CHALLENGE_INVALID: &str = r#"Bearer realm="teamctx", error="invalid_token""#;
@@ -67,11 +70,14 @@ pub trait TokenBackend: Send + Sync + 'static {
     /// [`RepoError::Backend`] when storage fails.
     fn active_token(&self, hash: &TokenHash) -> RepoResult<Option<AccessToken>>;
 
-    /// Records a successful use.
+    /// Records a use of the token, but only if it is still not revoked, in one atomic
+    /// step (see [`TokenWrite::touch_token`]). The middleware authorises a request only
+    /// when this succeeds.
     ///
     /// # Errors
     ///
-    /// [`RepoError`] when the row is gone or storage fails.
+    /// [`RepoError::NotFound`] when the token is revoked or gone (the request gets
+    /// `401`); any other [`RepoError`] when storage fails (`503`).
     fn touch_token(&self, id: TokenId, at: UnixMillis) -> RepoResult<()>;
 }
 
@@ -164,9 +170,10 @@ enum Verdict {
 
 /// Lets the request through only with a valid, non-revoked token.
 ///
-/// Responses: `429` while the client is locked out by the failure limit; `401` with a
-/// `WWW-Authenticate: Bearer` challenge for a missing, malformed, unknown or revoked
-/// token; `503` when storage fails (not counted as an auth failure).
+/// Responses: `429` while the client is locked out by the failure limit, or while its
+/// attempts in flight use up what is left of it; `401` with a `WWW-Authenticate: Bearer`
+/// challenge for a missing, malformed, unknown or revoked token; `503` when storage fails
+/// (not counted as an auth failure).
 pub async fn require_bearer(
     State(auth): State<Auth>,
     mut request: Request,
@@ -177,14 +184,22 @@ pub async fn require_bearer(
         .extensions()
         .get::<ConnectInfo<SocketAddr>>()
         .map_or(ClientKey::Unknown, |info| ClientKey::from_ip(info.0.ip()));
-    if let Some(wait) = auth.limiter.blocked(client, now) {
-        tracing::debug!(%client, "refused request from a client over the auth failure limit");
-        return too_many_requests(wait.as_secs().saturating_add(1));
-    }
+    // Reserving before the lookup, not counting after it, is what stops a concurrent
+    // burst from getting more guesses checked than the limit allows.
+    let attempt = match auth.limiter.admit(client, now) {
+        Ok(attempt) => attempt,
+        Err(wait) => {
+            tracing::debug!(%client, "refused request from a client over the auth failure limit");
+            return too_many_requests(wait.as_secs().saturating_add(1));
+        }
+    };
 
     let verdict = match request.headers().get(header::AUTHORIZATION) {
-        None => Verdict::Missing,
-        Some(value) => verify(&auth, value).await,
+        None => {
+            count_failure(attempt, now);
+            Verdict::Missing
+        }
+        Some(value) => verify(&auth, value, attempt, now).await,
     };
     match verdict {
         Verdict::Allowed(token) => {
@@ -198,9 +213,6 @@ pub async fn require_bearer(
         Verdict::Missing | Verdict::Invalid => {
             let missing = matches!(verdict, Verdict::Missing);
             tracing::debug!(%client, missing, "rejected request without a valid bearer token");
-            if auth.limiter.record_failure(client, now) {
-                tracing::warn!(%client, "too many failed authentications; client locked out");
-            }
             unauthorized(if missing {
                 CHALLENGE_MISSING
             } else {
@@ -210,37 +222,57 @@ pub async fn require_bearer(
     }
 }
 
+fn count_failure(attempt: Attempt, now: Instant) {
+    let client = attempt.client();
+    if attempt.fail(now) {
+        tracing::warn!(%client, "too many failed authentications; client locked out");
+    }
+}
+
 /// Hashes and looks up whatever was presented, then decides. Every presented header,
 /// well-formed or not, costs exactly one lookup.
-async fn verify(auth: &Auth, value: &HeaderValue) -> Verdict {
+///
+/// The attempt is settled inside the blocking task, so it stays reserved until the
+/// lookup has finished even if the client disconnects and this future is dropped.
+async fn verify(auth: &Auth, value: &HeaderValue, attempt: Attempt, now: Instant) -> Verdict {
     let candidate = bearer_token(value);
     let well_formed = candidate.is_some_and(token::is_well_formed);
     let hash = token::hash(candidate.unwrap_or_default());
     let backend = Arc::clone(&auth.backend);
-    let lookup = tokio::task::spawn_blocking(move || {
-        let found = backend.active_token(&hash)?.filter(|_| well_formed);
-        let touched = found
-            .as_ref()
-            .map(|token| backend.touch_token(token.id, now_millis()));
-        Ok::<_, RepoError>((found, touched))
+    let checked = tokio::task::spawn_blocking(move || {
+        let verdict = check(backend.as_ref(), &hash, well_formed);
+        if matches!(verdict, Verdict::Invalid) {
+            count_failure(attempt, now);
+        }
+        // Otherwise (allowed, or storage failed) dropping the attempt refunds it.
+        verdict
     })
     .await;
-    match lookup {
-        Ok(Ok((Some(token), touched))) => {
-            if let Some(Err(error)) = touched {
-                // Bookkeeping only: the token is valid, so the request proceeds.
-                tracing::warn!(%error, "could not record token use");
-            }
-            Verdict::Allowed(token)
-        }
-        Ok(Ok((None, _))) => Verdict::Invalid,
-        Ok(Err(error)) => {
-            // RepoError's Display is generic and never includes row data.
+    checked.unwrap_or_else(|_| {
+        tracing::error!("token lookup task failed");
+        Verdict::Unavailable
+    })
+}
+
+/// Looks the digest up, then records the use. Recording re-checks revocation in the
+/// same statement that writes, and only its success authorises the request: a token
+/// revoked after the lookup is rejected, and a failed write never lets a request
+/// through. `RepoError`'s Display is generic and never includes row data.
+fn check(backend: &dyn TokenBackend, hash: &TokenHash, well_formed: bool) -> Verdict {
+    let token = match backend.active_token(hash) {
+        Ok(Some(token)) if well_formed => token,
+        Ok(_) => return Verdict::Invalid,
+        Err(error) => {
             tracing::error!(%error, "token lookup failed");
-            Verdict::Unavailable
+            return Verdict::Unavailable;
         }
-        Err(_) => {
-            tracing::error!("token lookup task failed");
+    };
+    match backend.touch_token(token.id, now_millis()) {
+        Ok(()) => Verdict::Allowed(token),
+        // Revoked (or gone) since the lookup: the revocation wins.
+        Err(RepoError::NotFound { .. }) => Verdict::Invalid,
+        Err(error) => {
+            tracing::error!(%error, "could not record token use");
             Verdict::Unavailable
         }
     }

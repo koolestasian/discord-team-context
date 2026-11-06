@@ -375,11 +375,14 @@ pub trait TokenWrite {
         at: UnixMillis,
     ) -> RepoResult<AccessToken>;
 
-    /// Sets `last_used_at = at`.
+    /// Sets `last_used_at = at` if the token is not revoked, checking and writing in one
+    /// atomic step. Authentication treats success as the moment a token is accepted, so
+    /// a revocation that commits before it always wins (US-10).
     ///
     /// # Errors
     ///
-    /// [`RepoError::NotFound`] if the token does not exist; [`RepoError::Backend`].
+    /// [`RepoError::NotFound`] if the token does not exist or is revoked;
+    /// [`RepoError::Backend`].
     fn touch_token(&mut self, id: TokenId, at: UnixMillis) -> RepoResult<()>;
 
     /// Sets `revoked_at = at` on the named token. Revoking twice keeps the first time.
