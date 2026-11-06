@@ -6,6 +6,7 @@
 mod config;
 mod demo;
 mod eval;
+mod q;
 mod search;
 mod token;
 
@@ -25,7 +26,7 @@ const HELP: &str = concat!(
     "\n",
     "Offline init and doctor; live Discord support is not available yet.\n",
     "\n",
-    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS] | demo|search [ARGS]\n",
+    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS] | demo|search|q [ARGS]\n",
     "\n",
     "Options:\n",
     "  -h, --help     Print this help\n",
@@ -36,6 +37,17 @@ const HELP: &str = concat!(
     "  token         create|list|revoke access tokens (see 'teamctx token --help')\n",
     "  demo          Load a fictional team into a SQLite file (demo [--db PATH])\n",
     "  search        Search a database (search QUERY [--db PATH] [--limit N] [--timezone TZ])\n",
+    "  q             Ask a running host (see below; same results as the MCP tools)\n",
+    "\nClient commands (read TEAMCTX_URL; the token comes from TEAMCTX_TOKEN or a token file):\n",
+    "  q context TEXT [--limit N]        Ranked decisions, tasks, questions and chat for a branch\n",
+    "  q whats-new SINCE                 Changes since a date (2026-04-01) or window (24h, 7d)\n",
+    "  q record [--kind K] [--status S] [--topic TEXT] [--owner NAME] [--since S] [--cursor C]\n",
+    "  q search QUERY [--cursor C]       Search chat (query syntax as for 'search')\n",
+    "  q read ID [--before N] [--after N]   One message (m:123) or entry (D-12) with its source\n",
+    "  --json                Print the host's JSON instead of the framed text\n",
+    "  --url URL             Host URL (default: TEAMCTX_URL)\n",
+    "  --token-file PATH     Token file (default: TEAMCTX_TOKEN_FILE, else teamctx/token in the\n",
+    "                        OS data directory). It must be mode 0600 on Unix; Windows is not checked\n",
     "\nOffline options:\n",
     "  --config PATH         TOML file (default teamctx.toml if present)\n",
     "  --guild-id ID         Discord server id (required unless in file/environment)\n",
@@ -68,6 +80,7 @@ enum Command {
     Eval(eval::Options),
     Demo(demo::DemoOptions),
     Search(search::SearchOptions),
+    Q(q::QOptions),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -78,6 +91,7 @@ enum UsageError {
     Token(token::UsageError),
     Eval(eval::ArgError),
     Args(demo::ArgError),
+    Q(q::QArgError),
 }
 
 impl fmt::Display for UsageError {
@@ -90,6 +104,7 @@ impl fmt::Display for UsageError {
             Self::Token(error) => fmt::Display::fmt(error, f),
             Self::Eval(error) => fmt::Display::fmt(error, f),
             Self::Args(error) => fmt::Display::fmt(error, f),
+            Self::Q(error) => fmt::Display::fmt(error, f),
         }
     }
 }
@@ -132,6 +147,9 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, UsageError
                     .map(Command::Search)
                     .map_err(UsageError::Args);
             }
+            Some("q") => {
+                return q::parse_args(args).map(Command::Q).map_err(UsageError::Q);
+            }
             _ => return Err(UsageError::Unknown(arg)),
         },
     };
@@ -152,6 +170,7 @@ fn run(args: impl IntoIterator<Item = OsString>, out: &mut impl Write, err: &mut
         Ok(Command::Eval(options)) => return run_eval(&options, out, err),
         Ok(Command::Demo(options)) => return demo::run(&options, out, err),
         Ok(Command::Search(options)) => return search::run(&options, out, err),
+        Ok(Command::Q(options)) => return q::run(&options, out, err),
         Err(error) => {
             // If stderr is gone there is nowhere left to report that, so the error is dropped.
             let _ = writeln!(err, "error: {error}\nTry 'teamctx --help'.");

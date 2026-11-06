@@ -1616,13 +1616,17 @@ dependencies = [
 name = "teamctx"
 version = "0.0.0"
 dependencies = [
+ "reqwest",
  "serde",
+ "serde_json",
  "teamctx-core",
  "teamctx-discord",
  "teamctx-llm",
  "teamctx-server",
  "teamctx-store",
  "tempfile",
+ "tokio",
+ "tokio-util",
  "toml",
 ]
 

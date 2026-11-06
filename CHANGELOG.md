@@ -45,6 +45,17 @@ release.
 
 - `MessageRead::channel_messages_since`: oldest-first keyset paging of one channel's
   stored messages since a time, served by the `messages_channel_time` index.
+- The read-only JSON API and the `teamctx q` client. `GET /healthz` (no token) and, behind
+  the same bearer auth as `/mcp`, `GET /api/v1/{context,whats-new,record,search,read,status}`.
+  The routes run the MCP retrieval and view code on the same connection, so a response is
+  the MCP `structuredContent` plus the framed `text`, with identical ids, order, cursors and
+  untrusted-data framing; parity tests compare both over HTTP on the demo record. Unknown
+  or repeated parameters are refused with a fixed `400` message. `teamctx q <context|
+  whats-new|record|search|read> ... [--json]` reads `TEAMCTX_URL` and the token from
+  `TEAMCTX_TOKEN` or a token file (mode 0600 on Unix, looser is refused), never prints the
+  token, does not follow redirects and replaces terminal control characters in the output.
+  Not yet: `POST /api/v1/ask`, sessions and the web view; `status` only proves the record
+  is readable.
 - The MCP server's five read-only tools (`context_for`, `whats_new`, `record`, `search`,
   `read`) and the `catch_up` prompt, over streamable HTTP behind token auth. Results start
   with the untrusted-data notice, hold chat text only inside one framed block, cite message
