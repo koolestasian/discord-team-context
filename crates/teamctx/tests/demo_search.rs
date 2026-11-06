@@ -221,11 +221,14 @@ fn demo_default_location_is_the_data_dir_not_the_current_dir() -> TestResult {
     };
     assert!(expected.is_file(), "{expected:?}");
     assert!(text(&output.stdout)?.contains(path_text(&expected)?));
-    assert_eq!(
-        std::fs::read_dir(cwd.path())?.count(),
-        0,
-        "wrote into the cwd"
-    );
+    // Coverage builds drop `*.profraw` files into the cwd because `env_clear` removes
+    // LLVM_PROFILE_FILE; those are instrumentation output, not product writes.
+    let strays: Vec<_> = std::fs::read_dir(cwd.path())?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_none_or(|ext| ext != "profraw"))
+        .collect();
+    assert!(strays.is_empty(), "wrote into the cwd: {strays:?}");
 
     // `search` finds that database without --db.
     let found = run(&["search", "typeface"])?;
