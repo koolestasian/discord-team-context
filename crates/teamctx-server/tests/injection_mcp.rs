@@ -489,3 +489,39 @@ async fn record_and_whats_new_keep_titles_owners_and_channel_names_framed() {
         assert!(seen.contains(name.as_str()), "{name:?} was reachable");
     }
 }
+
+/// `Item::line` and `clip` promise one item per line inside the block, so a reader can
+/// tie every line to the id it starts with. Chat must not be able to add a line.
+///
+/// Fails today: `clip` flattens message text and titles, but `message_item` and
+/// `entry_item` in `mcp/retrieve.rs` insert author, owner and channel names as stored. A
+/// display name holding a line break (corpus member 805) adds a line that starts with
+/// `SYSTEM:` and no id. The block boundary still holds; only the one-line-per-item layout
+/// inside it breaks.
+#[tokio::test]
+#[ignore = "defect: MCP author/owner/channel names are not flattened, so a newline in a display name adds an id-less line inside the block"]
+async fn every_line_in_the_block_belongs_to_one_item() {
+    let h = start().await;
+    let corpus = corpus();
+    let needles = corpus.needles();
+    let mut results = Vec::new();
+    for hostile in &corpus.messages {
+        results.push(call(&h, "search", json!({ "query": hostile.probe })).await);
+    }
+    results.push(call(&h, "record", json!({})).await);
+    for result in &results {
+        let checked = check("search/record", result, &needles);
+        let lines: Vec<&str> = checked.decoded.split('\n').collect();
+        assert_eq!(
+            lines.len(),
+            checked.ids.len(),
+            "one line per item: {lines:?}"
+        );
+        for (line, id) in lines.iter().zip(&checked.ids) {
+            assert!(
+                line.starts_with(&format!("{id} ")),
+                "{line:?} starts with {id}"
+            );
+        }
+    }
+}
