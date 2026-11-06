@@ -593,4 +593,15 @@ mod tests {
         assert_eq!(search_plan("typeface").len(), 1);
         assert!(search_plan("the of and").is_empty());
     }
+
+    #[test]
+    fn a_huge_question_gives_a_bounded_search_plan() {
+        // `Bundle::retrieve` is public, so it must stay bounded even for text the
+        // pipeline's question limit never saw: 100,000 distinct words, no panic.
+        let question: String = (0..100_000).map(|i| format!("w{i} ")).collect();
+        let plan = search_plan(&question);
+        assert_eq!(plan.len(), MAX_TERM_QUERIES + 1);
+        assert!(plan.iter().all(|q| q.clauses.len() <= MAX_TERM_QUERIES));
+        assert_eq!(plan[0].clauses[0], Clause::Word("w0".to_owned()));
+    }
 }

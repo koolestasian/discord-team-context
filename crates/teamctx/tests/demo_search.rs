@@ -310,6 +310,29 @@ fn search_reports_bad_queries_and_missing_databases_with_exit_code_2() -> TestRe
 }
 
 #[test]
+fn oversized_queries_exit_with_code_2_without_echoing_the_query() -> TestResult {
+    let demo = Demo::load()?;
+    let marker = "not-a-real-secret-marker";
+    let long = format!("{marker} {}", "x".repeat(2_000));
+    let many = format!("{marker} {}", "word ".repeat(32));
+    for (query, expected) in [
+        (long, "error: bad query: query too long: at most 2000 bytes"),
+        (
+            many,
+            "error: bad query: too many terms: at most 32 words, phrases and filters",
+        ),
+    ] {
+        let output = demo.search(&[&query])?;
+        assert_eq!(output.status.code(), Some(2), "{expected}");
+        assert!(output.stdout.is_empty(), "{expected}");
+        let message = text(&output.stderr)?;
+        assert_eq!(message.trim_end(), expected);
+        assert!(!message.contains(marker), "{message}");
+    }
+    Ok(())
+}
+
+#[test]
 fn search_usage_mistakes_exit_with_code_2() -> TestResult {
     for args in [
         &["search"][..],
