@@ -29,6 +29,14 @@ release.
   the store never keeps; when no stored message can anchor the check it now reports the
   window as not covered instead of silently deleting nothing.
 
+### Fixed
+
+- MCP `record` and `search` paging. A page cut for size now continues right after the last
+  entry it returned, so none are skipped. `search` no longer offers a cursor past the
+  100-result limit that it would reject; its last page says the limit was reached.
+  `record`'s `owner` filter finds a member by display name through a parameterised store
+  query (`Store::member_by_display_name`) instead of probing member ids 1 to 500.
+
 ### Added
 
 - The MCP server's five read-only tools (`context_for`, `whats_new`, `record`, `search`,

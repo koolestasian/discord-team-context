@@ -24,7 +24,7 @@ use teamctx_store::Store;
 
 use super::{
     input::{self, MAX_CURSOR_OFFSET},
-    view::{Item, ItemKind, MAX_CONTEXT_CHARS, MAX_LINE_CHARS, Summary, clip},
+    view::{Item, ItemKind, MAX_CONTEXT_CHARS, MAX_LINE_CHARS, Paging, Summary, clip},
 };
 
 /// Entries and messages shown per group by `context_for` unless `limit` says otherwise.
@@ -41,8 +41,6 @@ const SEARCH_POOL: u32 = MAX_CURSOR_OFFSET + PAGE + 5;
 /// Longest text of the message a `read` is about.
 const READ_TARGET_CHARS: usize = 900;
 const MAX_NEIGHBOURS: u32 = 10;
-/// Member rows scanned when `record` filters by owner name.
-const OWNER_SCAN: i64 = 500;
 
 /// Why an operation produced no items.
 #[derive(Debug)]
@@ -296,7 +294,7 @@ pub(crate) fn context_for(ctx: &mut Ctx<'_>, text: &str, limit: Option<u32>) -> 
                 "context_for found {entry_count} record entries and {message_count} messages."
             ),
             next_step,
-            next_cursor: None,
+            paging: None,
             more,
         },
     ))
@@ -351,7 +349,7 @@ pub(crate) fn whats_new(ctx: &mut Ctx<'_>, since: UnixMillis) -> Done {
                 ctx.date(since)
             ),
             next_step,
-            next_cursor: None,
+            paging: None,
             more,
         },
     ))
@@ -416,8 +414,6 @@ pub(crate) fn record(ctx: &mut Ctx<'_>, args: &RecordArgs<'_>) -> Done {
     for entry in &entries {
         items.push(ctx.entry_item(entry)?);
     }
-    let next_cursor = (more && offset + RECORD_PAGE <= MAX_CURSOR_OFFSET)
-        .then(|| input::encode_cursor(offset + RECORD_PAGE));
     let next_step = match items.iter().find_map(|i| i.reference.as_ref()) {
         Some(first) => format!(
             "Next: use `read` with id {} for its source thread.",
@@ -430,36 +426,16 @@ pub(crate) fn record(ctx: &mut Ctx<'_>, args: &RecordArgs<'_>) -> Done {
         Summary {
             headline: format!("record returned {} entries.", entries.len()),
             next_step,
-            next_cursor,
+            // The cursor is set after any size trimming, in `view::respond`.
+            paging: Some(Paging { offset, more }),
             more: false,
         },
     ))
 }
 
-/// Finds a member by display name (case-insensitive) among the first rows. The store has
-/// no lookup by name, so this scans a bounded number of member ids.
+/// Finds a member by display name (case-insensitive), through one parameterised query.
 fn find_member(store: &Store, name: &str) -> Result<Option<MemberId>, RepoError> {
-    let mut misses = 0;
-    for raw in 1..=OWNER_SCAN {
-        let Some(id) = MemberId::new(raw) else {
-            continue;
-        };
-        match store.member(id)? {
-            Some(member) => {
-                misses = 0;
-                if member.display_name.eq_ignore_ascii_case(name.trim()) {
-                    return Ok(Some(id));
-                }
-            }
-            None => {
-                misses += 1;
-                if misses >= 50 {
-                    break;
-                }
-            }
-        }
-    }
-    Ok(None)
+    Ok(store.member_by_display_name(name)?.map(|member| member.id))
 }
 
 /// `search`: messages matching the section 9 syntax, ranked, one page at a time.
@@ -483,7 +459,7 @@ pub(crate) fn search(ctx: &mut Ctx<'_>, text: &str, cursor: Option<&str>) -> Don
         Some(text) => input::decode_cursor(text).ok_or(Failure::Rejected(
             "`cursor` is not valid; omit it to start over.",
         ))?,
-    } as usize;
+    };
     if !query
         .clauses
         .iter()
@@ -494,13 +470,13 @@ pub(crate) fn search(ctx: &mut Ctx<'_>, text: &str, cursor: Option<&str>) -> Don
         ));
     }
     let ranked = ranked_messages(ctx.store.search_messages(&query, SEARCH_POOL)?, ctx.now);
-    let page: Vec<&StoredMessage> = ranked.iter().skip(offset).take(PAGE as usize).collect();
-    let more = ranked.len() > offset + PAGE as usize;
+    let skip = offset as usize;
+    let page: Vec<&StoredMessage> = ranked.iter().skip(skip).take(PAGE as usize).collect();
+    let more = ranked.len() > skip + PAGE as usize;
     let mut items = Vec::new();
     for message in &page {
         items.push(ctx.message_item(message, false)?);
     }
-    let next_cursor = more.then(|| input::encode_cursor(offset as u32 + PAGE));
     let next_step = match items.iter().find_map(|i| i.reference.as_ref()) {
         Some(first) => format!(
             "Next: use `read` with id {} for the surrounding thread.",
@@ -513,7 +489,8 @@ pub(crate) fn search(ctx: &mut Ctx<'_>, text: &str, cursor: Option<&str>) -> Don
         Summary {
             headline: format!("search returned {} messages.", page.len()),
             next_step,
-            next_cursor,
+            // The cursor is set after any size trimming, in `view::respond`.
+            paging: Some(Paging { offset, more }),
             more: false,
         },
     ))
@@ -557,7 +534,7 @@ pub(crate) fn read(ctx: &mut Ctx<'_>, id: &str, before: Option<u32>, after: Opti
         Summary {
             headline: format!("read {id}."),
             next_step: "Next: use `search` or `context_for` to find related items.".to_owned(),
-            next_cursor: None,
+            paging: None,
             more: false,
         },
     ))

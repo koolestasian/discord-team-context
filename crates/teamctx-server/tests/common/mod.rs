@@ -51,13 +51,24 @@ impl TestDb {
         Self::build(true)
     }
 
+    /// A database filled by `seed` (synthetic data a test needs and the demo lacks).
+    pub(crate) fn with_seed(seed: impl FnOnce(&mut Store)) -> Self {
+        Self::build_with(seed)
+    }
+
     fn build(demo: bool) -> Self {
+        Self::build_with(|store| {
+            if demo {
+                teamctx_store::demo::import(store, DEMO_DATASET).expect("import demo");
+            }
+        })
+    }
+
+    fn build_with(seed: impl FnOnce(&mut Store)) -> Self {
         let dir = tempfile::tempdir().expect("temp dir");
         let path = dir.path().join("teamctx.db");
         let mut store = Store::open(&path).expect("open db");
-        if demo {
-            teamctx_store::demo::import(&mut store, DEMO_DATASET).expect("import demo");
-        }
+        seed(&mut store);
         let writer = Writer::spawn(store).expect("writer");
         Self {
             path,

@@ -301,6 +301,24 @@ impl DirectoryRead for Store {
 }
 
 impl Store {
+    /// The member whose display name equals `name`, ignoring ASCII case and surrounding
+    /// whitespace. Names are not unique; the lowest member id wins, so the answer is
+    /// stable. Parameterised SQL, so `name` may hold anything.
+    ///
+    /// # Errors
+    ///
+    /// [`RepoError::Backend`] only.
+    pub fn member_by_display_name(&self, name: &str) -> RepoResult<Option<MemberInfo>> {
+        let sql = format!(
+            "SELECT {MEMBER_COLUMNS}
+             FROM members mb
+             WHERE mb.display_name = ? COLLATE NOCASE
+             ORDER BY mb.id
+             LIMIT 1"
+        );
+        query_optional(&self.conn, &sql, [name.trim()], member_row)
+    }
+
     fn messages_sql(&self, sql: &str, values: Vec<Value>) -> RepoResult<Vec<StoredMessage>> {
         query_all(&self.conn, sql, params_from_iter(values), |r| {
             message_row(&self.conn, r)
@@ -627,5 +645,72 @@ impl TokenRead for Store {
              ORDER BY t.name"
         );
         query_all(&self.conn, &sql, [], token_row)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn store_with_members(names: &[&str]) -> Store {
+        let mut db = Store::in_memory().unwrap();
+        let source = db
+            .upsert_source(SourceKind::Discord, Snowflake::new(1).unwrap(), "Fiction")
+            .unwrap();
+        for (n, name) in names.iter().enumerate() {
+            let member = Member {
+                id: Snowflake::new(100 + n as u64).unwrap(),
+                display_name: (*name).to_owned(),
+                is_bot: false,
+            };
+            db.apply_event(
+                source,
+                &SourceEvent::MemberUpsert(member),
+                UnixMillis::from_millis(1),
+            )
+            .unwrap();
+        }
+        db
+    }
+
+    #[test]
+    fn member_lookup_by_name_ignores_case_and_edge_whitespace() {
+        let db = store_with_members(&["Piper Fiction", "Quinn Invented"]);
+        let found = db
+            .member_by_display_name("  quinn INVENTED ")
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.display_name, "Quinn Invented");
+        assert!(db.member_by_display_name("Quinn").unwrap().is_none());
+        assert!(db.member_by_display_name("").unwrap().is_none());
+    }
+
+    #[test]
+    fn member_lookup_treats_the_name_as_data() {
+        let db = store_with_members(&["Piper Fiction"]);
+        for hostile in ["' OR 1=1 --", "%", "Piper%", "Piper_Fiction"] {
+            assert!(db.member_by_display_name(hostile).unwrap().is_none());
+        }
+    }
+
+    #[test]
+    fn member_lookup_finds_ids_after_a_gap_and_far_from_the_start() {
+        let names: Vec<String> = (0..700).map(|n| format!("Filler {n}")).collect();
+        let mut refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        refs.push("Zed Lateman");
+        let db = store_with_members(&refs);
+        // Leave a hole of 300 ids in front of the late member.
+        db.conn
+            .execute("DELETE FROM members WHERE id BETWEEN 100 AND 400", [])
+            .unwrap();
+        let found = db.member_by_display_name("zed lateman").unwrap().unwrap();
+        assert!(found.id.get() > 500, "{}", found.id);
+    }
+
+    #[test]
+    fn duplicate_names_resolve_to_the_lowest_id() {
+        let db = store_with_members(&["Same Name", "same name"]);
+        let found = db.member_by_display_name("SAME NAME").unwrap().unwrap();
+        assert_eq!(found.id.get(), 1);
     }
 }

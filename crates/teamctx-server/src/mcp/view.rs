@@ -20,6 +20,8 @@ use teamctx_core::{
     time::UnixMillis,
 };
 
+use super::input::{self, MAX_CURSOR_OFFSET};
+
 /// The most characters one tool result may serialise to: 7,600, about 1,900 tokens, under
 /// the 2,000-token budget with room for protocol framing.
 pub(crate) const MAX_RESULT_CHARS: usize = 7_600;
@@ -181,18 +183,67 @@ pub(crate) fn clip(text: &str, max: usize) -> String {
     cut
 }
 
+/// Where a page of a paged tool (`search`, `record`) sits. One item is one result, so the
+/// next cursor is the page's offset plus the number of items actually returned.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Paging {
+    /// Offset of the page's first result.
+    pub(crate) offset: u32,
+    /// More results exist after the page the tool fetched, before any size trimming.
+    pub(crate) more: bool,
+}
+
 /// The parts of a result besides its items.
 #[derive(Debug)]
 pub(crate) struct Summary {
     /// A line written by this program (counts and filters, no chat text).
     pub(crate) headline: String,
     pub(crate) next_step: String,
-    pub(crate) next_cursor: Option<String>,
-    /// More exist than `items` holds, before any size trimming.
+    /// Set by tools that page. The cursor is worked out in [`respond`], after trimming, so
+    /// it never skips results that were cut for size.
+    pub(crate) paging: Option<Paging>,
+    /// More exist than `items` holds, before any size trimming. For paged tools the cursor
+    /// says so instead, and this stays false.
     pub(crate) more: bool,
 }
 
-fn build(items: &[Item], summary: &Summary, truncated: bool) -> CallToolResult {
+/// What follows a paged result.
+struct Tail {
+    cursor: Option<String>,
+    /// More results exist but no cursor can reach them.
+    capped: bool,
+}
+
+fn tail(paging: Option<Paging>, kept: usize, fetched: usize) -> Tail {
+    let none = Tail {
+        cursor: None,
+        capped: false,
+    };
+    let Some(paging) = paging else {
+        return none;
+    };
+    if kept == 0 || (!paging.more && kept >= fetched) {
+        return none;
+    }
+    let next = u32::try_from(kept)
+        .ok()
+        .and_then(|kept| paging.offset.checked_add(kept));
+    match next {
+        Some(next) if next <= MAX_CURSOR_OFFSET => Tail {
+            cursor: Some(input::encode_cursor(next)),
+            capped: false,
+        },
+        _ => Tail {
+            cursor: None,
+            capped: true,
+        },
+    }
+}
+
+/// Appended to `next_step` when results exist beyond the cursor limit.
+const CAP_NOTE: &str = " Result limit reached; narrow the query or filters to see the rest.";
+
+fn build(items: &[Item], summary: &Summary, truncated: bool, tail: &Tail) -> CallToolResult {
     let block = items
         .iter()
         .map(|item| item.line.as_str())
@@ -202,20 +253,20 @@ fn build(items: &[Item], summary: &Summary, truncated: bool) -> CallToolResult {
     if truncated {
         footer.push_str(" Output was shortened; ask for fewer items or page.");
     }
-    if let Some(cursor) = &summary.next_cursor {
+    if let Some(cursor) = &tail.cursor {
         footer.push_str(&format!(" Next page: cursor \"{cursor}\"."));
     }
-    let text = format!(
-        "{}\n\n{footer}\n{}",
-        framing::frame(&block),
-        summary.next_step
-    );
+    let mut next_step = summary.next_step.clone();
+    if tail.capped {
+        next_step.push_str(CAP_NOTE);
+    }
+    let text = format!("{}\n\n{footer}\n{next_step}", framing::frame(&block));
     let output = ToolOutput {
         notice: NOTICE.to_owned(),
         items: items.iter().filter_map(|i| i.reference.clone()).collect(),
         truncated,
-        next_cursor: summary.next_cursor.clone(),
-        next_step: summary.next_step.clone(),
+        next_cursor: tail.cursor.clone(),
+        next_step,
     };
     let mut result = CallToolResult::success(vec![ContentBlock::text(text)]);
     result.structured_content = serde_json::to_value(output).ok();
@@ -227,16 +278,21 @@ pub(crate) fn result_chars(result: &CallToolResult) -> usize {
     serde_json::to_string(result).map_or(usize::MAX, |s| s.chars().count())
 }
 
-/// Builds a result and drops trailing items until it fits [`MAX_RESULT_CHARS`].
+/// Builds a result and drops trailing items until it fits [`MAX_RESULT_CHARS`]. The next
+/// cursor starts after the last item kept, and results past the cursor limit are reported
+/// rather than offered as a cursor [`input::decode_cursor`] would refuse.
 pub(crate) fn respond(mut items: Vec<Item>, summary: &Summary) -> CallToolResult {
-    let mut truncated = summary.more;
+    let fetched = items.len();
+    let mut trimmed = false;
     loop {
-        let result = build(&items, summary, truncated);
+        let tail = tail(summary.paging, items.len(), fetched);
+        let truncated = summary.more || trimmed || tail.capped;
+        let result = build(&items, summary, truncated, &tail);
         if result_chars(&result) <= MAX_RESULT_CHARS || items.is_empty() {
             return result;
         }
         items.pop();
-        truncated = true;
+        trimmed = true;
     }
 }
 
@@ -267,7 +323,7 @@ mod tests {
         Summary {
             headline: "Found 1 item.".to_owned(),
             next_step: "Next: use `read` with id m:1.".to_owned(),
-            next_cursor: None,
+            paging: None,
             more: false,
         }
     }
@@ -299,6 +355,51 @@ mod tests {
         assert!((1..60).contains(&kept), "{kept}");
     }
 
+    fn paged(offset: u32, more: bool) -> Summary {
+        Summary {
+            paging: Some(Paging { offset, more }),
+            ..summary()
+        }
+    }
+
+    fn cursor_of(result: &CallToolResult) -> Option<String> {
+        let structured = result.structured_content.as_ref()?;
+        structured["next_cursor"].as_str().map(str::to_owned)
+    }
+
+    #[test]
+    fn a_trimmed_page_continues_after_the_last_item_it_kept() {
+        let long = "<".repeat(MAX_LINE_CHARS);
+        let items: Vec<Item> = (1..=8).map(|n| message_item(n, &long)).collect();
+        let result = respond(items, &paged(16, false));
+        let kept = result.structured_content.as_ref().unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .len();
+        assert!((1..8).contains(&kept), "{kept}");
+        let offset = input::decode_cursor(&cursor_of(&result).expect("a cursor"));
+        assert_eq!(offset, Some(16 + kept as u32));
+    }
+
+    #[test]
+    fn the_last_untrimmed_page_has_no_cursor() {
+        let items = vec![message_item(1, "a"), message_item(2, "b")];
+        assert_eq!(cursor_of(&respond(items, &paged(0, false))), None);
+    }
+
+    #[test]
+    fn a_cursor_is_only_offered_inside_the_accepted_range() {
+        let page = || (1..=5).map(|n| message_item(n, "x")).collect::<Vec<_>>();
+        let at_limit = respond(page(), &paged(95, true));
+        let cursor = cursor_of(&at_limit).expect("cursor at the limit");
+        assert_eq!(input::decode_cursor(&cursor), Some(100));
+        let past = respond(page(), &paged(100, true));
+        assert_eq!(cursor_of(&past), None);
+        let structured = past.structured_content.unwrap();
+        assert_eq!(structured["truncated"], true);
+        assert!(structured["next_step"].as_str().unwrap().contains("limit"));
+    }
+
     #[test]
     fn structured_content_matches_the_output_schema() {
         let mut with_everything = message_item(1, "text");
@@ -307,7 +408,10 @@ mod tests {
             reference.context = true;
         }
         let mut summary = summary();
-        summary.next_cursor = Some("v1.5".to_owned());
+        summary.paging = Some(Paging {
+            offset: 4,
+            more: true,
+        });
         let result = respond(vec![with_everything, message_item(2, "more")], &summary);
         let structured = result.structured_content.unwrap();
         let schema = serde_json::Value::Object((*output_schema()).clone());
