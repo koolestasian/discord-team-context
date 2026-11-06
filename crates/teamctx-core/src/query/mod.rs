@@ -3,12 +3,19 @@
 //! rank higher the more of them match. Date boundaries are resolved outside core at
 //! midnight in `server.timezone`: `after` inclusive, `before` exclusive. Bind filters as
 //! SQL parameters separately.
+//!
+//! Size limits (all query text is untrusted): [`parse`] rejects input over
+//! [`MAX_QUERY_BYTES`] bytes and more than [`MAX_CLAUSES`] clauses. The compilers below
+//! use at most [`MAX_CLAUSES`] terms even for a hand-built [`Query`], so no input can
+//! make the FTS expression, or the work to build it, grow without bound.
+
+use std::collections::HashSet;
 
 pub mod ast;
 mod parser;
 mod stopwords;
 pub use ast::{Clause, Query};
-pub use parser::{ParseQueryError, parse};
+pub use parser::{MAX_CLAUSES, MAX_QUERY_BYTES, ParseQueryError, parse};
 pub use stopwords::is_stopword;
 
 /// Quotes one text literal for an FTS5 MATCH expression. NUL becomes a space because
@@ -32,28 +39,41 @@ fn quote(text: &str) -> String {
 /// operators, column filters (`title:x`), `*`, `-` and parentheses in user text stay
 /// literals. The only operators in the output are the `AND`, `OR` and parentheses
 /// added here.
+///
+/// Size: at most [`MAX_CLAUSES`] terms are used, so a hand-built [`Query`] that never
+/// went through [`parse`] still compiles to a bounded expression. Phrases are required,
+/// so they are kept first, in order; the first distinct bare words fill the rest. A
+/// parsed query has at most [`MAX_CLAUSES`] clauses, so nothing it contains is dropped.
 #[must_use]
 pub fn fts_expression(query: &Query) -> Option<String> {
-    let mut all_words: Vec<&str> = Vec::new();
-    let mut phrases: Vec<String> = Vec::new();
-    for clause in &query.clauses {
-        match clause {
-            Clause::Word(text) => all_words.push(text),
-            Clause::Phrase(text) => phrases.push(quote(text)),
-            _ => {}
-        }
-    }
+    let phrases: Vec<String> = query
+        .clauses
+        .iter()
+        .filter_map(|clause| match clause {
+            Clause::Phrase(text) => Some(quote(text)),
+            _ => None,
+        })
+        .take(MAX_CLAUSES)
+        .collect();
+    let all_words = || {
+        query.clauses.iter().filter_map(|clause| match clause {
+            Clause::Word(text) => Some(text.as_str()),
+            _ => None,
+        })
+    };
+    let budget = MAX_CLAUSES - phrases.len();
     let mut words: Vec<&str> = Vec::new();
-    let mut seen: Vec<String> = Vec::new();
-    for word in all_words.iter().copied().filter(|word| !is_stopword(word)) {
-        let key = word.to_lowercase();
-        if !seen.contains(&key) {
-            seen.push(key);
+    let mut seen: HashSet<String> = HashSet::new();
+    for word in all_words().filter(|word| !is_stopword(word)) {
+        if words.len() == budget {
+            break;
+        }
+        if seen.insert(word.to_lowercase()) {
             words.push(word);
         }
     }
     if words.is_empty() && phrases.is_empty() {
-        words = all_words;
+        words = all_words().take(MAX_CLAUSES).collect();
     }
     let alternatives: Vec<String> = words.into_iter().map(quote).collect();
     let mut parts = Vec::new();
@@ -73,6 +93,7 @@ pub fn fts_expression(query: &Query) -> Option<String> {
 /// Compiles the text clauses with every term required (AND): words and phrases alike,
 /// no stopword removal. Used where text narrows a list, such as the `topic` filter of
 /// `list_entries`, rather than ranking a question. Escaping is as for [`fts_expression`].
+/// Only the first [`MAX_CLAUSES`] terms are used, so the expression stays bounded.
 #[must_use]
 pub fn fts_expression_all(query: &Query) -> Option<String> {
     let terms: Vec<_> = query
@@ -81,6 +102,7 @@ pub fn fts_expression_all(query: &Query) -> Option<String> {
             Clause::Word(text) | Clause::Phrase(text) => Some(quote(text)),
             _ => None,
         })
+        .take(MAX_CLAUSES)
         .collect();
     (!terms.is_empty()).then(|| terms.join(" AND "))
 }
@@ -88,10 +110,12 @@ pub fn fts_expression_all(query: &Query) -> Option<String> {
 /// Splits a branch or task description into lowercase literal terms, removes initial
 /// git prefixes and the stopword list ([`is_stopword`]), and deduplicates while
 /// preserving order. No filter syntax is interpreted. An input with no useful terms
-/// yields an empty AST.
+/// yields an empty AST. At most the first [`MAX_CLAUSES`] distinct terms are kept, and
+/// reading stops there, so long text costs time linear in its length at most.
 #[must_use]
 pub fn context_query(text: &str) -> Query {
     let mut words = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
     for (index, word) in text
         .split(|c: char| !c.is_alphanumeric())
         .filter(|s| !s.is_empty())
@@ -114,11 +138,15 @@ pub fn context_query(text: &str) -> Query {
                     | "release"
             ))
             || is_stopword(&word)
-            || words.contains(&word)
+            || seen.contains(&word)
         {
             continue;
         }
+        seen.insert(word.clone());
         words.push(word);
+        if words.len() == MAX_CLAUSES {
+            break;
+        }
     }
     Query {
         clauses: words.into_iter().map(Clause::Word).collect(),
@@ -289,5 +317,107 @@ mod tests {
                     .collect::<Vec<_>>()
             );
         }
+    }
+
+    /// Splits an expression into its quoted literals, unescaped.
+    fn literals(expression: &str) -> Vec<String> {
+        let mut found = Vec::new();
+        let mut current: Option<String> = None;
+        let mut chars = expression.chars().peekable();
+        while let Some(c) = chars.next() {
+            match (&mut current, c) {
+                (None, '"') => current = Some(String::new()),
+                (Some(text), '"') if chars.peek() == Some(&'"') => {
+                    chars.next();
+                    text.push('"');
+                }
+                (Some(_), '"') => found.extend(current.take()),
+                (Some(text), c) => text.push(c),
+                (None, _) => {}
+            }
+        }
+        found
+    }
+
+    fn many(count: usize, make: impl Fn(usize) -> Clause) -> Query {
+        Query {
+            clauses: (0..count).map(make).collect(),
+        }
+    }
+
+    #[test]
+    fn hand_built_queries_compile_to_a_bounded_expression() {
+        // 100,000 distinct words used to take seconds (linear de-duplication) and built
+        // a 100,000-term expression. Now the first MAX_CLAUSES distinct words are kept.
+        let query = many(100_000, |i| Clause::Word(format!("w{i}")));
+        let expression = fts_expression(&query).unwrap();
+        let terms = literals(&expression);
+        assert_eq!(terms.len(), MAX_CLAUSES);
+        assert_eq!(terms[0], "w0");
+        assert_eq!(terms[MAX_CLAUSES - 1], format!("w{}", MAX_CLAUSES - 1));
+
+        // Repeats (ignoring case) and stopwords do not use up the budget.
+        let mut clauses = vec![Clause::Word("the".to_owned()); 50_000];
+        clauses.extend((0..50_000).map(|i| Clause::Word(["W", "w"][i % 2].to_owned())));
+        clauses.extend((0..100).map(|i| Clause::Word(format!("x{i}"))));
+        let terms = literals(&fts_expression(&Query { clauses }).unwrap());
+        assert_eq!(terms.len(), MAX_CLAUSES);
+        assert_eq!(terms[0], "W");
+        assert_eq!(terms[1], "x0");
+
+        // Stopword-only fallback is bounded too.
+        let query = many(100_000, |_| Clause::Word("the".to_owned()));
+        assert_eq!(
+            literals(&fts_expression(&query).unwrap()).len(),
+            MAX_CLAUSES
+        );
+
+        // Phrases are required, so they take the budget first; words fill the rest.
+        let query = many(100_000, |i| Clause::Phrase(format!("p {i}")));
+        let terms = literals(&fts_expression(&query).unwrap());
+        assert_eq!(terms.len(), MAX_CLAUSES);
+        assert_eq!(terms[0], "p 0");
+        let mut clauses = vec![Clause::Phrase("full text".to_owned())];
+        clauses.extend((0..100_000).map(|i| Clause::Word(format!("w{i}"))));
+        let expression = fts_expression(&Query { clauses }).unwrap();
+        let terms = literals(&expression);
+        assert_eq!(terms.len(), MAX_CLAUSES);
+        assert!(expression.ends_with(" AND \"full text\""), "{expression}");
+
+        // The all-terms form is bounded the same way.
+        let query = many(100_000, |i| Clause::Word(format!("w{i}")));
+        let terms = literals(&fts_expression_all(&query).unwrap());
+        assert_eq!(terms.len(), MAX_CLAUSES);
+        assert_eq!(terms[0], "w0");
+    }
+
+    #[test]
+    fn parsed_queries_are_never_truncated() {
+        // Anything `parse` accepts fits the term cap, so search results never change.
+        let words: Vec<String> = (0..MAX_CLAUSES).map(|i| format!("w{i}")).collect();
+        let query = parse(&words.join(" ")).unwrap();
+        assert_eq!(literals(&fts_expression(&query).unwrap()), words);
+        assert_eq!(literals(&fts_expression_all(&query).unwrap()), words);
+    }
+
+    #[test]
+    fn context_query_keeps_at_most_the_term_cap() {
+        let text: String = (0..100_000).map(|i| format!("w{i} ")).collect();
+        let clauses = context_query(&text).clauses;
+        assert_eq!(clauses.len(), MAX_CLAUSES);
+        assert_eq!(clauses[0], Clause::Word("w0".to_owned()));
+        assert_eq!(
+            clauses[MAX_CLAUSES - 1],
+            Clause::Word(format!("w{}", MAX_CLAUSES - 1))
+        );
+        // Repeats and stopwords are skipped without using up the cap.
+        let text = format!("{}{}", "the Same same ".repeat(50_000), "unique");
+        assert_eq!(
+            context_query(&text).clauses,
+            [
+                Clause::Word("same".to_owned()),
+                Clause::Word("unique".to_owned())
+            ]
+        );
     }
 }
