@@ -447,7 +447,9 @@ the web view is configured. Every item ends with a jump link
   `before:/after:YYYY-MM-DD`. Parsed in `core`, compiled to parameterised SQL. User
   text is never concatenated into SQL; FTS terms are escaped. Bare words match any
   term (OR, after dropping a fixed list of stopwords) and rank higher the more of them
-  match; quoted phrases and filters are required (AND).
+  match; quoted phrases and filters are required (AND). A query is at most 2,000 bytes
+  and 32 clauses (words, phrases and filters), and FTS expressions use at most 32 terms,
+  so hostile input cannot make a search cost unbounded CPU.
 - **Ranking:** `bm25()` combined with recency decay and a boost for record entries.
   The exact formula lives in `core::rank` with table-driven tests on the demo dataset.
 - **Filter semantics** (maintainer clarification, 2026-11-05): all clauses, including

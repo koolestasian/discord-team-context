@@ -88,3 +88,10 @@ release.
 ### Removed
 
 - `docs/guides/repo-settings.md`, a maintainer-only checklist of GitHub settings.
+
+### Security
+
+- Search queries are limited to 2,000 bytes and 32 words, phrases and filters; longer
+  ones fail with "query too long" or "too many terms" (exit code 2 in `teamctx search`).
+  Compiled full-text expressions and `context_for` terms are capped at 32 as well. Before,
+  a query of 100,000 words took seconds of CPU and built an unbounded FTS5 expression.
