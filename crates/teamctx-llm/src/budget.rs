@@ -1,8 +1,8 @@
 //! Per-member budgets (plan section 11, step 6), backed by the `llm_usage` table.
 //!
-//! The pipeline talks to the table through [`UsageLedger`]. The store crate implements
-//! the trait over `llm_usage` when the host is wired; this crate ships an in-memory
-//! ledger for tests and demos.
+//! The pipeline talks to the table through [`UsageLedger`]. [`StoreLedger`] implements
+//! it over `llm_usage` (all SQL stays in the store crate); [`InMemoryLedger`] is for
+//! tests and demos.
 //!
 //! # Reserve, call, settle
 //!
@@ -23,12 +23,15 @@
 
 use std::error::Error as StdError;
 use std::fmt;
+use std::path::Path;
 use std::sync::{Mutex, PoisonError};
 
 use thiserror::Error;
 
 use teamctx_core::id::MemberId;
+use teamctx_core::repo::RepoError;
 use teamctx_core::time::UnixMillis;
+use teamctx_store::usage::{Reservation as StoreReservation, UsageDb, UsageRecord};
 
 use crate::error::AskError;
 
@@ -245,6 +248,100 @@ pub trait UsageLedger {
     ///
     /// [`LedgerError`] if the backend fails; the reservation then keeps counting.
     fn settle(&self, reservation: ReservationId, entry: &UsageEntry) -> Result<(), LedgerError>;
+}
+
+impl From<RepoError> for LedgerError {
+    fn from(error: RepoError) -> Self {
+        Self::new(error)
+    }
+}
+
+impl From<RepoError> for ReserveError {
+    fn from(error: RepoError) -> Self {
+        Self::Ledger(error.into())
+    }
+}
+
+/// The ledger over the `llm_usage` table, so budgets survive restarts.
+///
+/// Reserve and settle each run in one SQLite transaction (see
+/// [`teamctx_store::usage`]), so concurrent or crashed questions cannot exceed a
+/// budget. It holds its own connection, separate from the runtime's single writer
+/// thread; SQLite's write lock serializes the two. Call it from a blocking worker.
+#[derive(Debug)]
+pub struct StoreLedger {
+    db: UsageDb,
+}
+
+impl StoreLedger {
+    /// Opens the database file at `path`, applying migrations if needed.
+    ///
+    /// # Errors
+    ///
+    /// [`LedgerError`] if the file cannot be opened.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, LedgerError> {
+        Ok(Self {
+            db: UsageDb::open(path)?,
+        })
+    }
+
+    /// Wraps an existing usage handle.
+    #[must_use]
+    pub fn new(db: UsageDb) -> Self {
+        Self { db }
+    }
+}
+
+fn to_record(entry: &UsageEntry) -> UsageRecord {
+    UsageRecord {
+        at: entry.at,
+        member: entry.member,
+        provider: entry.provider.clone(),
+        model: entry.model.clone(),
+        input_tokens: entry.input_tokens,
+        output_tokens: entry.output_tokens,
+        ok: entry.ok,
+    }
+}
+
+impl UsageLedger for StoreLedger {
+    fn usage_since(&self, member: MemberId, since: UnixMillis) -> Result<WindowUsage, LedgerError> {
+        let usage = self.db.usage_since(member, since)?;
+        Ok(WindowUsage {
+            questions: usage.questions,
+            tokens: usage.tokens,
+        })
+    }
+
+    fn record(&self, entry: &UsageEntry) -> Result<(), LedgerError> {
+        Ok(self.db.record(&to_record(entry))?)
+    }
+
+    fn reserve(
+        &self,
+        member: MemberId,
+        now: UnixMillis,
+        budget: &Budget,
+        tokens: u64,
+    ) -> Result<ReservationId, ReserveError> {
+        let held = self.db.reserve(member, now, tokens, |usage_since| {
+            budget.admit(now, tokens, |since| {
+                let usage = usage_since(since)?;
+                Ok(WindowUsage {
+                    questions: usage.questions,
+                    tokens: usage.tokens,
+                })
+            })
+        })?;
+        Ok(ReservationId::new(held.get()))
+    }
+
+    fn settle(&self, reservation: ReservationId, entry: &UsageEntry) -> Result<(), LedgerError> {
+        Ok(self.db.settle(
+            StoreReservation::from_raw(reservation.get()),
+            &to_record(entry),
+        )?)
+    }
 }
 
 /// One outstanding reservation in [`InMemoryLedger`].
@@ -587,6 +684,124 @@ mod tests {
         let held = Reservation::take(&ledger, &budget(), row(1, NOW, 1_000)).unwrap();
         held.settle(&row(1, NOW, 7)).unwrap();
         assert_eq!(ledger.entries(), [row(1, NOW, 7)]);
+    }
+
+    /// A temp-file database holding one fictional member (usage rows reference members).
+    fn store_ledger(path: &Path) -> (StoreLedger, MemberId) {
+        use teamctx_core::id::Snowflake;
+        use teamctx_core::repo::{DirectoryRead, IngestWrite};
+        use teamctx_core::source::{Member, SourceEvent, SourceKind};
+        use teamctx_store::Store;
+
+        let mut store = Store::open(path).unwrap();
+        let source = store
+            .upsert_source(SourceKind::Discord, Snowflake::new(1).unwrap(), "Fiction")
+            .unwrap();
+        let external = Snowflake::new(100).unwrap();
+        let person = Member {
+            id: external,
+            display_name: "Piper Fiction".to_owned(),
+            is_bot: false,
+        };
+        store
+            .apply_event(
+                source,
+                &SourceEvent::MemberUpsert(person),
+                UnixMillis::from_millis(1),
+            )
+            .unwrap();
+        let id = store
+            .member_by_external(source, external)
+            .unwrap()
+            .unwrap()
+            .id;
+        drop(store);
+        (StoreLedger::open(path).unwrap(), id)
+    }
+
+    #[test]
+    fn store_ledger_refuses_an_exhausted_budget_and_survives_a_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.db");
+        let (ledger, who) = store_ledger(&path);
+        let id = ledger.reserve(who, now(), &budget(), 900).unwrap();
+        assert!(matches!(
+            ledger.reserve(who, now(), &budget(), 101),
+            Err(ReserveError::Refused(BudgetLimit::TokensPerHour))
+        ));
+        drop(ledger);
+
+        // After a restart the unsettled reservation still counts in full.
+        let ledger = StoreLedger::open(&path).unwrap();
+        let hour_ago = UnixMillis::from_millis(NOW - HOUR_MS);
+        assert_eq!(
+            ledger.usage_since(who, hour_ago).unwrap(),
+            WindowUsage {
+                questions: 1,
+                tokens: 900
+            }
+        );
+        assert!(ledger.reserve(who, now(), &budget(), 101).is_err());
+
+        // Settling swaps it for the real usage, which frees the rest of the budget.
+        ledger.settle(id, &row(who.get(), NOW, 40)).unwrap();
+        assert_eq!(
+            ledger.usage_since(who, hour_ago).unwrap(),
+            WindowUsage {
+                questions: 1,
+                tokens: 40
+            }
+        );
+        assert!(ledger.reserve(who, now(), &budget(), 900).is_ok());
+        // Window rollover: two hours later only the day window still holds them.
+        let later = UnixMillis::from_millis(NOW + 2 * HOUR_MS);
+        assert!(ledger.reserve(who, later, &budget(), 900).is_ok());
+    }
+
+    #[test]
+    fn store_ledger_racing_threads_get_exactly_the_budget() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.db");
+        let (ledger, who) = store_ledger(&path);
+        let one = Budget {
+            max_questions_per_hour: 1,
+            ..budget()
+        };
+        let granted = std::thread::scope(|scope| {
+            let ledger = &ledger;
+            let one = &one;
+            let handles: Vec<_> = (0..8)
+                .map(|_| scope.spawn(move || ledger.reserve(who, now(), one, 10).is_ok()))
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().unwrap())
+                .filter(|&ok| ok)
+                .count()
+        });
+        assert_eq!(granted, 1);
+    }
+
+    #[test]
+    fn a_dropped_store_reservation_is_charged_in_full() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.db");
+        let (ledger, who) = store_ledger(&path);
+        let if_dropped = UsageEntry {
+            output_tokens: 800,
+            ok: false,
+            ..row(who.get(), NOW, 200)
+        };
+        drop(Reservation::take(&ledger, &budget(), if_dropped).unwrap());
+        assert_eq!(
+            ledger
+                .usage_since(who, UnixMillis::from_millis(NOW - HOUR_MS))
+                .unwrap(),
+            WindowUsage {
+                questions: 1,
+                tokens: 1_000
+            }
+        );
     }
 
     #[test]

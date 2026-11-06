@@ -16,6 +16,9 @@ release.
   storage, a failed-attempt rate limit and a `Secret` wrapper that never prints its value.
   A token revoked at any moment is rejected on the next use, and concurrent bad attempts
   cannot exceed the limit.
+- A SQLite-backed usage ledger for `/ask` budgets (`StoreLedger`). Reserving a question
+  and settling it each run in one transaction, so concurrent requests cannot exceed the
+  hourly or daily limits, and an unsettled reservation keeps counting after a restart.
 - The `/ask` pipeline (not wired to Discord yet): Anthropic and OpenAI-compatible adapters
   over plain HTTP, framed retrieval bundle, citation and URL validation that also removes
   encoded and indirect Markdown links, and per-member budgets reserved before each call.
