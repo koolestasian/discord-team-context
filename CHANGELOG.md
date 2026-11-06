@@ -30,6 +30,11 @@ release.
 - The `/ask` pipeline (not wired to Discord yet): Anthropic and OpenAI-compatible adapters
   over plain HTTP, framed retrieval bundle, citation and URL validation that also removes
   encoded and indirect Markdown links, and per-member budgets reserved before each call.
+- The Discord REST sync algorithm (not connected to Discord yet): channel and thread
+  discovery, per-channel cursors for catch-up and backfill, and a 48 hour recheck window
+  that applies missed edits and deletes. It runs against a read-only `DiscordRest` trait
+  with no write methods, saves its cursor after every page so a failed run resumes where it
+  stopped, and returns rate limits and other failures as typed errors without sleeping.
 - Mapping of Discord gateway and REST payloads to source events, with fictional recorded
   fixtures. Nothing connects to Discord yet.
 - A retrieval eval (`cargo xtask eval`, recall@10 and MRR) with a CI baseline. Bare words in
