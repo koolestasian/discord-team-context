@@ -230,6 +230,11 @@ including `/ask`. `Connector`, `EventSink` and `CursorStore` live in `teamctx-di
 The `record` tool's `since` filters on last update. Member data comes from message
 authors and interaction users rather than a privileged member gateway intent.
 
+Schema version 2 (migration `0002_record_edits.sql`, 2026-11-09) adds `record_requests`
+(request key to entry, for retry-safe creation), an index on `record_events (entry_id,
+at, id)` and triggers that make `record_events` append-only. It is a new migration because
+databases created by `0001` exist.
+
 Migrations are plain SQL files in `crates/teamctx-store/migrations/NNNN_name.sql`. They
 are applied in order, tracked with `PRAGMA user_version`, and each runs in a transaction.
 Pragmas: `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=5000`,
@@ -436,6 +441,10 @@ the web view is configured. Every item ends with a jump link
 - **Dates.** Free-text due dates ("friday", "nov 20") are parsed against the host's
   configured timezone into an absolute date, then echoed back for confirmation. A
   small parser in `core`, no dependency; unparseable input is rejected with examples.
+  Ambiguous input (`11/20`, or a bare weekday on that same weekday) is rejected too, never
+  guessed; see `core::when` and `docs/design/contracts.md`.
+- **Edits.** Owner and due date can change while an entry is live (`active` or `open`);
+  only tasks have a due date. Repeating a change is a no-op without an audit event.
 - **v0.2: suggestions.** An optional LLM job proposes candidates into a review queue
   that people accept or reject with buttons. Never auto-added.
 
@@ -600,6 +609,9 @@ record/
 - Claims cite sources as footnotes keyed by source `id`.
 - Human-captured entries use the spec's `human:` actor prefix. Since every v0.1 entry
   is human-captured, this marks them as human-confirmed.
+- OKF limits `status` to `draft|stable|deprecated`, so `status` carries that value and
+  `entry_status` the exact lifecycle status (ADR 0013, implementation notes). The `md`
+  layout is one file, `record.md` (same ADR).
 - Use cases: hand in with a school project, commit to the team's repo so agents can
   grep it, back up, move to another tool.
 - `[v0.2]` Optional live mirror to a folder or git repo.

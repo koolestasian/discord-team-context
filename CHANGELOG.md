@@ -10,6 +10,21 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- `teamctx export --format okf|md DIR [--db PATH] [--force]` writes the record as an OKF
+  0.2 bundle (`index.md`, `log.md`, one file per entry) or as one `record.md`. Chat text is
+  escaped for file names, YAML and Markdown; a non-empty directory is refused without
+  `--force`. See ADR 0013 and `docs/research/M5.md`.
+- Core: `core::when` parses due dates and "since" windows (`tomorrow`, `next friday`,
+  `nov 20`, `2026-11-20`, `3d`, `24h`) against a caller-supplied timezone and rejects
+  ambiguous input; record edit rules (`check_edit`, `NewEntry::from_message`,
+  `RequestKey`) and owner and due-date audit actions.
+- Store: the retry-safe `RecordEdit` trait (`capture_message`, `create_entry_once`,
+  `change_status_once`, `set_owner`, `set_due`) on `Store` and `WriterClient`. Migration
+  0002 adds `record_requests`, an index on `record_events` and makes `record_events`
+  append-only (schema version 2).
+
 ### Changed
 
 - The retrieval eval now measures what users get: `search` and `context_for` go through

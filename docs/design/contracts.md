@@ -10,12 +10,14 @@ or milestone builds on it. Rust doc comments hold the full contract of every ite
 | Contract | File | Plan | Filled or used by |
 |---|---|---|---|
 | `Snowflake`, row ids (`SourceId`, `ChannelId`, `MemberId`, `MessageId`, `EntryId`, `TokenId`) | `src/id.rs` | §5.3, §6 | everyone |
-| `UnixMillis`, `CalendarDate` | `src/time.rs` | §5.2, §9 | everyone |
+| `UnixMillis`, `CalendarDate`, `Weekday` | `src/time.rs` | §5.2, §9 | everyone |
+| `parse_due`, `parse_since`, `Zone`, `FixedOffset`, `DueDate`, `WhenError` | `src/when.rs` | §8 | M5 commands; `q whats-new` |
 | `SourceKind`, `ChannelKind`, `Channel`, `Member`, `Message`, `MessageRef`, `MessagePatch`, `Marker`, `SourceEvent` | `src/source.rs` | §5.3, §6, §6.1, §7.2 | Discord mapping produces (M3); store applies |
 | `EntryKind`, `EntryStatus`, `check_transition`, `StatusChange`, `ShortId`, `EntryTitle`, `Tag`, `CreatedVia`, `NewEntry`, `RecordEntry`, `RecordAction`, `RecordEvent` | `src/record.rs` | §6, §6.1, §8 | store; M4 MCP tools; M5 commands |
 | `Query`, `Clause` (syntax tree only) | `src/query/ast.rs` | §9 | parser in `src/query/parser.rs`; store compiles it to SQL |
 | Ranking | `src/rank.rs` | §9 | store search; tuned by the M2 eval |
 | Untrusted framing, citation format | `src/framing.rs`, `src/citation.rs` | §10.1, §11 | M4 MCP tools, M6 `/ask` |
+| `RecordEdit`, `EntryOutcome`, `RequestKey`, `EditField`, `check_edit` | `src/repo.rs`, `src/record.rs` | §6.1, §8 | M5 Discord commands call; store implements |
 | Repository traits and their row types, `RepoError` | `src/repo.rs` | §5.2, §6, §6.1, §8, §9, §10.1 | `teamctx-store` implements; server, Discord connector and the binary call |
 | `ParseEnumError` and the `text_enum!` macro | `src/text_enum.rs` | §6 (text columns) | internal |
 
@@ -63,6 +65,24 @@ or milestone builds on it. Rust doc comments hold the full contract of every ite
   `messages_channel_time` index (a unit test checks the query plan). The REST sync's
   deletion recheck pages through this instead of anchoring on a stored message, so the
   stored side of its window has no size cap.
+- **Dates typed by people (§8, `core::when`):** `parse_due(text, now, &zone)` gives a
+  `DueDate { date, at }`: the local day to echo back and the instant that day starts in the
+  host's timezone (`at` is what `due_at` stores). `parse_since` gives an instant. Weeks run
+  Monday to Sunday. Ambiguous input (`11/20`, a bare weekday on that weekday) and past due
+  dates are errors; errors never echo the input. The caller supplies `now` and a `Zone`;
+  core has no clock and no timezone database (`FixedOffset` covers UTC and `+02:00`).
+- **Record edits (§6.1, §8, `RecordEdit`):** a separate trait from `RecordWrite`. Owner
+  and due-date changes need a live entry (`active` or `open`); only tasks have a due date.
+  Asking for the state an entry already has changes nothing and appends no event
+  (`EntryOutcome::changed == false`). `capture_message` creates at most one entry per
+  message and kind. `create_entry_once(key, ..)` creates once per `RequestKey` (use the
+  interaction id). `change_status_once` treats a repeat with the same data as success.
+  Audit encodings added: `("owner", "<from> <to>")` with member row ids and `("due", "<from>
+  <to>")` with Unix milliseconds, `-` for none. Short ids stay `kind prefix + the shared
+  row id` (`D-1`, `T-2`, `Q-3`, `D-4`), allocated by the database in the creating
+  transaction.
+- **Audit log:** `record_events` is append-only; the database rejects updates and deletes
+  of its rows (migration 0002).
 - **Core boundary:** no I/O, no async, no clock; `thiserror` is the only external
   dependency (`crates/teamctx/tests/architecture.rs` checks it).
 
