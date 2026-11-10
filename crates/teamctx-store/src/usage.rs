@@ -18,13 +18,19 @@
 //!
 //! The budget rules themselves (limits, windows, which limit is named) live with the
 //! caller; this module hands them the window totals through a closure and keeps the SQL.
+//!
+//! # Who pays
+//!
+//! A row is charged to an [`Asker`]: a member (Discord commands) or an access token
+//! (`POST /api/v1/ask`; tokens are not linked to members). Budgets are counted per
+//! asker, so each token has its own budget, as each member does.
 
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use teamctx_core::{
-    id::MemberId,
+    id::{MemberId, TokenId},
     repo::{RepoError, RepoResult},
     time::UnixMillis,
 };
@@ -35,7 +41,38 @@ use crate::{Store, backend, invalid};
 /// (failed) and 1 (answered).
 pub const PENDING: i64 = 2;
 
-/// What one member used inside a window, reservations included.
+/// Who a usage row is charged to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Asker {
+    /// A member, for questions asked in Discord.
+    Member(MemberId),
+    /// An access token, for questions asked over the HTTP API.
+    Token(TokenId),
+}
+
+impl From<MemberId> for Asker {
+    fn from(member: MemberId) -> Self {
+        Self::Member(member)
+    }
+}
+
+impl From<TokenId> for Asker {
+    fn from(token: TokenId) -> Self {
+        Self::Token(token)
+    }
+}
+
+impl Asker {
+    /// The `(member_id, token_id)` column values: exactly one is set.
+    fn columns(self) -> (Option<i64>, Option<i64>) {
+        match self {
+            Self::Member(member) => (Some(member.get()), None),
+            Self::Token(token) => (None, Some(token.get())),
+        }
+    }
+}
+
+/// What one asker used inside a window, reservations included.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct UsageWindow {
     /// Calls made, successful or not, plus outstanding reservations.
@@ -50,7 +87,7 @@ pub struct UsageRecord {
     /// When the call was made.
     pub at: UnixMillis,
     /// Who asked.
-    pub member: MemberId,
+    pub asker: Asker,
     /// The provider name, such as `"anthropic"`.
     pub provider: String,
     /// The model name.
@@ -98,14 +135,24 @@ fn to_u64(value: i64) -> RepoResult<u64> {
     u64::try_from(value).map_err(|_| invalid("stored usage is negative"))
 }
 
-fn window(conn: &Connection, member: MemberId, since: UnixMillis) -> RepoResult<UsageWindow> {
-    let (questions, tokens): (i64, i64) = conn
-        .query_row(
+fn window(conn: &Connection, asker: Asker, since: UnixMillis) -> RepoResult<UsageWindow> {
+    // Two fixed statements rather than a built one: the column is never interpolated.
+    let (sql, id) = match asker {
+        Asker::Member(member) => (
             "SELECT COUNT(*), COALESCE(SUM(input_tokens + output_tokens), 0)
              FROM llm_usage WHERE member_id = ? AND at >= ?",
-            params![member.get(), since.as_millis()],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        )
+            member.get(),
+        ),
+        Asker::Token(token) => (
+            "SELECT COUNT(*), COALESCE(SUM(input_tokens + output_tokens), 0)
+             FROM llm_usage WHERE token_id = ? AND at >= ?",
+            token.get(),
+        ),
+    };
+    let (questions, tokens): (i64, i64) = conn
+        .query_row(sql, params![id, since.as_millis()], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })
         .map_err(backend)?;
     Ok(UsageWindow {
         questions: u32::try_from(questions).unwrap_or(u32::MAX),
@@ -114,12 +161,15 @@ fn window(conn: &Connection, member: MemberId, since: UnixMillis) -> RepoResult<
 }
 
 fn insert(conn: &Connection, record: &UsageRecord) -> RepoResult<()> {
+    let (member, token) = record.asker.columns();
     conn.execute(
-        "INSERT INTO llm_usage (at, member_id, provider, model, input_tokens, output_tokens, ok)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO llm_usage
+             (at, member_id, token_id, provider, model, input_tokens, output_tokens, ok)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         params![
             record.at.as_millis(),
-            record.member.get(),
+            member,
+            token,
             record.provider,
             record.model,
             to_i64(record.input_tokens)?,
@@ -154,14 +204,18 @@ impl UsageDb {
         self.conn.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Calls and tokens by `member` with `at >= since`, reservations counted at their
-    /// reserved size.
+    /// Calls and tokens charged to `asker` with `at >= since`, reservations counted at
+    /// their reserved size.
     ///
     /// # Errors
     ///
     /// [`RepoError::Backend`] if the query fails.
-    pub fn usage_since(&self, member: MemberId, since: UnixMillis) -> RepoResult<UsageWindow> {
-        window(&self.conn(), member, since)
+    pub fn usage_since(
+        &self,
+        asker: impl Into<Asker>,
+        since: UnixMillis,
+    ) -> RepoResult<UsageWindow> {
+        window(&self.conn(), asker.into(), since)
     }
 
     /// Appends one finished call.
@@ -173,7 +227,7 @@ impl UsageDb {
         insert(&self.conn(), record)
     }
 
-    /// Holds one question and `tokens` tokens for `member` at `now`, if `admit` allows.
+    /// Holds one question and `tokens` tokens for `asker` at `now`, if `admit` allows.
     ///
     /// `admit` receives a function that reports the member's usage from a window start
     /// to now (reservations included) and returns `Ok` when the question fits. The check
@@ -186,21 +240,24 @@ impl UsageDb {
     /// fails.
     pub fn reserve<E: From<RepoError>>(
         &self,
-        member: MemberId,
+        asker: impl Into<Asker>,
         now: UnixMillis,
         tokens: u64,
         admit: impl FnOnce(&mut dyn FnMut(UnixMillis) -> RepoResult<UsageWindow>) -> Result<(), E>,
     ) -> Result<Reservation, E> {
+        let asker = asker.into();
         let reserved = to_i64(tokens)?;
+        let (member, token) = asker.columns();
         let mut guard = self.conn();
         let tx = guard
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(backend)?;
-        admit(&mut |since| window(&tx, member, since))?;
+        admit(&mut |since| window(&tx, asker, since))?;
         tx.execute(
-            "INSERT INTO llm_usage (at, member_id, provider, model, input_tokens, output_tokens, ok)
-             VALUES (?, ?, '', '', ?, 0, ?)",
-            params![now.as_millis(), member.get(), reserved, PENDING],
+            "INSERT INTO llm_usage
+                 (at, member_id, token_id, provider, model, input_tokens, output_tokens, ok)
+             VALUES (?, ?, ?, '', '', ?, 0, ?)",
+            params![now.as_millis(), member, token, reserved, PENDING],
         )
         .map_err(backend)?;
         let id = to_u64(tx.last_insert_rowid())?;
@@ -229,14 +286,16 @@ impl UsageDb {
             .optional()
             .map_err(backend)?;
         if pending.is_some() {
+            let (member, token) = record.asker.columns();
             tx.execute(
                 "UPDATE llm_usage
-                 SET at = ?, member_id = ?, provider = ?, model = ?,
+                 SET at = ?, member_id = ?, token_id = ?, provider = ?, model = ?,
                      input_tokens = ?, output_tokens = ?, ok = ?
                  WHERE id = ?",
                 params![
                     record.at.as_millis(),
-                    record.member.get(),
+                    member,
+                    token,
                     record.provider,
                     record.model,
                     to_i64(record.input_tokens)?,

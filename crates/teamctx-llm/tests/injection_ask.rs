@@ -179,7 +179,9 @@ fn every_id(loaded: &Loaded, corpus: &Corpus) -> Vec<CitationId> {
 
 fn request(question: &str) -> AskRequest<'_> {
     AskRequest {
-        member: teamctx_core::id::MemberId::new(1).expect("member id"),
+        asker: teamctx_core::id::MemberId::new(1)
+            .expect("member id")
+            .into(),
         question,
         now: UnixMillis::from_millis(NOW),
     }

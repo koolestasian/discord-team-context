@@ -22,7 +22,7 @@ use teamctx_core::source::{
 use teamctx_core::time::UnixMillis;
 use teamctx_llm::provider::estimate_tokens;
 use teamctx_llm::{
-    Answer, AskConfig, AskError, AskPipeline, AskRequest, Budget, BudgetLimit, BundleLimits,
+    Answer, AskConfig, AskError, AskPipeline, AskRequest, Asker, Budget, BudgetLimit, BundleLimits,
     Completion, CompletionRequest, FakeProvider, InMemoryLedger, LlmError, LlmProvider,
     NOT_FOUND_TEXT, NotFoundReason, Prepared, TokenUsage, UsageEntry, UsageLedger,
 };
@@ -285,13 +285,13 @@ fn message_id(fixture: &Fixture, name: &str) -> CitationId {
     CitationId::Message(fixture.message(name))
 }
 
-fn asker() -> MemberId {
-    MemberId::new(1).unwrap()
+fn asker() -> Asker {
+    Asker::Member(MemberId::new(1).unwrap())
 }
 
 fn request(question: &str) -> AskRequest<'_> {
     AskRequest {
-        member: asker(),
+        asker: asker(),
         question,
         now: at(NOW),
     }
@@ -781,7 +781,7 @@ async fn the_hourly_question_limit_applies_per_member() {
     assert_eq!(pipe.provider().call_count(), 2);
     // Another member still can.
     let other = AskRequest {
-        member: MemberId::new(2).unwrap(),
+        asker: Asker::Member(MemberId::new(2).unwrap()),
         question: "typeface for reading",
         now: at(NOW),
     };
@@ -809,7 +809,7 @@ fn token_budgets_count_the_pending_prompt() {
     ledger
         .record(&UsageEntry {
             at: at(NOW - 3 * 60 * MINUTE),
-            member: asker(),
+            asker: asker(),
             provider: "fake".to_owned(),
             model: "m".to_owned(),
             input_tokens: 4_990,
@@ -1044,7 +1044,7 @@ fn ledger_with_tokens_left(day_limit: u64, left: u64) -> InMemoryLedger {
     ledger
         .record(&UsageEntry {
             at: at(NOW - 3 * 60 * MINUTE),
-            member: asker(),
+            asker: asker(),
             provider: "fake".to_owned(),
             model: "m".to_owned(),
             input_tokens: day_limit - left,

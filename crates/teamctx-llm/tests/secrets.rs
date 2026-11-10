@@ -231,7 +231,7 @@ async fn ask<P: LlmProvider + Debug>(
     let pipeline = AskPipeline::new(provider, AskConfig::default());
     text.push_str(&format!("{pipeline:?}\n"));
     let request = AskRequest {
-        member: MemberId::new(member).expect("member id"),
+        asker: MemberId::new(member).expect("member id").into(),
         question: QUESTION,
         now: now(),
     };
