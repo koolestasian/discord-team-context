@@ -62,6 +62,13 @@ asserts that its own canary event was captured, so an unwired capture cannot pas
 
 | live connector | `crates/teamctx-discord/tests/connector_logs.rs` | The gateway loop, ingest thread and sync worker at TRACE, fed frames whose content, author, guild and channel names carry a chat marker and a token-shaped value: malformed payloads, unknown event types, non-JSON frames, receive failures, a fatal close and a REST client that fails with the value in its error source. It asserts its own error and sync log lines were captured first. |
 | `run`, `doctor --live` | `crates/teamctx/tests/run_cli.rs` | The binary refusing bad settings (no token, named time zone, reaction capture, bad guild id, a token pasted as `--bind`) before any network call, without echoing the fake token. |
+| interactions | `crates/teamctx-discord/tests/interactions.rs` | The gateway loop and interaction service at TRACE, answering fixture interactions whose tokens are fake and whose text carries chat markers, a garbled payload and a slow (deferred) answer. It asserts the service's own lines were captured, then that no token, chat text, nickname or link from the payloads appears. |
+
+The interaction layer adds one read-only check: the write-shaped `twilight-http` calls in
+`src/http.rs` are exactly `create_response`, `update_response` and `set_guild_commands`
+(`set_global_commands` stays on the allow-list but is not used; follow-ups and deletes
+are denied by R1). The interaction token is a credential for one reply: its `Debug` is
+`***` and it must be URL-safe characters only, so it cannot change the request path.
 
 The live connector adds three read-only checks in `tests/readonly.rs`: `twilight_http`
 may be named in `crates/teamctx-discord/src/http.rs` only (so R3 sees the whole HTTP

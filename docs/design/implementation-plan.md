@@ -426,6 +426,21 @@ Responses: Discord embeds, at most 10 items each, with a "more in web view" link
 the web view is configured. Every item ends with a jump link
 `https://discord.com/channels/{guild}/{channel}/{message}`.
 
+Implementation notes (M5, 2026-11-10; `docs/research/M5.md`):
+
+- Commands are registered as guild commands on the first `READY`. Global registration
+  is not built: section 12 names no configuration field for it (open question).
+- `/catchup` without a previous catch-up covers the last 14 days. The last catch-up is
+  `user_state.last_catchup_at` (no new migration).
+- Any member who can run a command may close or edit any entry; section 8 limits
+  changes by lifecycle only, and the audit log records who did it.
+- Replies show chat-derived items (messages, titles copied from messages) only from
+  channels the person can read in Discord; a `public:true` reply only from channels
+  `@everyone` can read. Entries typed with a slash command are visible to all.
+- The task modal uses Label components (Discord deprecated action rows with text inputs
+  in modals) with a user picker for the owner. No follow-up messages are sent.
+- The "more in web view" link is not added yet: the web view is M7.
+
 ---
 
 ## 8. The record

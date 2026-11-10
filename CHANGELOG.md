@@ -12,6 +12,18 @@ release.
 
 ### Added
 
+- Discord commands (plan section 7.3), served by `teamctx run`: message context menus
+  "Mark as decision", "Mark as task" (a form with an optional owner and due date) and
+  "Mark as question"; `/decide text [replaces]`, `/decisions [topic]
+  [include_superseded]`, `/todo add|list|done`, `/question`, `/answer id message_link`,
+  `/catchup [since]` (from your last catch-up, at most 14 days), `/search query [channel]
+  [author]` and `/teamctx status`. Registered as guild commands on start. Replies are
+  visible only to you unless you pass `public:true`, never ping anyone, escape chat text
+  and only show messages from channels you can read (a public reply only what everyone
+  can read). Slow commands defer and then edit their reply. Retried interactions create
+  nothing twice; every change is in the audit log with who made it. `/ask` is not
+  registered yet. Not yet verified against a live Discord server (spike S2 is a manual
+  step in `docs/guides/discord-bot.md`).
 - `teamctx export --format okf|md DIR [--db PATH] [--force]` writes the record as an OKF
   0.2 bundle (`index.md`, `log.md`, one file per entry) or as one `record.md`. Chat text is
   escaped for file names, YAML and Markdown; a non-empty directory is refused without

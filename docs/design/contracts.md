@@ -32,6 +32,30 @@ Live connector contracts (in `crates/teamctx-discord`, not core):
 | `HostStore` | `src/store.rs` | §5.2 | writer client for writes, own read-only connection for reads |
 | `doctor::diagnose`, `doctor::check` | `src/doctor.rs` | §7.1 | pure on payloads; five `GET`s |
 | `status::HostStatus`, `StatusProvider` | `crates/teamctx-server/src/status.rs` | §10.2 | ids, times, counts, fixed text |
+| `interactions::commands::commands` | `src/interactions/commands.rs` | §7.3 | the registered set; no `/ask` until M6 |
+| `interactions::payload::{parse, Request, InteractionToken}` | `src/interactions/payload.rs` | §7.3 | raw JSON in; the token's `Debug` is `***` |
+| `interactions::handler::{handle, Context, Outcome, Reply, InteractionStore}` | `src/interactions/handler.rs` | §7.3, §8, §9 | pure; never fails, errors become fixed-text ephemeral replies |
+| `interactions::access::AccessSnapshot` | `src/interactions/access.rs` | §7.3, §13 | per-member channel visibility; fail closed |
+| `interactions::{InteractionApi, InteractionService, InteractionEvent}` | `src/interactions/service.rs` | §7.3 | answer, edit after defer, register; nothing else |
+
+Interaction invariants (pinned by tests in `src/interactions/` and
+`tests/interactions.rs`):
+
+- Every reply sets `allowed_mentions` to `{"parse": []}`; it is ephemeral (flag 64) unless
+  the person passed `public:true`; content, embed and total lengths stay within Discord's
+  limits; lists hold at most 10 items, each with a jump link when it cites a message.
+- Chat-derived text reaches a reply only through `render::inline` (one line, no control,
+  bidirectional or zero-width characters, markdown escaped, `@` defused), and only from
+  channels the person can read; public replies only from channels `@everyone` can read.
+  Entries typed with a slash command have no source channel and are visible to all.
+- Creating commands use `discord:<interaction id>` as the `RequestKey`; marking a message
+  is unique per message and kind; `/todo done` and `/answer` use `change_status_once`. A
+  retried interaction never creates or changes anything twice.
+- The actor of every write is the interaction's `member.user`, upserted as a member from
+  the interaction (display-name rule as for message authors).
+- Dates come from `core::when` in `server.timezone`; their errors are shown as written
+  (they never echo the input). `/catchup` defaults to the person's last catch-up, else 14
+  days, and never covers more than 14 days.
 
 The §5.3 `Connector` trait with `EventSink` and `CursorStore` is not introduced yet:
 with one connector, `Connector` is a concrete type over a `Gateway`, a `DiscordRest` and

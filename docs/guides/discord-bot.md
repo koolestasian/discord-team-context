@@ -139,9 +139,54 @@ finishes HTTP requests, closes the gateway, writes queued events and checkpoints
 database before exiting 0. Create access tokens with `teamctx token create NAME --db`
 pointing at the same database.
 
-If a token leaks, reset it on the Bot page, replace the process environment value and
-restart the process using it. Remove the token from any local files; resetting it is
-necessary even if a leaked copy was deleted.
+## 6. Commands in Discord (not yet verified on a real server)
+
+On `READY`, `run` registers its commands for the configured server with one bulk
+overwrite (guild commands appear at once). If the invite lacked the
+`applications.commands` scope, the log says the commands could not be registered; invite
+the bot again with the URL from `init`. Global registration is not available yet.
+
+| Where | Command | What it does |
+|---|---|---|
+| Message menu (Apps) | Mark as decision / Mark as question | Records the message; the title is copied from it |
+| Message menu (Apps) | Mark as task | Opens a form with an optional owner and due date, then records it |
+| Slash | `/decide text [replaces]` | Records a decision; `replaces:D-12` supersedes that one |
+| Slash | `/decisions [topic] [include_superseded]` | Current decisions, with author, date and jump link |
+| Slash | `/todo add text [owner] [due]` · `/todo list [owner] [status]` · `/todo done id` | Tasks |
+| Slash | `/question text` · `/answer id message_link` | Open questions and their answers |
+| Slash | `/catchup [since]` | Record changes, busiest channels and mentions of you since your last catch-up (at most 14 days) |
+| Slash | `/search query [channel] [author]` | Messages, with the query syntax of `teamctx search` |
+| Slash | `/teamctx status` | Gateway and sync state of the host |
+
+Replies are visible only to the person who ran the command unless they pass
+`public:true`. A reply only shows messages and copied titles from channels that person can
+read in Discord; a public reply only shows what `@everyone` can read. Due and "since"
+dates use `server.timezone`. `/ask` is not registered: it needs the `[llm]` pipeline,
+which this build does not have.
+
+### Spike S2: replies without Send Messages (manual)
+
+The bot is invited without Send Messages. Discord's documentation does not say in so
+many words that interaction replies work without it, and no test here can check it, so
+check it by hand on the throwaway server before trusting the setup:
+
+1. Invite the bot with the URL from `init` (66560 only) and start `run`.
+2. In a channel where the bot's role has View Channels and Read Message History but
+   **not** Send Messages (check the channel's permission overwrites), right-click a
+   message, choose **Apps → Mark as decision**. Expected: a reply visible only to you that
+   starts "Recorded as a decision".
+3. Run `/decisions` (ephemeral) and `/decisions public:true` (visible to the channel), and
+   `/catchup` (shows "thinking", then the result: a deferred reply that is edited).
+4. Run **Apps → Mark as task**, fill in the form and submit it.
+5. Record the result in `docs/research/S2.md`: what worked, the Discord client and
+   platform, and the date. If any step fails with "Missing Permissions", stop and
+   revisit ADR 0005 with the maintainer before changing the invite.
+
+## If a token leaks
+
+Reset it on the Bot page, replace the process environment value and restart the process
+using it. Remove the token from any local files; resetting it is necessary even if a
+leaked copy was deleted.
 
 ## Configuration precedence
 
