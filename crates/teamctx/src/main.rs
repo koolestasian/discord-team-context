@@ -8,6 +8,7 @@ mod demo;
 mod eval;
 mod q;
 mod search;
+mod skill;
 mod token;
 
 use std::ffi::OsString;
@@ -26,7 +27,7 @@ const HELP: &str = concat!(
     "\n",
     "Offline init and doctor; live Discord support is not available yet.\n",
     "\n",
-    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS] | demo|search|q [ARGS]\n",
+    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS] | demo|search|q|skill [ARGS]\n",
     "\n",
     "Options:\n",
     "  -h, --help     Print this help\n",
@@ -38,6 +39,7 @@ const HELP: &str = concat!(
     "  demo          Load a fictional team into a SQLite file (demo [--db PATH])\n",
     "  search        Search a database (search QUERY [--db PATH] [--limit N] [--timezone TZ])\n",
     "  q             Ask a running host (see below; same results as the MCP tools)\n",
+    "  skill         Install the Agent Skill for coding agents (skill install [--dir PATH] [--force])\n",
     "\nClient commands (read TEAMCTX_URL; the token comes from TEAMCTX_TOKEN or a token file):\n",
     "  q context TEXT [--limit N]        Ranked decisions, tasks, questions and chat for a branch\n",
     "  q whats-new SINCE                 Changes since a date (2026-04-01) or window (24h, 7d)\n",
@@ -77,6 +79,7 @@ enum Command {
     Init(config::OfflineOptions),
     Doctor(config::OfflineOptions),
     Token(token::Command),
+    Skill(skill::Command),
     Eval(eval::Options),
     Demo(demo::DemoOptions),
     Search(search::SearchOptions),
@@ -89,6 +92,7 @@ enum UsageError {
     Extra(OsString),
     Config(config::ConfigError),
     Token(token::UsageError),
+    Skill(skill::UsageError),
     Eval(eval::ArgError),
     Args(demo::ArgError),
     Q(q::QArgError),
@@ -102,6 +106,7 @@ impl fmt::Display for UsageError {
             Self::Extra(arg) => write!(f, "unexpected extra argument {arg:?}"),
             Self::Config(error) => fmt::Display::fmt(error, f),
             Self::Token(error) => fmt::Display::fmt(error, f),
+            Self::Skill(error) => fmt::Display::fmt(error, f),
             Self::Eval(error) => fmt::Display::fmt(error, f),
             Self::Args(error) => fmt::Display::fmt(error, f),
             Self::Q(error) => fmt::Display::fmt(error, f),
@@ -131,6 +136,11 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, UsageError
                 return token::parse(args)
                     .map(Command::Token)
                     .map_err(UsageError::Token);
+            }
+            Some("skill") => {
+                return skill::parse(args)
+                    .map(Command::Skill)
+                    .map_err(UsageError::Skill);
             }
             Some("eval") => {
                 return eval::parse_args(args)
@@ -167,6 +177,7 @@ fn run(args: impl IntoIterator<Item = OsString>, out: &mut impl Write, err: &mut
         Ok(Command::Init(options)) => return run_offline(true, &options, out, err),
         Ok(Command::Doctor(options)) => return run_offline(false, &options, out, err),
         Ok(Command::Token(command)) => return token::run(&command, out, err),
+        Ok(Command::Skill(command)) => return skill::run(&command, out, err),
         Ok(Command::Eval(options)) => return run_eval(&options, out, err),
         Ok(Command::Demo(options)) => return demo::run(&options, out, err),
         Ok(Command::Search(options)) => return search::run(&options, out, err),
