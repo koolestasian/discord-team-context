@@ -434,6 +434,57 @@ pub enum RecordRuleError {
     /// `replaces` was set on a task or question (plan section 7.3: `/decide` only).
     #[error("only a decision can replace a decision")]
     ReplacesOnNonDecision,
+    /// An owner or due-date change on an entry whose lifecycle is over.
+    #[error("a {status} entry can no longer be changed")]
+    NotEditable {
+        /// The terminal status the entry is in.
+        status: EntryStatus,
+    },
+    /// A request key that is empty, too long, or not printable ASCII.
+    #[error("request key must be 1 to 128 printable ASCII characters")]
+    InvalidRequestKey,
+}
+
+impl EntryStatus {
+    /// Whether the lifecycle still allows changes to the entry: `active` decisions and
+    /// `open` tasks and questions. `superseded`, `done`, `answered` and `dropped` are
+    /// final (plan section 8 has no way back).
+    #[must_use]
+    pub const fn is_live(self) -> bool {
+        matches!(self, Self::Active | Self::Open)
+    }
+}
+
+/// A field a person can change after capture (plan section 7.3: `/todo owner`, `/todo due`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditField {
+    /// Who the entry belongs to.
+    Owner,
+    /// When a task is due.
+    Due,
+}
+
+/// Checks that an owner or due-date change is allowed for an entry.
+///
+/// Rules: the entry must still be live ([`EntryStatus::is_live`]); only tasks have a due
+/// date. An owner may be set on any live entry.
+///
+/// # Errors
+///
+/// [`RecordRuleError::NotEditable`] for a finished entry, [`RecordRuleError::DueOnNonTask`]
+/// for a due date on a decision or question. The status is checked first.
+pub const fn check_edit(
+    kind: EntryKind,
+    status: EntryStatus,
+    field: EditField,
+) -> Result<(), RecordRuleError> {
+    if !status.is_live() {
+        return Err(RecordRuleError::NotEditable { status });
+    }
+    if matches!(field, EditField::Due) && !matches!(kind, EntryKind::Task) {
+        return Err(RecordRuleError::DueOnNonTask);
+    }
+    Ok(())
 }
 
 /// A request to create an entry. The store assigns the id, sets the status to
@@ -468,6 +519,40 @@ pub struct NewEntry {
 }
 
 impl NewEntry {
+    /// Captures a message as an entry (plan section 8: context menu, slash command or
+    /// reaction). The title is copied from the message text, so it is one line, at most
+    /// 200 characters, and flagged `title_is_copied` so the deletion rule can redact it.
+    /// Nothing else is set: no owner, due date, tags or `replaces`.
+    ///
+    /// `text` is untrusted chat content and is only ever stored as a title.
+    ///
+    /// # Errors
+    ///
+    /// [`RecordRuleError::EmptyTitle`] when the message has no text (for example an
+    /// attachment only). The caller then asks for an explicit title.
+    pub fn from_message(
+        kind: EntryKind,
+        message: MessageId,
+        text: &str,
+        created_by: MemberId,
+        created_via: CreatedVia,
+        created_at: UnixMillis,
+    ) -> Result<Self, RecordRuleError> {
+        Ok(Self {
+            kind,
+            title: EntryTitle::copy_from_message(text)?,
+            title_is_copied: true,
+            owner: None,
+            due_at: None,
+            source_message: Some(message),
+            created_by,
+            created_via,
+            tags: Vec::new(),
+            replaces: None,
+            created_at,
+        })
+    }
+
     /// Checks the field rules that depend on the kind.
     ///
     /// # Errors
@@ -485,6 +570,42 @@ impl NewEntry {
             return Err(RecordRuleError::ReplacesOnNonDecision);
         }
         Ok(())
+    }
+}
+
+/// The most bytes a [`RequestKey`] may have.
+pub const MAX_REQUEST_KEY_BYTES: usize = 128;
+
+/// A caller-chosen key that makes a creation request safe to retry: the same key never
+/// creates a second entry. A Discord command handler uses its interaction id, for
+/// example `slash:decide:1234567890`.
+///
+/// Invariants: 1 to [`MAX_REQUEST_KEY_BYTES`] bytes of printable ASCII (no spaces or
+/// control characters), so a key can never smuggle text that is later shown to people.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RequestKey(String);
+
+impl RequestKey {
+    /// Checks and wraps a key.
+    ///
+    /// # Errors
+    ///
+    /// [`RecordRuleError::InvalidRequestKey`] when the key is empty, too long, or has a
+    /// character other than printable ASCII.
+    pub fn new(text: &str) -> Result<Self, RecordRuleError> {
+        if text.is_empty()
+            || text.len() > MAX_REQUEST_KEY_BYTES
+            || !text.bytes().all(|b| b.is_ascii_graphic())
+        {
+            return Err(RecordRuleError::InvalidRequestKey);
+        }
+        Ok(Self(text.to_owned()))
+    }
+
+    /// The key text.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -567,6 +688,22 @@ pub enum RecordAction {
     /// The cited message was deleted and the deletion rule applied. Encoded
     /// `("source_deleted", None)`.
     SourceDeleted,
+    /// The owner changed. Encoded `("owner", Some("<from> <to>"))` with member row ids,
+    /// or `-` for nobody, for example `("owner", Some("- 4"))`.
+    OwnerChanged {
+        /// The previous owner.
+        from: Option<MemberId>,
+        /// The new owner; `None` clears it.
+        to: Option<MemberId>,
+    },
+    /// The due date changed. Encoded `("due", Some("<from> <to>"))` with Unix
+    /// milliseconds, or `-` for none, for example `("due", Some("- 1793836800000"))`.
+    DueChanged {
+        /// The previous due time.
+        from: Option<UnixMillis>,
+        /// The new due time; `None` clears it.
+        to: Option<UnixMillis>,
+    },
 }
 
 /// Text that is not a [`RecordAction`] encoding.
@@ -582,6 +719,8 @@ impl RecordAction {
             Self::Created => "created",
             Self::StatusChanged { .. } => "status",
             Self::SourceDeleted => "source_deleted",
+            Self::OwnerChanged { .. } => "owner",
+            Self::DueChanged { .. } => "due",
         }
     }
 
@@ -590,6 +729,16 @@ impl RecordAction {
     pub fn detail(self) -> Option<String> {
         match self {
             Self::StatusChanged { from, to } => Some(format!("{from} {to}")),
+            Self::OwnerChanged { from, to } => Some(format!(
+                "{} {}",
+                optional_number(from.map(MemberId::get)),
+                optional_number(to.map(MemberId::get))
+            )),
+            Self::DueChanged { from, to } => Some(format!(
+                "{} {}",
+                optional_number(from.map(UnixMillis::as_millis)),
+                optional_number(to.map(UnixMillis::as_millis))
+            )),
             Self::Created | Self::SourceDeleted => None,
         }
     }
@@ -611,8 +760,46 @@ impl RecordAction {
                     to: to.parse().map_err(|_| ParseRecordActionError)?,
                 })
             }
+            ("owner", Some(detail)) => {
+                let (from, to) = detail.split_once(' ').ok_or(ParseRecordActionError)?;
+                let member = |text| {
+                    parse_optional_number(text)?
+                        .map(|raw| MemberId::new(raw).ok_or(ParseRecordActionError))
+                        .transpose()
+                };
+                Ok(Self::OwnerChanged {
+                    from: member(from)?,
+                    to: member(to)?,
+                })
+            }
+            ("due", Some(detail)) => {
+                let (from, to) = detail.split_once(' ').ok_or(ParseRecordActionError)?;
+                Ok(Self::DueChanged {
+                    from: parse_optional_number(from)?.map(UnixMillis::from_millis),
+                    to: parse_optional_number(to)?.map(UnixMillis::from_millis),
+                })
+            }
             _ => Err(ParseRecordActionError),
         }
+    }
+}
+
+/// `-` for nothing, else the number.
+fn optional_number(value: Option<i64>) -> String {
+    value.map_or_else(|| "-".to_owned(), |value| value.to_string())
+}
+
+/// The inverse of [`optional_number`]. Only canonical text is accepted, so the encoding
+/// round-trips exactly.
+fn parse_optional_number(text: &str) -> Result<Option<i64>, ParseRecordActionError> {
+    if text == "-" {
+        return Ok(None);
+    }
+    let value: i64 = text.parse().map_err(|_| ParseRecordActionError)?;
+    if value.to_string() == text {
+        Ok(Some(value))
+    } else {
+        Err(ParseRecordActionError)
     }
 }
 
@@ -958,14 +1145,171 @@ mod tests {
     }
 
     #[test]
+    fn edits_need_a_live_entry_and_due_needs_a_task() {
+        for &kind in EntryKind::ALL {
+            for &status in kind.statuses() {
+                for field in [EditField::Owner, EditField::Due] {
+                    let expected = if !status.is_live() {
+                        Err(RecordRuleError::NotEditable { status })
+                    } else if field == EditField::Due && kind != Task {
+                        Err(RecordRuleError::DueOnNonTask)
+                    } else {
+                        Ok(())
+                    };
+                    assert_eq!(check_edit(kind, status, field), expected, "{kind} {status}");
+                }
+            }
+        }
+        // The live statuses are exactly the starting statuses.
+        for &kind in EntryKind::ALL {
+            assert!(kind.initial_status().is_live());
+        }
+        assert_eq!(
+            RecordRuleError::NotEditable { status: Done }.to_string(),
+            "a done entry can no longer be changed"
+        );
+    }
+
+    #[test]
+    fn request_keys_are_short_printable_ascii() {
+        assert_eq!(
+            RequestKey::new("slash:decide:123").unwrap().as_str(),
+            "slash:decide:123"
+        );
+        assert!(RequestKey::new(&"k".repeat(MAX_REQUEST_KEY_BYTES)).is_ok());
+        for bad in [
+            "",
+            " ",
+            "two words",
+            "tab\t",
+            "new\nline",
+            "é",
+            "\u{7f}",
+            &"k".repeat(MAX_REQUEST_KEY_BYTES + 1),
+        ] {
+            assert_eq!(
+                RequestKey::new(bad),
+                Err(RecordRuleError::InvalidRequestKey),
+                "{bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn capturing_a_message_copies_its_text_as_a_one_line_title() {
+        let message = MessageId::new(7).unwrap();
+        let by = MemberId::new(2).unwrap();
+        let at = UnixMillis::from_millis(5);
+        let entry = NewEntry::from_message(
+            Task,
+            message,
+            "  ship the beta\n\nby friday\t(please) ",
+            by,
+            CreatedVia::ContextMenu,
+            at,
+        )
+        .unwrap();
+        assert_eq!(entry.title.as_str(), "ship the beta by friday (please)");
+        assert!(entry.title_is_copied);
+        assert_eq!(entry.source_message, Some(message));
+        assert_eq!(entry.created_by, by);
+        assert_eq!(entry.created_via, CreatedVia::ContextMenu);
+        assert_eq!(entry.created_at, at);
+        assert_eq!(entry.kind, Task);
+        assert_eq!(
+            (entry.owner, entry.due_at, entry.replaces),
+            (None, None, None)
+        );
+        assert!(entry.tags.is_empty());
+        assert_eq!(entry.validate(), Ok(()));
+        for &kind in EntryKind::ALL {
+            let entry =
+                NewEntry::from_message(kind, message, "x", by, CreatedVia::Slash, at).unwrap();
+            assert_eq!(entry.validate(), Ok(()));
+        }
+        let long = "é".repeat(300);
+        let entry =
+            NewEntry::from_message(Decision, message, &long, by, CreatedVia::Slash, at).unwrap();
+        assert_eq!(entry.title.as_str().chars().count(), MAX_TITLE_CHARS);
+        assert_eq!(
+            NewEntry::from_message(Question, message, " \n ", by, CreatedVia::Slash, at),
+            Err(RecordRuleError::EmptyTitle)
+        );
+    }
+
+    #[test]
+    fn owner_and_due_actions_round_trip() {
+        let member = |raw| MemberId::new(raw).unwrap();
+        let time = UnixMillis::from_millis;
+        let actions = [
+            RecordAction::OwnerChanged {
+                from: None,
+                to: Some(member(4)),
+            },
+            RecordAction::OwnerChanged {
+                from: Some(member(4)),
+                to: Some(member(9)),
+            },
+            RecordAction::OwnerChanged {
+                from: Some(member(9)),
+                to: None,
+            },
+            RecordAction::DueChanged {
+                from: None,
+                to: Some(time(1_793_836_800_000)),
+            },
+            RecordAction::DueChanged {
+                from: Some(time(-86_400_000)),
+                to: None,
+            },
+        ];
+        for action in actions {
+            let detail = action.detail();
+            assert_eq!(
+                RecordAction::decode(action.action(), detail.as_deref()),
+                Ok(action)
+            );
+        }
+        let encoded = RecordAction::OwnerChanged {
+            from: None,
+            to: Some(member(4)),
+        };
+        assert_eq!(
+            (encoded.action(), encoded.detail().as_deref()),
+            ("owner", Some("- 4"))
+        );
+        let encoded = RecordAction::DueChanged {
+            from: None,
+            to: Some(time(1_793_836_800_000)),
+        };
+        assert_eq!(
+            (encoded.action(), encoded.detail().as_deref()),
+            ("due", Some("- 1793836800000"))
+        );
+    }
+
+    #[test]
     fn record_action_rejects_unknown_encodings() {
-        let cases: [(&str, Option<&str>); 6] = [
+        let cases: [(&str, Option<&str>); 19] = [
             ("created", Some("x")),
             ("status", None),
             ("status", Some("open")),
             ("status", Some("open finished")),
             ("edited", None),
             ("", None),
+            ("owner", None),
+            ("owner", Some("4")),
+            ("owner", Some("0 4")),
+            ("owner", Some("04 5")),
+            ("owner", Some("+4 5")),
+            ("owner", Some("a b")),
+            ("owner", Some("-1 2")),
+            ("due", None),
+            ("due", Some("1")),
+            ("due", Some("1 2 3")),
+            ("due", Some("007 2")),
+            ("due", Some("x -")),
+            ("source_deleted", Some("")),
         ];
         for (action, detail) in cases {
             assert_eq!(
