@@ -10,6 +10,36 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- `teamctx run [--config PATH] [--db PATH]`: the host. It validates the configuration
+  (flags > environment > file > defaults), refuses named time zones (no time zone
+  database is built in), enabled reaction capture (not built yet), a missing bot token
+  and a `secrets.env` that is not owner-only, all before any network call. It then opens
+  the store with the single writer, serves `/mcp`, `/api/v1` and `/healthz` (connection
+  info for the per-address auth limiter; `Host` allow-list from `server.bind` and
+  `server.public_url`; dates in `server.timezone`), and runs the Discord connector.
+  Ctrl-C or SIGTERM stops HTTP, closes the gateway, drains queued events and the writer,
+  checkpoints the WAL and exits 0. `retention.max_age_days` is applied at start and daily.
+  Not yet verified against a live Discord server.
+- Discord connector: one `twilight-gateway` shard with exactly `GUILDS`, `GUILD_MESSAGES`
+  and `MESSAGE_CONTENT`; live message, thread and channel events for the configured guild
+  only; partial `MESSAGE_UPDATE` merged with the stored row, or the message fetched with a
+  read-only `GET` when it is missing; discovery and catch-up on every start and after
+  every reconnect, background backfill, back-off on rate limits and Discord errors.
+  `twilight-http` (GET only) implements the existing read-only REST trait.
+- `teamctx doctor --live`: read-only checks that the bot sees the guild, which text,
+  announcement and forum channels it can read (channel overwrites resolved), whether it
+  holds more than View Channels and Read Message History, and whether the Message Content
+  intent is enabled. Prints no secret; channel names are escaped.
+- `teamctx mcp --stdio [--db PATH] [--timezone TZ]`: the five MCP tools over standard
+  input and output from a local database, for agents on the host machine.
+- `/api/v1/status` reports sync state when served by `run`: gateway state, last event,
+  sync runs, the current problem and each channel's cursor (ids only, no names).
+- Guards: the read-only test also pins `twilight_http` to one file, pins the doctor's
+  `GET` endpoints and forbids gateway-side sends other than the close frame; a log-capture
+  test shows chat text from the gateway never reaches the connector's logs.
+
 ### Changed
 
 - The retrieval eval now measures what users get: `search` and `context_for` go through
