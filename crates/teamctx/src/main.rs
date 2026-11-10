@@ -6,6 +6,7 @@
 mod config;
 mod demo;
 mod eval;
+mod export;
 mod q;
 mod search;
 mod skill;
@@ -27,7 +28,7 @@ const HELP: &str = concat!(
     "\n",
     "Offline init and doctor; live Discord support is not available yet.\n",
     "\n",
-    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS] | demo|search|q|skill [ARGS]\n",
+    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS] | demo|search|export|q|skill [ARGS]\n",
     "\n",
     "Options:\n",
     "  -h, --help     Print this help\n",
@@ -38,6 +39,7 @@ const HELP: &str = concat!(
     "  token         create|list|revoke access tokens (see 'teamctx token --help')\n",
     "  demo          Load a fictional team into a SQLite file (demo [--db PATH])\n",
     "  search        Search a database (search QUERY [--db PATH] [--limit N] [--timezone TZ])\n",
+    "  export        Write the record as files (export --format okf|md DIR [--db PATH] [--force])\n",
     "  q             Ask a running host (see below; same results as the MCP tools)\n",
     "  skill         Install the Agent Skill for coding agents (skill install [--dir PATH] [--force])\n",
     "\nClient commands (read TEAMCTX_URL; the token comes from TEAMCTX_TOKEN or a token file):\n",
@@ -82,6 +84,7 @@ enum Command {
     Skill(skill::Command),
     Eval(eval::Options),
     Demo(demo::DemoOptions),
+    Export(export::Options),
     Search(search::SearchOptions),
     Q(q::QOptions),
 }
@@ -95,6 +98,7 @@ enum UsageError {
     Skill(skill::UsageError),
     Eval(eval::ArgError),
     Args(demo::ArgError),
+    Export(export::ArgError),
     Q(q::QArgError),
 }
 
@@ -109,6 +113,7 @@ impl fmt::Display for UsageError {
             Self::Skill(error) => fmt::Display::fmt(error, f),
             Self::Eval(error) => fmt::Display::fmt(error, f),
             Self::Args(error) => fmt::Display::fmt(error, f),
+            Self::Export(error) => fmt::Display::fmt(error, f),
             Self::Q(error) => fmt::Display::fmt(error, f),
         }
     }
@@ -152,6 +157,11 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, UsageError
                     .map(Command::Demo)
                     .map_err(UsageError::Args);
             }
+            Some("export") => {
+                return export::parse_args(args)
+                    .map(Command::Export)
+                    .map_err(UsageError::Export);
+            }
             Some("search") => {
                 return search::parse_args(args)
                     .map(Command::Search)
@@ -180,6 +190,7 @@ fn run(args: impl IntoIterator<Item = OsString>, out: &mut impl Write, err: &mut
         Ok(Command::Skill(command)) => return skill::run(&command, out, err),
         Ok(Command::Eval(options)) => return run_eval(&options, out, err),
         Ok(Command::Demo(options)) => return demo::run(&options, out, err),
+        Ok(Command::Export(options)) => return export::run(&options, out, err),
         Ok(Command::Search(options)) => return search::run(&options, out, err),
         Ok(Command::Q(options)) => return q::run(&options, out, err),
         Err(error) => {
