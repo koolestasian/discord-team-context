@@ -41,7 +41,10 @@ impl fmt::Debug for Store {
 
 /// Schema migrations in order. Entry `n` takes the database from `user_version` `n` to
 /// `n + 1`, so a new migration is one new line here.
-const MIGRATIONS: &[&str] = &[include_str!("../migrations/0001_init.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("../migrations/0001_init.sql"),
+    include_str!("../migrations/0002_record_edits.sql"),
+];
 
 /// Reads `PRAGMA user_version`, which counts the migrations already applied.
 fn schema_version(conn: &Connection) -> RepoResult<usize> {

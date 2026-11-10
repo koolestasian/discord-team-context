@@ -24,6 +24,36 @@ enum Command {
         Reply<RecordEntry>,
     ),
     Catchup(MemberId, UnixMillis, Reply<()>),
+    Capture(
+        EntryKind,
+        MessageId,
+        MemberId,
+        CreatedVia,
+        UnixMillis,
+        Reply<EntryOutcome>,
+    ),
+    CreateOnce(RequestKey, NewEntry, Reply<EntryOutcome>),
+    StatusOnce(
+        ShortId,
+        StatusChange,
+        MemberId,
+        UnixMillis,
+        Reply<EntryOutcome>,
+    ),
+    Owner(
+        ShortId,
+        Option<MemberId>,
+        MemberId,
+        UnixMillis,
+        Reply<EntryOutcome>,
+    ),
+    Due(
+        ShortId,
+        Option<UnixMillis>,
+        MemberId,
+        UnixMillis,
+        Reply<EntryOutcome>,
+    ),
     CreateToken(String, TokenHash, String, UnixMillis, Reply<AccessToken>),
     TouchToken(TokenId, UnixMillis, Reply<()>),
     RevokeToken(String, UnixMillis, Reply<AccessToken>),
@@ -94,6 +124,22 @@ impl Writer {
                         }
                         Command::Catchup(member, at, reply) => {
                             let _ = reply.send(store.set_last_catchup(member, at));
+                        }
+                        Command::Capture(kind, message, actor, via, at, reply) => {
+                            let _ =
+                                reply.send(store.capture_message(kind, message, actor, via, at));
+                        }
+                        Command::CreateOnce(key, entry, reply) => {
+                            let _ = reply.send(store.create_entry_once(&key, &entry));
+                        }
+                        Command::StatusOnce(id, change, actor, at, reply) => {
+                            let _ = reply.send(store.change_status_once(id, change, actor, at));
+                        }
+                        Command::Owner(id, owner, actor, at, reply) => {
+                            let _ = reply.send(store.set_owner(id, owner, actor, at));
+                        }
+                        Command::Due(id, due, actor, at, reply) => {
+                            let _ = reply.send(store.set_due(id, due, actor, at));
                         }
                         Command::CreateToken(name, hash, scopes, at, reply) => {
                             let _ = reply.send(store.create_token(&name, &hash, &scopes, at));
@@ -207,6 +253,52 @@ impl RecordWrite for WriterClient {
     }
     fn set_last_catchup(&mut self, member: MemberId, at: UnixMillis) -> RepoResult<()> {
         self.request(|r| Command::Catchup(member, at, r))
+    }
+}
+impl RecordEdit for WriterClient {
+    fn capture_message(
+        &mut self,
+        kind: EntryKind,
+        message: MessageId,
+        actor: MemberId,
+        via: CreatedVia,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome> {
+        self.request(|r| Command::Capture(kind, message, actor, via, at, r))
+    }
+    fn create_entry_once(
+        &mut self,
+        key: &RequestKey,
+        entry: &NewEntry,
+    ) -> RepoResult<EntryOutcome> {
+        self.request(|r| Command::CreateOnce(key.clone(), entry.clone(), r))
+    }
+    fn change_status_once(
+        &mut self,
+        id: ShortId,
+        change: StatusChange,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome> {
+        self.request(|r| Command::StatusOnce(id, change, actor, at, r))
+    }
+    fn set_owner(
+        &mut self,
+        id: ShortId,
+        owner: Option<MemberId>,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome> {
+        self.request(|r| Command::Owner(id, owner, actor, at, r))
+    }
+    fn set_due(
+        &mut self,
+        id: ShortId,
+        due: Option<UnixMillis>,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome> {
+        self.request(|r| Command::Due(id, due, actor, at, r))
     }
 }
 impl TokenWrite for WriterClient {

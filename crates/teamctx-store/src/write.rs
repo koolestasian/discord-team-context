@@ -874,6 +874,229 @@ impl RecordWrite for Store {
     }
 }
 
+fn outcome(entry: RecordEntry, changed: bool) -> EntryOutcome {
+    EntryOutcome { entry, changed }
+}
+
+/// The entry for a short id; the kind must match, as for every lookup by short id.
+fn entry_by_short_id(conn: &Connection, id: ShortId) -> RepoResult<RecordEntry> {
+    let entry = raw_entry(conn, id.id)?;
+    if entry.kind == id.kind {
+        Ok(entry)
+    } else {
+        Err(missing("entry"))
+    }
+}
+
+fn capture_message(
+    conn: &Connection,
+    kind: EntryKind,
+    message: MessageId,
+    actor: MemberId,
+    via: CreatedVia,
+    at: UnixMillis,
+) -> RepoResult<EntryOutcome> {
+    exists(conn, "members", actor.get(), "actor")?;
+    let sql = format!(
+        "SELECT {MESSAGE_COLUMNS}
+         FROM messages m
+         JOIN channels c ON c.id = m.channel_id
+         WHERE m.id = ?
+           AND c.is_included = 1"
+    );
+    let stored = query_optional(conn, &sql, [message.get()], |r| message_row(conn, r))?
+        .ok_or_else(|| missing("message"))?;
+    let existing = query_optional(
+        conn,
+        &format!(
+            "SELECT {ENTRY_COLUMNS}
+             FROM record_entries e
+             WHERE e.source_message_id = ?
+               AND e.kind = ?"
+        ),
+        params![message.get(), kind.as_str()],
+        entry_row,
+    )?;
+    if let Some(entry) = existing {
+        return Ok(outcome(entry, false));
+    }
+    let entry = NewEntry::from_message(kind, message, &stored.content, actor, via, at)?;
+    create_entry(conn, &entry).map(|entry| outcome(entry, true))
+}
+
+fn create_entry_once(
+    conn: &Connection,
+    key: &RequestKey,
+    entry: &NewEntry,
+) -> RepoResult<EntryOutcome> {
+    let previous = query_optional(
+        conn,
+        "SELECT entry_id
+         FROM record_requests
+         WHERE request_key = ?",
+        [key.as_str()],
+        |r| r.get::<_, i64>(0),
+    )?;
+    if let Some(raw) = previous {
+        let id = EntryId::new(raw).ok_or_else(|| invalid("invalid entry id"))?;
+        let existing = raw_entry(conn, id)?;
+        if existing.kind != entry.kind {
+            return Err(RepoError::Conflict {
+                what: "request key",
+            });
+        }
+        return Ok(outcome(existing, false));
+    }
+    let created = create_entry(conn, entry)?;
+    conn.execute(
+        "INSERT INTO record_requests (request_key, entry_id, created_at)
+         VALUES (?, ?, ?)",
+        params![key.as_str(), created.id.get(), entry.created_at.as_millis()],
+    )
+    .map_err(backend)?;
+    Ok(outcome(created, true))
+}
+
+fn change_status_once(
+    conn: &Connection,
+    id: ShortId,
+    change: StatusChange,
+    actor: MemberId,
+    at: UnixMillis,
+) -> RepoResult<EntryOutcome> {
+    let entry = entry_by_short_id(conn, id)?;
+    let repeat = entry.status == change.target()
+        && match change {
+            StatusChange::Supersede { by } => entry.superseded_by == Some(by),
+            StatusChange::Answer { message } => entry.answered_by_message == Some(message),
+            StatusChange::Done | StatusChange::Drop => true,
+        };
+    if repeat {
+        // A repeat still needs a real actor, so a bad caller is not hidden by a retry.
+        exists(conn, "members", actor.get(), "actor")?;
+        return Ok(outcome(entry, false));
+    }
+    change_status(conn, id, change, actor, at).map(|entry| outcome(entry, true))
+}
+
+fn set_owner(
+    conn: &Connection,
+    id: ShortId,
+    owner: Option<MemberId>,
+    actor: MemberId,
+    at: UnixMillis,
+) -> RepoResult<EntryOutcome> {
+    let entry = entry_by_short_id(conn, id)?;
+    check_edit(entry.kind, entry.status, EditField::Owner)?;
+    exists(conn, "members", actor.get(), "actor")?;
+    if let Some(owner) = owner {
+        exists(conn, "members", owner.get(), "owner")?;
+    }
+    if entry.owner == owner {
+        return Ok(outcome(entry, false));
+    }
+    conn.execute(
+        "UPDATE record_entries
+         SET owner_member_id = ?,
+             updated_at = max(updated_at, ?)
+         WHERE id = ?",
+        params![owner.map(MemberId::get), at.as_millis(), id.id.get()],
+    )
+    .map_err(backend)?;
+    audit(
+        conn,
+        id.id,
+        Some(actor),
+        RecordAction::OwnerChanged {
+            from: entry.owner,
+            to: owner,
+        },
+        at,
+    )?;
+    raw_entry(conn, id.id).map(|entry| outcome(entry, true))
+}
+
+fn set_due(
+    conn: &Connection,
+    id: ShortId,
+    due: Option<UnixMillis>,
+    actor: MemberId,
+    at: UnixMillis,
+) -> RepoResult<EntryOutcome> {
+    let entry = entry_by_short_id(conn, id)?;
+    check_edit(entry.kind, entry.status, EditField::Due)?;
+    exists(conn, "members", actor.get(), "actor")?;
+    if entry.due_at == due {
+        return Ok(outcome(entry, false));
+    }
+    conn.execute(
+        "UPDATE record_entries
+         SET due_at = ?,
+             updated_at = max(updated_at, ?)
+         WHERE id = ?",
+        params![due.map(UnixMillis::as_millis), at.as_millis(), id.id.get()],
+    )
+    .map_err(backend)?;
+    audit(
+        conn,
+        id.id,
+        Some(actor),
+        RecordAction::DueChanged {
+            from: entry.due_at,
+            to: due,
+        },
+        at,
+    )?;
+    raw_entry(conn, id.id).map(|entry| outcome(entry, true))
+}
+
+impl RecordEdit for Store {
+    fn capture_message(
+        &mut self,
+        kind: EntryKind,
+        message: MessageId,
+        actor: MemberId,
+        via: CreatedVia,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome> {
+        self.transaction(|conn| capture_message(conn, kind, message, actor, via, at))
+    }
+    fn create_entry_once(
+        &mut self,
+        key: &RequestKey,
+        entry: &NewEntry,
+    ) -> RepoResult<EntryOutcome> {
+        self.transaction(|conn| create_entry_once(conn, key, entry))
+    }
+    fn change_status_once(
+        &mut self,
+        id: ShortId,
+        change: StatusChange,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome> {
+        self.transaction(|conn| change_status_once(conn, id, change, actor, at))
+    }
+    fn set_owner(
+        &mut self,
+        id: ShortId,
+        owner: Option<MemberId>,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome> {
+        self.transaction(|conn| set_owner(conn, id, owner, actor, at))
+    }
+    fn set_due(
+        &mut self,
+        id: ShortId,
+        due: Option<UnixMillis>,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome> {
+        self.transaction(|conn| set_due(conn, id, due, actor, at))
+    }
+}
+
 impl TokenWrite for Store {
     fn create_token(
         &mut self,
