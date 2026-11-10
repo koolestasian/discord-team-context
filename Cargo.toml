@@ -24,7 +24,7 @@ teamctx-server = { path = "crates/teamctx-server" }
 rusqlite = { version = "0.41.1", default-features = false, features = ["bundled"] }
 tempfile = "3.27.0"
 # HTTP server and MCP (ADR 0006, spike S3).
-rmcp = { version = "3.8.0", default-features = false, features = ["server", "macros", "transport-streamable-http-server"] }
+rmcp = { version = "3.9.0", default-features = false, features = ["server", "macros", "transport-streamable-http-server"] }
 axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
 tokio-util = "0.7"
