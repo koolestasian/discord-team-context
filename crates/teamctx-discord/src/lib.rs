@@ -9,6 +9,7 @@ pub mod connector;
 pub mod doctor;
 pub mod gateway;
 pub mod http;
+pub mod interactions;
 pub mod live;
 pub mod mapping;
 pub mod permissions;

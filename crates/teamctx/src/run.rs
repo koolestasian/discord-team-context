@@ -5,8 +5,10 @@
 //! environment > file > defaults), the timezone, the bot token's presence, `secrets.env`
 //! permissions and settings this build cannot honour. Then it opens the store, spawns
 //! the single writer, serves `/mcp`, `/api/v1` and `/healthz`, and starts the Discord
-//! connector. Ctrl-C or SIGTERM stops HTTP, closes the gateway, drains the writer and
-//! checkpoints the WAL, then exits 0.
+//! connector with the interaction service (slash commands and context menus, registered
+//! as guild commands on `READY`). Ctrl-C or SIGTERM stops HTTP, closes the gateway,
+//! lets interactions in flight finish, drains the writer and checkpoints the WAL, then
+//! exits 0.
 //!
 //! The wiring ([`serve_host`]) is generic over the gateway and the REST client, so the
 //! end-to-end test runs it in-process against fakes.
@@ -23,12 +25,14 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use teamctx_core::id::Snowflake;
-use teamctx_core::repo::{IngestWrite, RepoResult};
+use teamctx_core::repo::{IngestWrite, RepoError, RepoResult};
 use teamctx_core::time::UnixMillis;
+use teamctx_core::when::{FixedOffset, Zone};
 use teamctx_discord::connector::{Clock, Connector, StatusSnapshot, Timing};
 use teamctx_discord::doctor::{self, DoctorReport, MessageContentIntent};
 use teamctx_discord::gateway::{Gateway, TwilightGateway};
 use teamctx_discord::http::TwilightRest;
+use teamctx_discord::interactions::{InteractionApi, InteractionConfig, InteractionService};
 use teamctx_discord::secret::BotToken;
 use teamctx_discord::store::HostStore;
 use teamctx_discord::sync::{DiscordRest, SyncConfig};
@@ -36,7 +40,7 @@ use teamctx_server::auth::StoreTokens;
 use teamctx_server::mcp::McpConfig;
 use teamctx_server::status::{HostStatus, StatusProvider};
 use teamctx_server::{HttpConfig, router, serve};
-use teamctx_store::{Store, Writer, WriterClient};
+use teamctx_store::{DateResolver, Store, Writer, WriterClient};
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 
@@ -51,6 +55,9 @@ const HTTP_STOP: Duration = Duration::from_secs(10);
 
 /// How long the connector may take to close the gateway and drain at shutdown.
 const CONNECTOR_STOP: Duration = Duration::from_secs(30);
+
+/// Interactions queued between the gateway loop and the interaction service.
+const INTERACTION_QUEUE: usize = 64;
 
 /// Retention runs at start and then once a day (plan section 6.1).
 const RETENTION_EVERY: Duration = Duration::from_secs(24 * 3600);
@@ -337,7 +344,7 @@ pub(crate) async fn serve_host<G, R>(
 ) -> Result<(), RunError>
 where
     G: Gateway + 'static,
-    R: DiscordRest + Send + Sync + 'static,
+    R: DiscordRest + InteractionApi + Send + Sync + 'static,
 {
     let HostParts {
         db,
@@ -351,13 +358,16 @@ where
     let read_only = || Store::open_read_only(&db).map_err(|_| RunError::Store);
     let writer = Writer::spawn(Store::open(&db).map_err(|_| RunError::Store)?)
         .map_err(|_| RunError::Store)?;
+    let zone = FixedOffset::from_seconds(settings.utc_offset_seconds)
+        .ok_or_else(|| usage("server.timezone", TIMEZONE_HELP))?;
+    let (interactions, interaction_events) = tokio::sync::mpsc::channel(INTERACTION_QUEUE);
 
     let connector = {
         let client = writer.client();
         let path = db.clone();
         Connector::new(
             gateway,
-            rest,
+            Arc::clone(&rest),
             move || -> RepoResult<HostStore> {
                 Ok(HostStore::new(
                     client.clone(),
@@ -368,8 +378,26 @@ where
             Arc::clone(&clock),
         )
         .with_timing(timing)
+        .with_interactions(interactions)
     };
     let status = connector.status();
+    // Slash commands and context menus (plan section 7.3): answers go through the same
+    // REST client, record writes through the single writer, reads through their own
+    // read-only connection with dates in `server.timezone`.
+    let service = {
+        let mut reader = read_only()?;
+        reader.set_date_resolver(midnight_in(zone));
+        InteractionService::new(
+            Arc::clone(&rest),
+            HostStore::new(writer.client(), reader),
+            InteractionConfig {
+                guild: settings.sync.guild,
+                zone,
+            },
+            status.clone(),
+            Arc::clone(&clock),
+        )
+    };
     let provider: StatusProvider = Arc::new(move || host_status(&status.snapshot()));
     let mcp = McpConfig::new(read_only()?)
         .with_clock(Arc::clone(&clock))
@@ -385,6 +413,8 @@ where
     let mut http = tokio::spawn(serve(listener, app, http_stop.clone()));
     let connector_stop = CancellationToken::new();
     let mut connector = tokio::spawn(connector.run(connector_stop.clone()));
+    let service_stop = CancellationToken::new();
+    let mut service = tokio::spawn(service.run(interaction_events, service_stop.clone()));
     let retention = (settings.retention_days > 0).then(|| {
         tokio::spawn(retention_loop(
             writer.client(),
@@ -431,6 +461,16 @@ where
         tracing::warn!("the Discord connector did not stop in time");
         connector.abort();
     }
+    // Interactions already being answered finish (bounded inside the service) before the
+    // writer drains.
+    service_stop.cancel();
+    if tokio::time::timeout(CONNECTOR_STOP, &mut service)
+        .await
+        .is_err()
+    {
+        tracing::warn!("the interaction service did not stop in time");
+        service.abort();
+    }
     if let Some(retention) = retention {
         retention.abort();
     }
@@ -445,6 +485,14 @@ where
         return Err(RunError::Http);
     }
     Ok(())
+}
+
+/// Midnight of a calendar date in `zone`, for `before:`/`after:` in `/search`.
+fn midnight_in(zone: FixedOffset) -> DateResolver {
+    Arc::new(move |date| {
+        zone.start_of_day(date)
+            .map_err(|_| RepoError::NotFound { what: "date" })
+    })
 }
 
 /// Deletes messages older than `days` (plan section 6.1). Returns how many went.

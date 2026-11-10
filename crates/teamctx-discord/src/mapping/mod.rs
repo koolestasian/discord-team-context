@@ -40,6 +40,9 @@ pub use channel::{
     map_thread_list,
 };
 pub use message::{map_message, map_message_delete, map_message_delete_bulk, map_message_update};
+/// The display-name rule, shared with the interaction layer (interaction users and
+/// resolved option users follow the same rule as message authors).
+pub(crate) use normalize::display_name;
 
 /// The result of mapping one payload.
 #[derive(Debug, Clone, PartialEq, Eq)]

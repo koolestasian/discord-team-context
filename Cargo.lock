@@ -1699,6 +1699,7 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-subscriber",
+ "twilight-model",
 ]
 
 [[package]]

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 ///
 /// Empty or whitespace-only values count as unset, so a blank nickname never hides the
 /// real name.
-pub(super) fn display_name(
+pub(crate) fn display_name(
     nick: Option<&str>,
     global_name: Option<&str>,
     username: &str,

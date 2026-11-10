@@ -31,3 +31,6 @@ tracing-subscriber.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+# The `run` wiring test fakes the interaction API, whose methods take twilight types.
+# Already in the tree through teamctx-discord.
+twilight-model.workspace = true

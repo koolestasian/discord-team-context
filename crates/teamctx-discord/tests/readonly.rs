@@ -776,6 +776,14 @@ fn product_code_has_no_discord_write_calls() {
         "crates/teamctx-discord/src/connector.rs",
         "crates/teamctx-discord/src/live.rs",
         "crates/teamctx-discord/src/doctor.rs",
+        // The interaction layer: registration, answers and deferred edits go through
+        // `http.rs`; the transport, handler and payload reader must not reach Discord
+        // any other way.
+        "crates/teamctx-discord/src/interactions/mod.rs",
+        "crates/teamctx-discord/src/interactions/service.rs",
+        "crates/teamctx-discord/src/interactions/handler.rs",
+        "crates/teamctx-discord/src/interactions/payload.rs",
+        "crates/teamctx-discord/src/interactions/commands.rs",
         "crates/teamctx/src/run.rs",
         "crates/teamctx-llm/src/http.rs",
         "crates/teamctx-server/src/lib.rs",
@@ -1131,6 +1139,29 @@ fn only_the_reviewed_rest_client_uses_twilight_http() {
     assert_eq!(
         files_naming("twilight_http"),
         ["crates/teamctx-discord/src/http.rs"]
+    );
+}
+
+#[test]
+fn the_interaction_client_makes_only_the_planned_writes() {
+    // Plan section 7.3 with ADR 0005: answer (callback), edit the deferred answer
+    // (@original) and register guild commands. Global registration has no configuration
+    // option yet, follow-ups are new messages and deleting is never allowed, so none of
+    // those may be called.
+    let tokens = lex(&product_file("crates/teamctx-discord/src/http.rs"));
+    let mut called: Vec<&str> = tokens
+        .iter()
+        .enumerate()
+        .filter_map(|(i, token)| {
+            let name = ident(Some(token))?;
+            (write_shaped(name) && in_call_or_path(&tokens, i)).then_some(name)
+        })
+        .collect();
+    called.sort_unstable();
+    called.dedup();
+    assert_eq!(
+        called,
+        ["create_response", "set_guild_commands", "update_response"]
     );
 }
 

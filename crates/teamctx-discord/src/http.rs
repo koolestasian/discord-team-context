@@ -1,11 +1,14 @@
 //! The production REST client: `twilight-http` behind the read-only [`DiscordRest`] trait
 //! (plan sections 7.2 and 7.3).
 //!
-//! Every call in this file is a `GET`. The sync uses the four [`DiscordRest`] methods;
-//! the live `doctor` uses [`TwilightRest::read`] with a [`Read`], whose variants are the
-//! only other endpoints this crate can reach. There is no method here, or anywhere in the
-//! product, that creates, edits or deletes anything; `tests/readonly.rs` fails the build
-//! if one appears.
+//! Every read in this file is a `GET`. The sync uses the four [`DiscordRest`] methods;
+//! the live `doctor` and the interaction access check use [`TwilightRest::read`] with a
+//! [`Read`], whose variants are the only other endpoints this crate reads. The only writes
+//! are the interaction surface of plan section 7.3 ([`InteractionApi`]): registering the
+//! commands, answering an interaction and editing that answer after a deferral. There is
+//! no method here, or anywhere in the product, that creates, edits or deletes messages,
+//! sends follow-ups or touches anything else; `tests/readonly.rs` fails the build if one
+//! appears.
 //!
 //! Rate limits: `twilight-http`'s built-in ratelimiter waits out route buckets before a
 //! request is sent. A `429` that still comes back is returned as
@@ -30,8 +33,12 @@ use twilight_http::Client;
 use twilight_http::api_error::ApiError;
 use twilight_http::error::{Error as HttpError, ErrorType};
 use twilight_http::response::Response;
+use twilight_model::application::command::Command;
+use twilight_model::http::interaction::InteractionResponse;
 use twilight_model::id::Id;
 
+use crate::interactions::payload::InteractionToken;
+use crate::interactions::{InteractionApi, Reply};
 use crate::secret::BotToken;
 use crate::sync::{DiscordRest, MessagesRequest, PagePosition, RestError, ThreadVisibility};
 
@@ -141,6 +148,21 @@ impl TwilightRest {
         serde_json::from_slice(&bytes).map_err(|_| transport("the response body is not JSON"))
     }
 
+    /// Sends one interaction request and drops the response unread (an edited message
+    /// body would echo chat text).
+    async fn deliver<Q, T>(&self, request: Q) -> Result<(), RestError>
+    where
+        Q: IntoFuture<Output = Result<Response<T>, HttpError>>,
+    {
+        if self.cancel.is_cancelled() {
+            return Err(shutting_down());
+        }
+        tokio::select! {
+            () = self.cancel.cancelled() => Err(shutting_down()),
+            response = request.into_future() => response.map(drop).map_err(|error| from_http(&error)),
+        }
+    }
+
     /// Runs a request to completion from the sync thread.
     fn blocking<F>(&self, future: F) -> Result<Value, RestError>
     where
@@ -201,6 +223,58 @@ impl DiscordRest for TwilightRest {
                 self.blocking(self.body(messages.after(id(message)).limit(limit)))
             }
         }
+    }
+}
+
+/// The interaction surface of plan section 7.3, and nothing else: register the commands
+/// (bulk overwrite), answer an interaction, edit that answer after a deferral. The access
+/// check reads two of the [`Read`] endpoints.
+impl InteractionApi for TwilightRest {
+    async fn install_commands(
+        &self,
+        application: Snowflake,
+        guild: Snowflake,
+        commands: &[Command],
+    ) -> Result<(), RestError> {
+        let client = self.client.interaction(id(application));
+        self.deliver(client.set_guild_commands(id(guild), commands))
+            .await
+    }
+
+    async fn respond(
+        &self,
+        application: Snowflake,
+        interaction: Snowflake,
+        token: &InteractionToken,
+        response: &InteractionResponse,
+    ) -> Result<(), RestError> {
+        let client = self.client.interaction(id(application));
+        self.deliver(client.create_response(id(interaction), token.expose(), response))
+            .await
+    }
+
+    async fn fill_deferred(
+        &self,
+        application: Snowflake,
+        token: &InteractionToken,
+        reply: &Reply,
+    ) -> Result<(), RestError> {
+        let data = reply.data();
+        let embeds = data.embeds.unwrap_or_default();
+        let mentions = data.allowed_mentions.unwrap_or_default();
+        let client = self.client.interaction(id(application));
+        let request = client
+            .update_response(token.expose())
+            .content(data.content.as_deref())
+            .embeds(Some(embeds.as_slice()))
+            .allowed_mentions(Some(&mentions));
+        self.deliver(request).await
+    }
+
+    async fn access_payloads(&self, guild: Snowflake) -> Result<(Value, Value), RestError> {
+        let guild_json = self.read(Read::Guild(guild)).await?;
+        let channels = self.read(Read::Channels(guild)).await?;
+        Ok((guild_json, channels))
     }
 }
 

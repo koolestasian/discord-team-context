@@ -50,8 +50,54 @@ fn dispatch(kind: &str, data: &Value) -> GatewayEvent {
     GatewayEvent::Text(json!({ "op": 0, "s": 1, "t": kind, "d": data }).to_string())
 }
 
+/// Read-only REST history, plus a recording of the interaction calls (answers as JSON).
 #[derive(Default)]
-struct FakeRest(Mutex<Map<u64, Value>>);
+struct FakeRest(Mutex<Map<u64, Value>>, Mutex<Vec<Value>>);
+
+impl InteractionApi for FakeRest {
+    async fn install_commands(
+        &self,
+        application: Snowflake,
+        guild: Snowflake,
+        commands: &[twilight_model::application::command::Command],
+    ) -> Result<(), RestError> {
+        self.1.lock().unwrap().push(json!({
+            "install": [application.to_string(), guild.to_string(), commands.len()]
+        }));
+        Ok(())
+    }
+    async fn respond(
+        &self,
+        _application: Snowflake,
+        _interaction: Snowflake,
+        _token: &teamctx_discord::interactions::payload::InteractionToken,
+        response: &twilight_model::http::interaction::InteractionResponse,
+    ) -> Result<(), RestError> {
+        self.1
+            .lock()
+            .unwrap()
+            .push(serde_json::to_value(response).unwrap());
+        Ok(())
+    }
+    async fn fill_deferred(
+        &self,
+        _application: Snowflake,
+        _token: &teamctx_discord::interactions::payload::InteractionToken,
+        reply: &teamctx_discord::interactions::Reply,
+    ) -> Result<(), RestError> {
+        self.1
+            .lock()
+            .unwrap()
+            .push(json!({ "fill": serde_json::to_value(reply.data()).unwrap() }));
+        Ok(())
+    }
+    async fn access_payloads(&self, guild: Snowflake) -> Result<(Value, Value), RestError> {
+        Ok((
+            json!({ "id": guild.to_string(), "roles": [{ "id": guild.to_string(), "permissions": "66560" }] }),
+            json!([{ "id": GENERAL.to_string(), "type": 0, "permission_overwrites": [] }]),
+        ))
+    }
+}
 
 impl DiscordRest for FakeRest {
     fn guild_channels(&self, _guild: Snowflake) -> Result<Value, RestError> {
@@ -126,6 +172,7 @@ struct Running {
     frames: UnboundedSender<GatewayEvent>,
     shutdown: CancellationToken,
     host: tokio::task::JoinHandle<Result<(), RunError>>,
+    rest: Arc<FakeRest>,
 }
 
 fn test_settings() -> Settings {
@@ -147,7 +194,7 @@ async fn start(history: &[(u64, &str)]) -> Running {
         .unwrap()
         .create_token("e2e", &new.hash, "read", UnixMillis::from_millis(1))
         .unwrap();
-    let rest = FakeRest::default();
+    let rest = Arc::new(FakeRest::default());
     for (id, content) in history {
         rest.0.lock().unwrap().insert(*id, message(*id, content));
     }
@@ -164,7 +211,7 @@ async fn start(history: &[(u64, &str)]) -> Running {
                 closing: false,
                 closed: false,
             },
-            rest: Arc::new(rest),
+            rest: Arc::clone(&rest),
             settings: test_settings(),
             clock: Arc::new(|| UnixMillis::from_millis(NOW_MS)),
             timing: Timing {
@@ -183,6 +230,7 @@ async fn start(history: &[(u64, &str)]) -> Running {
         frames,
         shutdown,
         host,
+        rest,
     }
 }
 
@@ -389,6 +437,63 @@ async fn shutdown_drains_live_events_already_received() {
         );
     }
     assert_eq!(wal_len(&r.db), 0);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn run_registers_commands_and_answers_interactions() {
+    let r = start(&[]).await;
+    let client = reqwest::Client::new();
+    r.frames
+        .send(dispatch(
+            "READY",
+            &json!({ "v": 10, "application": { "id": "1100000000000000900", "flags": 0 } }),
+        ))
+        .unwrap();
+    r.frames
+        .send(dispatch(
+            "GUILD_CREATE",
+            &json!({ "id": GUILD.to_string(), "name": "Example Team" }),
+        ))
+        .unwrap();
+    wait_for("the first sync", async || {
+        get_json(&client, &r, "/api/v1/status").await["sync"]["sync_runs"]
+            .as_u64()
+            .is_some_and(|runs| runs >= 1)
+    })
+    .await;
+    let decide = json!({
+        "id": "1100000000000007001", "application_id": "1100000000000000900", "type": 2,
+        "token": "FAKE-interaction-token.not-a-real-credential",
+        "guild_id": GUILD.to_string(), "channel_id": GENERAL.to_string(),
+        "member": { "user": { "id": "1100000000000000201", "username": "robin_example" }, "roles": [] },
+        "data": { "id": "1100000000000000950", "name": "decide", "type": 1,
+                  "options": [{ "name": "text", "type": 3, "value": "Ship on Friday" }] }
+    });
+    r.frames
+        .send(dispatch("INTERACTION_CREATE", &decide))
+        .unwrap();
+    wait_for("the answer", async || r.rest.1.lock().unwrap().len() >= 2).await;
+    let calls = r.rest.1.lock().unwrap().clone();
+    assert_eq!(calls[0]["install"][0], "1100000000000000900");
+    assert_eq!(calls[0]["install"][1], GUILD.to_string());
+    assert_eq!(calls[1]["type"], 4);
+    assert_eq!(calls[1]["data"]["flags"], 64);
+    assert!(
+        calls[1]["data"]["content"]
+            .as_str()
+            .unwrap()
+            .starts_with("Recorded: **D-1**")
+    );
+    // The MCP side sees the new entry.
+    let record = mcp_call(&client, &r, "record", json!({ "kind": "decision" })).await;
+    assert!(record.to_string().contains("Ship on Friday"), "{record}");
+    r.shutdown.cancel();
+    tokio::time::timeout(Duration::from_secs(30), r.host)
+        .await
+        .expect("host stopped in time")
+        .unwrap()
+        .map_err(|e| e.to_string())
+        .unwrap();
 }
 
 #[test]

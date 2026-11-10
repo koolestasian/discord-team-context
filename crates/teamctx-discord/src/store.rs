@@ -1,11 +1,18 @@
 //! The store as the connector sees it: writes through the single writer thread, reads
 //! through the connector's own read-only connection (plan section 5.2).
+//!
+//! The interaction layer uses the same type: record writes (`RecordWrite`, `RecordEdit`)
+//! go to the writer, which appends their audit events, and record reads to the reader.
 
-use teamctx_core::id::{ChannelId, MemberId, MessageId, Snowflake, SourceId};
+use teamctx_core::id::{ChannelId, EntryId, MemberId, MessageId, Snowflake, SourceId};
 use teamctx_core::query::Query;
+use teamctx_core::record::{
+    CreatedVia, EntryKind, NewEntry, RecordEntry, RecordEvent, RequestKey, ShortId, StatusChange,
+};
 use teamctx_core::repo::{
-    ApplyOutcome, ChannelActivity, ChannelInfo, DirectoryRead, IngestWrite, MemberInfo,
-    MessageCursor, MessageHit, MessageRead, RepoResult, SourceInfo, StoredMessage, SyncCursor,
+    ApplyOutcome, ChannelActivity, ChannelInfo, DirectoryRead, EntryFilter, EntryHit, EntryOutcome,
+    IngestWrite, MemberInfo, MessageCursor, MessageHit, MessageRead, PageRequest, RecordEdit,
+    RecordRead, RecordWrite, RepoResult, SourceInfo, StoredMessage, SyncCursor,
 };
 use teamctx_core::source::{MessageRef, SourceEvent, SourceKind};
 use teamctx_core::time::UnixMillis;
@@ -59,6 +66,99 @@ impl IngestWrite for HostStore {
 
     fn purge_messages_before(&mut self, cutoff: UnixMillis, now: UnixMillis) -> RepoResult<u64> {
         self.writer.purge_messages_before(cutoff, now)
+    }
+}
+
+impl RecordWrite for HostStore {
+    fn create_entry(&mut self, entry: &NewEntry) -> RepoResult<RecordEntry> {
+        self.writer.create_entry(entry)
+    }
+
+    fn change_status(
+        &mut self,
+        id: ShortId,
+        change: StatusChange,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<RecordEntry> {
+        self.writer.change_status(id, change, actor, at)
+    }
+
+    fn set_last_catchup(&mut self, member: MemberId, at: UnixMillis) -> RepoResult<()> {
+        self.writer.set_last_catchup(member, at)
+    }
+}
+
+impl RecordEdit for HostStore {
+    fn capture_message(
+        &mut self,
+        kind: EntryKind,
+        message: MessageId,
+        actor: MemberId,
+        via: CreatedVia,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome> {
+        self.writer.capture_message(kind, message, actor, via, at)
+    }
+
+    fn create_entry_once(
+        &mut self,
+        key: &RequestKey,
+        entry: &NewEntry,
+    ) -> RepoResult<EntryOutcome> {
+        self.writer.create_entry_once(key, entry)
+    }
+
+    fn change_status_once(
+        &mut self,
+        id: ShortId,
+        change: StatusChange,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome> {
+        self.writer.change_status_once(id, change, actor, at)
+    }
+
+    fn set_owner(
+        &mut self,
+        id: ShortId,
+        owner: Option<MemberId>,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome> {
+        self.writer.set_owner(id, owner, actor, at)
+    }
+
+    fn set_due(
+        &mut self,
+        id: ShortId,
+        due: Option<UnixMillis>,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome> {
+        self.writer.set_due(id, due, actor, at)
+    }
+}
+
+impl RecordRead for HostStore {
+    fn entry(&self, id: ShortId) -> RepoResult<Option<RecordEntry>> {
+        self.reader.entry(id)
+    }
+
+    fn list_entries(
+        &self,
+        filter: &EntryFilter,
+        page: PageRequest,
+    ) -> RepoResult<Vec<RecordEntry>> {
+        self.reader.list_entries(filter, page)
+    }
+
+    fn search_entries(&self, query: &Query, limit: u32) -> RepoResult<Vec<EntryHit>> {
+        self.reader.search_entries(query, limit)
+    }
+
+    fn entry_events(&self, id: EntryId) -> RepoResult<Vec<RecordEvent>> {
+        self.reader.entry_events(id)
     }
 }
 

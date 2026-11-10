@@ -10,6 +10,10 @@
 //!   every reconnect, whether the shard resumed or identified again.
 //! - **Ingest thread**: applies each dispatch with [`live::ingest`] through its own
 //!   [`HostStore`]. Events about unknown channels ask for a sync run.
+//! - **Interactions** (optional, [`Connector::with_interactions`]): the application id
+//!   from `READY` and every `INTERACTION_CREATE` go to the interaction service over a
+//!   bounded queue without waiting; a full queue drops the interaction rather than
+//!   delaying live events (Discord expects an answer within 3 seconds anyway).
 //! - **Sync worker**: runs [`sync_guild`] whenever asked, coalescing requests. A run that
 //!   left work (backfill or catch-up page limits) is followed by another after
 //!   [`Timing::continue_after`], so backfill finishes in the background without starving
@@ -44,6 +48,7 @@ use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 
 use crate::gateway::{Gateway, GatewayEvent, fatal_close_reason};
+use crate::interactions::InteractionEvent;
 use crate::live::{self, LIVE_EVENTS, LiveOutcome};
 use crate::sync::{DiscordRest, RestError, SyncConfig, SyncError, SyncReport, sync_guild};
 
@@ -191,7 +196,11 @@ pub struct Connector<G, R, F> {
     timing: Timing,
     clock: Clock,
     status: ConnectorStatus,
+    interactions: Option<InteractionSender>,
 }
+
+/// Where the gateway loop hands interactions and the application id.
+pub type InteractionSender = tokio::sync::mpsc::Sender<InteractionEvent>;
 
 impl<G, R, F> std::fmt::Debug for Connector<G, R, F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -220,7 +229,16 @@ where
             timing: Timing::default(),
             clock,
             status: ConnectorStatus::default(),
+            interactions: None,
         }
+    }
+
+    /// Hands `READY` (for command registration) and every `INTERACTION_CREATE` to the
+    /// interaction service. Without it interactions are ignored.
+    #[must_use]
+    pub fn with_interactions(mut self, sender: InteractionSender) -> Self {
+        self.interactions = Some(sender);
+        self
     }
 
     /// Replaces the sync worker's delays (tests use short ones).
@@ -252,6 +270,7 @@ where
             timing,
             clock,
             status,
+            interactions,
         } = self;
         let guild_name: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
 
@@ -307,6 +326,7 @@ where
                         &sync_tx,
                         &clock,
                         &status,
+                        interactions.as_ref(),
                     )
                     .await;
                     if !keep_going {
@@ -349,6 +369,7 @@ where
         }
         drop(work_tx);
         drop(sync_tx);
+        drop(interactions);
         let joined = tokio::task::spawn_blocking(move || {
             let ingest = ingest.join().is_ok();
             let syncer = syncer.join().is_ok();
@@ -378,6 +399,10 @@ fn spawn(
 }
 
 /// Handles one text frame. Returns `false` when the ingest thread is gone.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the loop's shared state, passed by reference instead of bundled"
+)]
 async fn on_frame(
     text: &str,
     config: &SyncConfig,
@@ -386,6 +411,7 @@ async fn on_frame(
     sync: &SyncSender<()>,
     clock: &Clock,
     status: &ConnectorStatus,
+    interactions: Option<&InteractionSender>,
 ) -> bool {
     let Ok(mut frame) = serde_json::from_str::<Value>(text) else {
         tracing::warn!("a Discord gateway frame is not JSON");
@@ -399,7 +425,24 @@ async fn on_frame(
         return true;
     };
     match kind {
-        "READY" => status.update(|s| s.gateway = GatewayState::Connected),
+        "READY" => {
+            status.update(|s| s.gateway = GatewayState::Connected);
+            let application = frame
+                .get("d")
+                .and_then(|d| d.get("application"))
+                .and_then(|a| a.get("id"))
+                .and_then(Value::as_str)
+                .and_then(|id| id.parse::<Snowflake>().ok());
+            if let (Some(sender), Some(application)) = (interactions, application) {
+                hand_over(sender, InteractionEvent::Ready { application });
+            }
+        }
+        "INTERACTION_CREATE" => {
+            if let Some(sender) = interactions {
+                let data = frame.get_mut("d").map(Value::take).unwrap_or(Value::Null);
+                hand_over(sender, InteractionEvent::Interaction(data));
+            }
+        }
         "RESUMED" => {
             status.update(|s| s.gateway = GatewayState::Connected);
             request_sync(sync);
@@ -447,6 +490,21 @@ async fn on_frame(
         }
     }
     true
+}
+
+/// Gives an event to the interaction service without blocking the gateway. Discord
+/// expects an answer within 3 seconds, so a full queue drops the interaction (the person
+/// sees "did not respond") rather than delaying live events.
+fn hand_over(sender: &InteractionSender, event: InteractionEvent) {
+    match sender.try_send(event) {
+        Ok(()) => {}
+        Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+            tracing::warn!("the interaction queue is full; an interaction was dropped");
+        }
+        Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+            tracing::warn!("the interaction service has stopped; an interaction was dropped");
+        }
+    }
 }
 
 /// Asks the sync worker for a run; a run already queued covers this request too.

@@ -1,0 +1,22 @@
+{
+  "op": 0,
+  "s": 1,
+  "t": "READY",
+  "d": {
+    "v": 10,
+    "user": {
+      "id": "1100000000000000900",
+      "username": "teamctx_example",
+      "global_name": null,
+      "discriminator": "0",
+      "avatar": null,
+      "bot": true
+    },
+    "guilds": [
+      { "id": "1100000000000000001", "unavailable": true }
+    ],
+    "session_id": "fake-session-id",
+    "resume_gateway_url": "wss://gateway.example.invalid",
+    "application": { "id": "1100000000000000900", "flags": 0 }
+  }
+}
