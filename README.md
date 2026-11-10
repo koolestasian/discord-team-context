@@ -34,8 +34,10 @@ coding agents, and a minimal web view. Everything except `/ask` works without an
 | | Retrieval eval runner (`cargo xtask eval`), `teamctx demo`, `teamctx search` | Done |
 | | Natural-language questions: any-word matching lifts recall@10 from 0.0 to about 0.6 | Done, still improving |
 | M3 Discord sync | Offline `init`/`doctor`, permission checks, bot setup guide | Done |
-| | Live sync, backfill, live events | Planned |
-| M4-M8 | MCP tools and tokens, record commands, `/ask`, web view, v0.1.0 release | Planned |
+| | Live sync, backfill, live events (`teamctx run`) | Built and tested against fakes; not yet run against a real server |
+| M4 Agent surfaces | MCP tools, tokens, JSON API, `teamctx q`, Agent Skill | Done, tested in-process and over loopback |
+| M5 Record in Discord | Context menus, `/decide`, `/todo`, `/question`, `/answer`, `/catchup`, `/search`, export | Built and tested against fixtures; not yet run against a real server |
+| M6-M8 | `/ask` live, web view, v0.1.0 release | Planned |
 
 The [implementation plan](docs/design/implementation-plan.md) defines each milestone and
 its "done when" criteria. [CHANGELOG.md](CHANGELOG.md) lists what has landed.
@@ -89,8 +91,20 @@ cargo run -p teamctx -- token create robin-laptop --url https://team.example.net
 cargo run -p teamctx -- skill install
 ```
 
-There is no host to connect to yet (`teamctx run` is planned), so these commands cannot
-be tried end to end today.
+To try the agent side without Discord, serve the demo record on loopback and query it:
+
+```sh
+cargo run -p teamctx -- demo --db demo.db
+cargo run -p teamctx -- token create trial --db demo.db      # copy the tctx_... token
+cargo run -p teamctx -- serve --db demo.db                   # leave running; Ctrl-C stops it
+# in a second terminal:
+export TEAMCTX_URL=http://127.0.0.1:7420 TEAMCTX_TOKEN=tctx_...
+cargo run -p teamctx -- q search "beta date"
+cargo run -p teamctx -- q context "pricing for the beta"
+```
+
+`serve` has no Discord connection and binds loopback only. A team host uses
+`teamctx run`, which needs a bot token (see the guide below).
 
 To prepare a throwaway test server and bot, follow the
 [Discord test bot guide](docs/guides/discord-bot.md). The fictional dataset that the

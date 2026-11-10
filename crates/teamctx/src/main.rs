@@ -29,7 +29,7 @@ const HELP: &str = concat!(
     "\n",
     "Pre-alpha: live Discord sync is not yet verified against a real server.\n",
     "\n",
-    "Usage: teamctx [OPTIONS] | init|doctor|run [CONFIG OPTIONS] | demo|search|q|skill|mcp [ARGS]\n",
+    "Usage: teamctx [OPTIONS] | init|doctor|run [CONFIG OPTIONS] | demo|search|q|skill|serve|mcp [ARGS]\n",
     "\n",
     "Options:\n",
     "  -h, --help     Print this help\n",
@@ -40,7 +40,14 @@ const HELP: &str = concat!(
     "                token is read from the variable named by discord.token_env\n",
     "  doctor --live Also check the bot on Discord: guild access, per-channel permissions and\n",
     "                the Message Content intent (read-only requests; prints no secret)\n",
-    "  mcp --stdio   Serve the MCP tools on stdin/stdout from a local database, without a token\n",
+    "  serve         Serve /mcp and /api/v1 from a local database on loopback, with no Discord
+",
+    "                connection, to try the record and `teamctx q` (serve [--db PATH]
+",
+    "                [--bind 127.0.0.1:PORT] [--timezone TZ]; make a token with `token create`)
+",
+    "  mcp --stdio   Serve the MCP tools on stdin/stdout from a local database, without a token
+",
     "                (mcp --stdio [--db PATH] [--timezone TZ]; --db defaults to teamctx.db)\n",
     "\nOffline commands:\n",
     "  init          Print a config template and optional bot invite; writes no files\n",
@@ -92,6 +99,7 @@ enum Command {
     DoctorLive(config::OfflineOptions),
     Run(run::RunOptions),
     Mcp(run::McpOptions),
+    Serve(run::ServeOptions),
     Token(token::Command),
     Skill(skill::Command),
     Eval(eval::Options),
@@ -160,6 +168,11 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, UsageError
                     .map(Command::Run)
                     .map_err(UsageError::Config);
             }
+            Some("serve") => {
+                return run::parse_serve(args)
+                    .map(Command::Serve)
+                    .map_err(UsageError::Config);
+            }
             Some("mcp") => {
                 return run::parse_mcp(args)
                     .map(Command::Mcp)
@@ -217,6 +230,7 @@ fn run(args: impl IntoIterator<Item = OsString>, out: &mut impl Write, err: &mut
         Ok(Command::DoctorLive(options)) => return run::doctor_live(&options, out, err),
         Ok(Command::Run(options)) => return run::run(&options, out, err),
         Ok(Command::Mcp(options)) => return run::mcp_stdio(&options, err),
+        Ok(Command::Serve(options)) => return run::serve_only(&options, out, err),
         Ok(Command::Token(command)) => return token::run(&command, out, err),
         Ok(Command::Skill(command)) => return skill::run(&command, out, err),
         Ok(Command::Eval(options)) => return run_eval(&options, out, err),
@@ -293,8 +307,8 @@ mod tests {
     #[test]
     fn unknown_and_extra_arguments_are_errors() {
         assert_eq!(
-            parse_strs(&["serve"]),
-            Err(UsageError::Unknown(OsString::from("serve")))
+            parse_strs(&["frobnicate"]),
+            Err(UsageError::Unknown(OsString::from("frobnicate")))
         );
         assert_eq!(
             parse_strs(&["--version", "--help"]),

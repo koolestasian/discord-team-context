@@ -168,6 +168,64 @@ pub(crate) fn parse_mcp(
     })
 }
 
+/// Options of `teamctx serve`.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ServeOptions {
+    db: PathBuf,
+    bind: SocketAddr,
+    utc_offset_seconds: i32,
+}
+
+/// Parses `serve [--db PATH] [--bind IP:PORT] [--timezone TZ]`.
+pub(crate) fn parse_serve(
+    args: impl IntoIterator<Item = OsString>,
+) -> Result<ServeOptions, ConfigError> {
+    let mut db = None;
+    let mut bind = None;
+    let mut offset = 0;
+    let mut args = args.into_iter();
+    while let Some(arg) = args.next() {
+        match arg.to_str() {
+            Some("--db") => {
+                db = Some(PathBuf::from(
+                    args.next()
+                        .ok_or_else(|| usage("--db", "needs a file path"))?,
+                ));
+            }
+            Some("--bind") => {
+                bind = Some(
+                    args.next()
+                        .and_then(|value| value.to_str().and_then(|text| text.parse().ok()))
+                        .ok_or_else(|| {
+                            usage("--bind", "must be IP:PORT, such as 127.0.0.1:7420")
+                        })?,
+                );
+            }
+            Some("--timezone") => {
+                let value = args
+                    .next()
+                    .ok_or_else(|| usage("--timezone", "needs a value"))?;
+                offset = value
+                    .to_str()
+                    .and_then(|text| parse_timezone(text).ok())
+                    .ok_or_else(|| usage("--timezone", TIMEZONE_HELP))?
+                    .seconds();
+            }
+            _ => {
+                return Err(usage(
+                    "serve",
+                    "unknown option; use serve [--db PATH] [--bind IP:PORT] [--timezone TZ]",
+                ));
+            }
+        }
+    }
+    Ok(ServeOptions {
+        db: db.unwrap_or_else(|| PathBuf::from(DEFAULT_DB)),
+        bind: bind.unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 7420))),
+        utc_offset_seconds: offset,
+    })
+}
+
 const TIMEZONE_HELP: &str = "must be UTC or a fixed offset such as +02:00; named zones \
                              (America/Toronto) need a time zone database this build does not have";
 
@@ -764,6 +822,83 @@ pub(crate) fn print_live_report(
         "Live checks: {}",
         if report.ready() { "passed" } else { "FAILED" }
     )
+}
+
+/// `teamctx serve`: the record over HTTP from an existing database, with no Discord
+/// connection. For trying the MCP server, `/api/v1` and `teamctx q` on the demo record
+/// (or a copy of a real one); `run` is the production host.
+pub(crate) fn serve_only(options: &ServeOptions, out: &mut impl Write, err: &mut impl Write) -> u8 {
+    if !options.bind.ip().is_loopback() {
+        let _ = writeln!(
+            err,
+            "error: serve only binds loopback addresses; use `teamctx run` for a team host"
+        );
+        return 1;
+    }
+    if !options.db.is_file() {
+        let _ = writeln!(
+            err,
+            "error: no database at {:?}; run `teamctx demo --db PATH` first, or pass --db PATH",
+            options.db
+        );
+        return 1;
+    }
+    init_logging();
+    let Ok(runtime) = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    else {
+        let _ = writeln!(err, "error: {}", RunError::Runtime);
+        return 1;
+    };
+    let result = runtime.block_on(async {
+        let db = options.db.as_path();
+        let writer = Writer::spawn(Store::open(db).map_err(|_| RunError::Store)?)
+            .map_err(|_| RunError::Store)?;
+        let read_only = || Store::open_read_only(db).map_err(|_| RunError::Store);
+        let zone = FixedOffset::from_seconds(options.utc_offset_seconds)
+            .ok_or_else(|| usage("--timezone", TIMEZONE_HELP))?;
+        let mut mcp_store = read_only()?;
+        mcp_store.set_date_resolver(midnight_in(zone));
+        let mcp = McpConfig::new(mcp_store).with_utc_offset_seconds(options.utc_offset_seconds);
+        let stop = CancellationToken::new();
+        let app = router(HttpConfig {
+            tokens: Arc::new(StoreTokens::new(read_only()?, writer.client())),
+            allowed_hosts: allowed_hosts(options.bind, None),
+            shutdown: stop.clone(),
+            mcp,
+        });
+        let listener = TcpListener::bind(options.bind)
+            .await
+            .map_err(|_| RunError::Bind)?;
+        let _ = writeln!(
+            out,
+            "teamctx serve: http://{} (no Discord connection) with database {}; press Ctrl-C to stop",
+            options.bind,
+            db.display()
+        );
+        let _ = out.flush();
+        let signal_stop = stop.clone();
+        tokio::spawn(async move {
+            shutdown_signal().await;
+            signal_stop.cancel();
+        });
+        let served = serve(listener, app, stop).await;
+        let drained = tokio::task::spawn_blocking(move || writer.shutdown())
+            .await
+            .map_err(|_| RunError::Shutdown)?;
+        if served.is_err() {
+            return Err(RunError::Http);
+        }
+        drained.map_err(|_| RunError::Shutdown)
+    });
+    match result {
+        Ok(()) => 0,
+        Err(error) => {
+            let _ = writeln!(err, "error: {error}");
+            1
+        }
+    }
 }
 
 /// `teamctx mcp --stdio`.

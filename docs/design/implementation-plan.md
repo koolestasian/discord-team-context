@@ -573,7 +573,7 @@ instead of guessing:
 
 ### 10.3 CLI
 
-Host commands: `teamctx init` · `run` · `demo` · `doctor` · `token create|list|revoke` ·
+Host commands: `teamctx init` · `run` · `serve` (HTTP only, loopback, no Discord: a local trial of the record on an existing database) · `demo` · `doctor` · `token create|list|revoke` ·
 `export --format okf|md <dir>` · `purge` · `version`. The `md` layout is defined in M5
 with the OKF export (ADR 0013).
 

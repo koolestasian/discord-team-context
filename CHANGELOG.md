@@ -12,6 +12,10 @@ release.
 
 ### Added
 
+- `teamctx serve [--db PATH] [--bind 127.0.0.1:PORT] [--timezone TZ]`: serves `/mcp`, `/api/v1`
+  and `/healthz` from an existing database on a loopback address, with no Discord connection,
+  so `teamctx q`, MCP clients and the Agent Skill can be tried on the demo record. A process
+  test runs demo, token, serve and `q`. `run` remains the team host.
 - Discord commands (plan section 7.3), served by `teamctx run`: message context menus
   "Mark as decision", "Mark as task" (a form with an optional owner and due date) and
   "Mark as question"; `/decide text [replaces]`, `/decisions [topic]

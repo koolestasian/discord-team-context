@@ -565,6 +565,15 @@ fn run_and_mcp_arguments_parse_strictly() {
     assert!(parse_run(args(&["--application-id", "456"])).is_err());
     assert!(parse_run(args(&["--token", "x"])).is_err());
 
+    let serve = parse_serve(args(&["--bind", "127.0.0.1:9000", "--timezone", "-05:00"])).unwrap();
+    assert_eq!(serve.db, PathBuf::from("teamctx.db"));
+    assert_eq!(serve.bind.port(), 9000);
+    assert_eq!(serve.utc_offset_seconds, -18_000);
+    assert_eq!(parse_serve(args(&[])).unwrap().bind.port(), 7420);
+    assert!(parse_serve(args(&["--bind", "not-an-address"])).is_err());
+    assert!(parse_serve(args(&["--timezone", "Europe/Paris"])).is_err());
+    assert!(parse_serve(args(&["--guild-id", "1"])).is_err());
+
     let mcp = parse_mcp(args(&["--stdio", "--timezone", "+02:00"])).unwrap();
     assert_eq!(mcp.db, PathBuf::from("teamctx.db"));
     assert_eq!(mcp.utc_offset_seconds, 7200);

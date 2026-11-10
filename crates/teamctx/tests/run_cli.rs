@@ -158,3 +158,88 @@ fn mcp_stdio_answers_on_stdout_and_logs_only_to_stderr() {
     assert!(status.success(), "{status:?}");
     assert!(lines.next().is_none(), "nothing else on stdout");
 }
+
+#[test]
+fn serve_refuses_a_missing_database_and_a_public_address() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let missing = teamctx(dir.path(), &["serve", "--db", "nope.db"], &[]);
+    assert!(!missing.status.success());
+    assert!(all(&missing).contains("no database"), "{}", all(&missing));
+    let public = teamctx(dir.path(), &["serve", "--bind", "0.0.0.0:7420"], &[]);
+    assert!(!public.status.success());
+    assert!(all(&public).contains("loopback"), "{}", all(&public));
+}
+
+/// The local trial path from the README: demo database, token, `serve`, then `q`.
+#[test]
+fn serve_answers_q_on_the_demo_record_without_discord() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let db = dir.path().join("demo.db");
+    let db_text = db.to_str().expect("utf-8 path");
+    let demo = teamctx(dir.path(), &["demo", "--db", db_text], &[]);
+    assert!(demo.status.success(), "{}", all(&demo));
+    let created = teamctx(
+        dir.path(),
+        &["token", "create", "trial", "--db", db_text],
+        &[],
+    );
+    assert!(created.status.success(), "{}", all(&created));
+    let token = String::from_utf8_lossy(&created.stdout)
+        .split_whitespace()
+        .find(|word| word.starts_with("tctx_"))
+        .expect("the token is printed once")
+        .to_owned();
+    let port = {
+        let probe = std::net::TcpListener::bind("127.0.0.1:0").expect("free port");
+        probe.local_addr().expect("addr").port()
+    };
+    let bind = format!("127.0.0.1:{port}");
+    let mut server = Command::new(env!("CARGO_BIN_EXE_teamctx"))
+        .current_dir(dir.path())
+        .env_clear()
+        // Windows sockets need SystemRoot; without it the bind fails.
+        .envs(std::env::var_os("SystemRoot").map(|root| ("SystemRoot", root)))
+        .args(["serve", "--db", db_text, "--bind", &bind])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("start serve");
+    let mut banner = String::new();
+    BufReader::new(server.stdout.as_mut().expect("stdout"))
+        .read_line(&mut banner)
+        .expect("banner");
+    if !banner.contains(&bind) {
+        let _ = server.kill();
+        let output = server.wait_with_output().expect("collect output");
+        panic!("serve did not start: {banner:?} {}", all(&output));
+    }
+    let url = format!("http://{bind}");
+    // Windows sockets need SystemRoot, which `env_clear` removes.
+    let root = std::env::var("SystemRoot").unwrap_or_default();
+    let with_root = |token: &str| -> Vec<(String, String)> {
+        let mut vars = vec![("TEAMCTX_TOKEN".to_owned(), token.to_owned())];
+        if !root.is_empty() {
+            vars.push(("SystemRoot".to_owned(), root.clone()));
+        }
+        vars
+    };
+    let run_q = |token: &str| {
+        let vars = with_root(token);
+        let pairs: Vec<(&str, &str)> = vars.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+        teamctx(dir.path(), &["q", "search", "beta", "--url", &url], &pairs)
+    };
+    let wrong = run_q("tctx_wrong");
+    let found = run_q(&token);
+    let _ = server.kill();
+    let _ = server.wait();
+    assert!(!wrong.status.success(), "a wrong token must be refused");
+    assert!(
+        all(&wrong).contains("rejected the token"),
+        "refused by the host: {}",
+        all(&wrong)
+    );
+    assert!(found.status.success(), "{}", all(&found));
+    let shown = all(&found);
+    assert!(shown.contains("team chat data"), "framed output: {shown}");
+    assert!(!shown.contains(&token), "the token must never be printed");
+}

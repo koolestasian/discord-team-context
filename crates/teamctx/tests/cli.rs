@@ -47,7 +47,7 @@ fn help_flags_describe_the_offline_pre_alpha_commands() -> TestResult {
 
 #[test]
 fn unknown_argument_is_a_usage_error() -> TestResult {
-    for args in [&["serve"][..], &["--bogus"], &["--version", "extra"]] {
+    for args in [&["frobnicate"][..], &["--bogus"], &["--version", "extra"]] {
         let output = teamctx(args)?;
         assert_eq!(output.status.code(), Some(2), "{args:?}");
         assert!(output.stdout.is_empty(), "{args:?}");
