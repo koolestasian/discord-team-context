@@ -17,6 +17,7 @@
 //! `allowed_mentions` to parse nothing.
 
 pub mod access;
+pub mod ask;
 pub mod commands;
 pub mod handler;
 pub mod payload;
@@ -35,6 +36,7 @@ use twilight_model::http::interaction::{
     InteractionResponse, InteractionResponseData, InteractionResponseType,
 };
 
+pub use ask::{AskBackend, AskFuture, Cited, LlmJob, LlmOutcome, LlmRequest, LlmTask, Refusal};
 pub use handler::{Outcome, Reply};
 pub use service::{
     InteractionApi, InteractionConfig, InteractionEvent, InteractionService, ServiceTiming,
@@ -60,6 +62,9 @@ impl Reply {
 
 impl Outcome {
     /// The initial response (callback type 4, or 9 for the task modal).
+    ///
+    /// A language-model task cannot be answered directly: the service always defers it.
+    /// Should it ever get here, the person gets a fixed "try again" note.
     #[must_use]
     pub fn response(&self) -> InteractionResponse {
         match self {
@@ -68,6 +73,10 @@ impl Outcome {
                 data: Some(reply.data()),
             },
             Self::Modal(message) => task_modal(*message),
+            Self::Llm(_) => InteractionResponse {
+                kind: InteractionResponseType::ChannelMessageWithSource,
+                data: Some(Reply::note(ask::RETRY).data()),
+            },
         }
     }
 }

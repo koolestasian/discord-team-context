@@ -4,9 +4,9 @@
 //! (they update instantly) with one bulk overwrite. Every slash command takes an optional
 //! `public` flag; replies are ephemeral without it.
 //!
-//! `/ask` is deliberately absent: it needs the LLM pipeline (plan section 11, milestone
-//! M6). When that exists it is added to [`commands`] behind the `[llm]` configuration,
-//! and `ask_is_not_registered` below changes with it.
+//! With a language model configured (`[llm]`, plan section 12) there are two more: the
+//! `/ask` command and the `summarize` option of `/catchup`. Without one neither is
+//! registered, so nobody is offered a command that cannot work.
 //!
 //! Limits checked against Discord's documentation (`docs/research/M5.md`): names of
 //! slash commands and options are lowercase, 1 to 32 characters; message command names
@@ -40,6 +40,7 @@ pub(crate) const ANSWER: &str = "answer";
 pub(crate) const CATCHUP: &str = "catchup";
 pub(crate) const SEARCH: &str = "search";
 pub(crate) const TEAMCTX: &str = "teamctx";
+pub(crate) const ASK: &str = "ask";
 
 /// Longest title a person can type (plan section 6: titles are at most 200 characters).
 const TITLE_MAX: u16 = 200;
@@ -51,12 +52,29 @@ const DATE_MAX: u16 = 64;
 const QUERY_MAX: u16 = 500;
 /// Topics and message links.
 const SHORT_MAX: u16 = 200;
+/// `/ask` questions (the pipeline accepts at most 500 characters).
+const QUESTION_MAX: u16 = 500;
 
-/// Every command this build registers.
+/// Every command this build registers; `llm` adds `/ask` and `/catchup summarize`.
 #[must_use]
-pub fn commands() -> Vec<Command> {
+pub fn commands(llm: bool) -> Vec<Command> {
     let public = || boolean("public", "Show the reply to everyone in the channel");
-    vec![
+    let mut catchup = vec![
+        string(
+            "since",
+            "Like 24h, 3d, yesterday or 2026-11-01 (at most 14 days)",
+            false,
+            DATE_MAX,
+        ),
+        public(),
+    ];
+    if llm {
+        catchup.push(boolean(
+            "summarize",
+            "Add a summary written by a language model",
+        ));
+    }
+    let mut list = vec![
         message_menu(MARK_DECISION),
         message_menu(MARK_TASK),
         message_menu(MARK_QUESTION),
@@ -141,19 +159,7 @@ pub fn commands() -> Vec<Command> {
                 public(),
             ],
         ),
-        slash(
-            CATCHUP,
-            "What changed since you last caught up",
-            vec![
-                string(
-                    "since",
-                    "Like 24h, 3d, yesterday or 2026-11-01 (at most 14 days)",
-                    false,
-                    DATE_MAX,
-                ),
-                public(),
-            ],
-        ),
+        slash(CATCHUP, "What changed since you last caught up", catchup),
         slash(
             SEARCH,
             "Search the team's messages",
@@ -178,7 +184,18 @@ pub fn commands() -> Vec<Command> {
                 vec![public()],
             )],
         ),
-    ]
+    ];
+    if llm {
+        list.push(slash(
+            ASK,
+            "Ask a question about the team's messages (uses a language model)",
+            vec![
+                string("question", "Your question", true, QUESTION_MAX),
+                public(),
+            ],
+        ));
+    }
+    list
 }
 
 #[expect(
@@ -331,25 +348,25 @@ mod tests {
 
     #[test]
     fn the_planned_commands_are_registered_and_valid() {
-        let commands = commands();
-        let names: Vec<&str> = commands.iter().map(|c| c.name.as_str()).collect();
-        assert_eq!(
-            names,
-            [
-                MARK_DECISION,
-                MARK_TASK,
-                MARK_QUESTION,
-                DECIDE,
-                DECISIONS,
-                TODO,
-                QUESTION,
-                ANSWER,
-                CATCHUP,
-                SEARCH,
-                TEAMCTX
-            ]
-        );
-        for command in &commands {
+        let base = [
+            MARK_DECISION,
+            MARK_TASK,
+            MARK_QUESTION,
+            DECIDE,
+            DECISIONS,
+            TODO,
+            QUESTION,
+            ANSWER,
+            CATCHUP,
+            SEARCH,
+            TEAMCTX,
+        ];
+        let names = |llm| -> Vec<String> { commands(llm).into_iter().map(|c| c.name).collect() };
+        assert_eq!(names(false), base);
+        let mut with_llm = base.to_vec();
+        with_llm.push(ASK);
+        assert_eq!(names(true), with_llm);
+        for command in commands(false).iter().chain(&commands(true)) {
             match command.kind {
                 CommandType::Message => {
                     assert!((1..=32).contains(&command.name.chars().count()));
@@ -368,9 +385,21 @@ mod tests {
     }
 
     #[test]
-    fn ask_is_not_registered() {
-        // `/ask` needs the LLM pipeline (M6); until then it must not appear.
-        assert!(commands().iter().all(|c| c.name != "ask"));
+    fn ask_and_summarize_are_registered_only_with_a_model() {
+        let has_summarize = |llm| {
+            commands(llm)
+                .iter()
+                .find(|c| c.name == CATCHUP)
+                .is_some_and(|c| c.options.iter().any(|o| o.name == "summarize"))
+        };
+        assert!(commands(false).iter().all(|c| c.name != ASK));
+        assert!(!has_summarize(false));
+        assert!(commands(true).iter().any(|c| c.name == ASK));
+        assert!(has_summarize(true));
+        let ask = commands(true).into_iter().find(|c| c.name == ASK).unwrap();
+        assert_eq!(ask.options[0].name, "question");
+        assert_eq!(ask.options[0].required, Some(true));
+        assert_eq!(ask.options[0].max_length, Some(QUESTION_MAX));
     }
 
     #[test]
@@ -382,7 +411,7 @@ mod tests {
                         && o.options.as_deref().is_some_and(has_public)
                 })
         }
-        for command in commands()
+        for command in commands(true)
             .iter()
             .filter(|c| c.kind == CommandType::ChatInput)
         {
@@ -392,7 +421,7 @@ mod tests {
 
     #[test]
     fn serialised_shape_matches_discord() {
-        let json = serde_json::to_value(commands()).unwrap();
+        let json = serde_json::to_value(commands(false)).unwrap();
         assert_eq!(json[0]["type"], 3);
         assert_eq!(json[0]["name"], MARK_DECISION);
         assert_eq!(json[3]["type"], 1);

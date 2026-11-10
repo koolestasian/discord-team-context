@@ -74,6 +74,7 @@ struct World {
     access: AccessSnapshot,
     status: StatusSnapshot,
     zone: FixedOffset,
+    llm: bool,
 }
 
 fn channel(
@@ -207,6 +208,7 @@ fn world() -> World {
             ..StatusSnapshot::default()
         },
         zone: FixedOffset::from_seconds(2 * 3600).unwrap(),
+        llm: false,
     }
 }
 
@@ -268,6 +270,7 @@ impl World {
             zone: self.zone,
             access: Some(&self.access),
             status: &self.status,
+            llm: self.llm,
         };
         handle(&mut self.store, &ctx, &interaction)
     }
@@ -1013,6 +1016,171 @@ fn us5_catchup_shows_changes_channels_and_mentions_since_last_time() {
     assert!(shown.contains("Not a time I understand"), "{shown}");
 }
 
+// ---- /ask and /catchup summarize ----
+
+fn ask(question: &str, public: bool) -> Value {
+    slash(
+        "ask",
+        json!([
+            { "name": "question", "type": 3, "value": question },
+            { "name": "public", "type": 5, "value": public }
+        ]),
+    )
+}
+
+fn llm_task(outcome: Outcome) -> ask::LlmTask {
+    match outcome {
+        Outcome::Llm(task) => *task,
+        other => panic!("expected a language-model task, got {other:?}"),
+    }
+}
+
+/// Store ids of channels, by Discord id.
+fn channel_ids(
+    w: &World,
+    external: &[u64],
+) -> std::collections::HashSet<teamctx_core::id::ChannelId> {
+    w.store
+        .channels(w.source)
+        .unwrap()
+        .into_iter()
+        .filter(|c| external.contains(&c.external_id.get()))
+        .map(|c| c.id)
+        .collect()
+}
+
+#[test]
+fn ask_without_a_model_is_a_fixed_note() {
+    let mut w = world();
+    let response = w.respond(&interaction(7070, ROBIN, &[], 2, ask("Who ships?", false)));
+    assert_ephemeral_and_silent(&response);
+    let shown = text(&response);
+    assert!(shown.contains("not enabled on this host"), "{shown}");
+    assert!(!shown.contains("Who ships"), "the question is not echoed");
+    // A stale summarize option still gets the catch-up, plus a note.
+    let response = w.respond(&interaction(
+        7071,
+        ROBIN,
+        &[],
+        2,
+        slash(
+            "catchup",
+            json!([{ "name": "summarize", "type": 5, "value": true }]),
+        ),
+    ));
+    let shown = text(&response);
+    assert!(shown.contains("Mentions of you"), "{shown}");
+    assert!(shown.contains("Summaries need a language model"), "{shown}");
+}
+
+#[test]
+fn ask_is_scoped_to_the_channels_the_member_can_read() {
+    let mut w = world();
+    w.llm = true;
+    // Robin without the staff role: general and its thread, not the staff room or the
+    // excluded channel.
+    let task = llm_task(w.run(&interaction(7072, ROBIN, &[], 2, ask("beta?", false))));
+    assert_eq!(task.request.scope, channel_ids(&w, &[GENERAL, THREAD]));
+    assert_eq!(task.request.member, w.member(ROBIN));
+    assert_eq!(task.request.now, UnixMillis::from_millis(NOW));
+    assert_eq!(
+        task.request.job,
+        ask::LlmJob::Ask {
+            question: "beta?".to_owned()
+        }
+    );
+    assert!(!task.public && task.base.is_none() && task.footer.is_none());
+    // With the role, the staff room too.
+    let task = llm_task(w.run(&interaction(
+        7073,
+        ROBIN,
+        &[STAFF_ROLE],
+        2,
+        ask("beta?", false),
+    )));
+    assert_eq!(
+        task.request.scope,
+        channel_ids(&w, &[GENERAL, THREAD, STAFF_ROOM])
+    );
+    // A public answer may only use what everyone can read.
+    let task = llm_task(w.run(&interaction(
+        7074,
+        ROBIN,
+        &[STAFF_ROLE],
+        2,
+        ask("beta?", true),
+    )));
+    assert!(task.public);
+    assert_eq!(task.request.scope, channel_ids(&w, &[GENERAL, THREAD]));
+    // Without channel access nothing chat-derived may be used, and the reply says so.
+    let status = w.status.clone();
+    let ctx = Context {
+        guild: sf(GUILD),
+        source: Some(w.source),
+        now: UnixMillis::from_millis(NOW),
+        zone: w.zone,
+        access: None,
+        status: &status,
+        llm: true,
+    };
+    let parsed = parse(&interaction(7075, ROBIN, &[], 2, ask("beta?", false))).unwrap();
+    let task = llm_task(handle(&mut w.store, &ctx, &parsed));
+    assert!(task.request.scope.is_empty());
+    assert!(task.footer.is_some());
+}
+
+#[test]
+fn catchup_summarize_lists_only_the_visible_items_it_shows() {
+    let mut w = world();
+    w.llm = true;
+    w.respond(&interaction(
+        7076,
+        SAM,
+        &[],
+        2,
+        mark("Mark as decision", GENERAL, M_DECISION, "x"),
+    ));
+    let task = llm_task(w.run(&interaction(
+        7077,
+        ROBIN,
+        &[],
+        2,
+        slash(
+            "catchup",
+            json!([{ "name": "summarize", "type": 5, "value": true }]),
+        ),
+    )));
+    let ask::LlmJob::Summarize { entries, messages } = &task.request.job else {
+        panic!("expected a summary job");
+    };
+    assert_eq!(entries.len(), 1);
+    // Robin is mentioned in the staff room (hidden), in #general and by the hostile
+    // message in #general.
+    let visible: Vec<_> = messages
+        .iter()
+        .map(|id| w.store.message(*id).unwrap().unwrap().channel)
+        .collect();
+    let general = channel_ids(&w, &[GENERAL]);
+    assert_eq!(visible.len(), 2);
+    assert!(visible.iter().all(|c| general.contains(c)));
+    let base = task.base.as_ref().unwrap();
+    assert!(base.content.starts_with("Since"));
+    assert_eq!(base.embeds.len(), 3);
+    // The catch-up itself still happened.
+    assert!(w.store.last_catchup(w.member(ROBIN)).unwrap().is_some());
+    // Without summarize, a normal reply.
+    assert!(matches!(
+        w.run(&interaction(
+            7078,
+            ROBIN,
+            &[],
+            2,
+            slash("catchup", json!([]))
+        )),
+        Outcome::Reply(_)
+    ));
+}
+
 // ---- search ----
 
 #[test]
@@ -1259,7 +1427,7 @@ fn other_servers_direct_messages_and_startup_get_fixed_notes() {
         &[],
         2,
         slash(
-            "ask",
+            "purge",
             json!([{ "name": "question", "type": 3, "value": "?" }]),
         ),
     );
@@ -1281,6 +1449,7 @@ fn other_servers_direct_messages_and_startup_get_fixed_notes() {
         zone: w.zone,
         access: Some(&access),
         status: &status,
+        llm: false,
     };
     let Outcome::Reply(reply) = handle(&mut w.store, &ctx, &parsed) else {
         panic!()
@@ -1316,6 +1485,7 @@ fn without_channel_access_nothing_chat_derived_is_shown() {
         zone: w.zone,
         access: None,
         status: &status,
+        llm: false,
     };
     for (data, absent) in [
         (slash("decisions", json!([])), "We ship the beta"),
@@ -1412,6 +1582,7 @@ fn demo_record_answers_us4_us5_and_us6() {
         zone: FixedOffset::UTC,
         access: Some(&access),
         status: &status,
+        llm: false,
     };
     let run = |store: &mut Store, data: Value| {
         let mut payload = interaction(7400, 102, &[], 2, data);
@@ -1522,6 +1693,7 @@ fn interaction_fixtures_parse_and_hold_only_fictional_ids() {
     assert_eq!(
         names,
         [
+            "ask.json",
             "catchup.json",
             "decide_public.json",
             "mark_as_decision.json",

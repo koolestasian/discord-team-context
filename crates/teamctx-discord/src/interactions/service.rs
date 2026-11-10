@@ -3,8 +3,9 @@
 //!
 //! Discord invalidates an interaction that is not answered within 3 seconds. So:
 //!
-//! - `/catchup` and `/search` always defer first (callback type 5) and then edit the
-//!   original response with the result;
+//! - `/catchup`, `/search` and `/ask` always defer first (callback type 5) and then edit
+//!   the original response with the result; `/ask` and `/catchup summarize:true` call the
+//!   host's [`AskBackend`] in between;
 //! - every other command answers directly (type 4) if its work finishes within
 //!   [`ServiceTiming::defer_after`], and otherwise defers and edits;
 //! - "Mark as task" must answer with its modal (type 9), which cannot follow a deferral,
@@ -34,6 +35,7 @@ use twilight_model::application::command::Command;
 use twilight_model::http::interaction::InteractionResponse;
 
 use super::access::AccessSnapshot;
+use super::ask::{self, AskBackend, LlmJob, LlmOutcome, LlmTask, Refusal};
 use super::commands::commands;
 use super::deferred;
 use super::handler::{self, Context, InteractionStore, Outcome, Reply};
@@ -136,6 +138,7 @@ type AccessCache = tokio::sync::Mutex<Option<(Instant, Option<Arc<AccessSnapshot
 
 struct Shared<A, S> {
     api: Arc<A>,
+    ask: Option<Arc<dyn AskBackend>>,
     store: Arc<Mutex<S>>,
     config: InteractionConfig,
     status: ConnectorStatus,
@@ -147,6 +150,7 @@ struct Shared<A, S> {
 /// Answers interactions until cancelled.
 pub struct InteractionService<A, S> {
     api: Arc<A>,
+    ask: Option<Arc<dyn AskBackend>>,
     store: S,
     config: InteractionConfig,
     status: ConnectorStatus,
@@ -158,6 +162,7 @@ impl<A, S> std::fmt::Debug for InteractionService<A, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InteractionService")
             .field("guild", &self.config.guild)
+            .field("llm", &self.ask.is_some())
             .field("timing", &self.timing)
             .finish_non_exhaustive()
     }
@@ -180,12 +185,21 @@ where
     ) -> Self {
         Self {
             api,
+            ask: None,
             store,
             config,
             status,
             clock,
             timing: ServiceTiming::default(),
         }
+    }
+
+    /// Enables `/ask` and `/catchup summarize:true` through `backend` (the host's `/ask`
+    /// pipeline). Without it neither is registered.
+    #[must_use]
+    pub fn with_ask(mut self, backend: Arc<dyn AskBackend>) -> Self {
+        self.ask = Some(backend);
+        self
     }
 
     /// Replaces the delays (tests use short ones).
@@ -204,6 +218,7 @@ where
     ) {
         let shared = Arc::new(Shared {
             api: self.api,
+            ask: self.ask,
             store: Arc::new(Mutex::new(self.store)),
             config: self.config,
             status: self.status,
@@ -262,7 +277,7 @@ where
 
 /// Registers the guild commands. Returns whether it worked.
 async fn register<A: InteractionApi, S>(shared: &Shared<A, S>, application: Snowflake) -> bool {
-    let commands = commands();
+    let commands = commands(shared.ask.is_some());
     match shared
         .api
         .install_commands(application, shared.config.guild, &commands)
@@ -314,6 +329,7 @@ async fn fill<A: InteractionApi, S>(shared: &Shared<A, S>, envelope: &Envelope, 
         Outcome::Reply(reply) => reply,
         // A modal cannot follow a deferral; `answer` never defers a request that can open one.
         Outcome::Modal(_) => Reply::note(FAILED),
+        Outcome::Llm(task) => run_llm(shared, *task).await,
     };
     if let Err(error) = shared
         .api
@@ -322,6 +338,27 @@ async fn fill<A: InteractionApi, S>(shared: &Shared<A, S>, envelope: &Envelope, 
     {
         tracing::warn!(%error, "a deferred interaction could not be completed");
     }
+}
+
+/// Runs a language-model task through the backend and renders the reply. Logs only the
+/// kind of task and a fixed outcome name: never the question, the answer or the sources.
+async fn run_llm<A, S>(shared: &Shared<A, S>, task: LlmTask) -> Reply {
+    let kind = match task.request.job {
+        LlmJob::Ask { .. } => "ask",
+        LlmJob::Summarize { .. } => "summarize",
+    };
+    let outcome = match &shared.ask {
+        Some(backend) => backend.ask(task.request.clone()).await,
+        // The handler only builds a task when a backend is configured.
+        None => LlmOutcome::Refused(Refusal::Host),
+    };
+    let result = match &outcome {
+        LlmOutcome::Answer { .. } => "answered",
+        LlmOutcome::NotFound { .. } => "not-found",
+        LlmOutcome::Refused(refusal) => refusal.name(),
+    };
+    tracing::info!(task = kind, result, "language model task finished");
+    ask::render(task, &outcome)
 }
 
 /// Handles one `INTERACTION_CREATE`.
@@ -353,7 +390,7 @@ where
     let public = interaction.public;
     let defer_first = matches!(
         interaction.request,
-        Request::Catchup { .. } | Request::Search { .. }
+        Request::Catchup { .. } | Request::Search { .. } | Request::Ask { .. }
     );
     let opens_modal = matches!(
         interaction.request,
@@ -377,6 +414,7 @@ where
             };
             let store = Arc::clone(&shared.store);
             let config = shared.config;
+            let llm = shared.ask.is_some();
             let status = shared.status.snapshot();
             let now = (shared.clock)();
             tokio::task::spawn_blocking(move || {
@@ -387,6 +425,7 @@ where
                     zone: config.zone,
                     access: access.as_deref(),
                     status: &status,
+                    llm,
                 };
                 let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
                 handler::handle(&mut *store, &ctx, &interaction)
