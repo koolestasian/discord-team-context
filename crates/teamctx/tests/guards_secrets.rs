@@ -100,14 +100,18 @@ fn forms(secret: &str) -> Vec<(String, String)> {
     out
 }
 
+/// Fails if any form of any secret is in `text`. The failure names the secret and the
+/// form by position only, never by anything derived from the secret (CodeQL
+/// `rust/cleartext-logging`, and a real failure must not print what it found).
 fn assert_free_of(text: &str, place: &str, secrets: &[(&str, &str)]) {
-    for (name, secret) in secrets {
-        for (form, value) in forms(secret) {
-            assert!(
-                !text.contains(&value),
-                "the {name} appeared ({form}) in {place}"
-            );
-        }
+    let leak = secrets.iter().enumerate().find_map(|(which, (_, secret))| {
+        forms(secret)
+            .iter()
+            .position(|(_, value)| text.contains(value.as_str()))
+            .map(|form| (which, form))
+    });
+    if let Some((which, form)) = leak {
+        panic!("secret number {which} appeared in form number {form} in {place}");
     }
 }
 
@@ -526,4 +530,24 @@ fn malformed_payload_values_are_not_quoted_in_errors() {
     )
     .expect_err("discovery fails");
     assert_free_of_secrets(&error_text(&error), "SyncError for a type-confused channel");
+}
+
+/// The guard must fire on a leak, and its own failure text must not repeat the secret.
+#[test]
+fn a_leak_is_reported_without_repeating_the_secret() {
+    let secret = "FAKE-guard-selftest-secret-0000-not-real";
+    let leaked = format!("log line with {secret} inside");
+    let panic = std::panic::catch_unwind(|| {
+        assert_free_of(&leaked, "a self-test", &[("test secret", secret)]);
+    })
+    .expect_err("a leaked secret must fail the guard");
+    let message = panic
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| panic.downcast_ref::<&str>().copied())
+        .unwrap_or_default();
+    assert!(message.contains("a self-test"), "names the place");
+    assert!(!message.contains(secret), "the failure repeated the secret");
+    assert!(!message.contains("FAKE-guard"), "or part of it");
+    assert_free_of("clean text", "a self-test", &[("test secret", secret)]);
 }
