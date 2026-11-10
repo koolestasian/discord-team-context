@@ -1,0 +1,35 @@
+{
+  "threads": [
+    {
+      "id": "1100000000000000601",
+      "guild_id": "1100000000000000001",
+      "parent_id": "1100000000000000101",
+      "owner_id": "1100000000000000201",
+      "type": 11,
+      "name": "Old planning thread",
+      "thread_metadata": {
+        "archived": true,
+        "archive_timestamp": "2026-03-04T10:10:00.000000+00:00",
+        "auto_archive_duration": 1440,
+        "locked": false
+      }
+    },
+    {
+      "id": "1100000000000000602",
+      "guild_id": "1100000000000000001",
+      "parent_id": "1100000000000000103",
+      "owner_id": "1100000000000000202",
+      "type": 11,
+      "name": "Idea: dark mode",
+      "thread_metadata": {
+        "archived": true,
+        "archive_timestamp": "2026-03-04T10:10:00.000000+00:00",
+        "auto_archive_duration": 1440,
+        "locked": false
+      },
+      "applied_tags": []
+    }
+  ],
+  "members": [],
+  "has_more": false
+}

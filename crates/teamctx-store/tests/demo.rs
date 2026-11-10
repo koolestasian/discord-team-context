@@ -1,4 +1,6 @@
-//! Validate the fictional demo against the core contracts before any DB import exists.
+//! Validate the fictional demo against the core contracts, and check that the library
+//! importer (`teamctx_store::demo`) accepts it. The importer's own tests are in
+//! `demo_import.rs`.
 
 #![expect(
     clippy::expect_used,
@@ -14,6 +16,7 @@ use teamctx_core::{
     source::{Channel, Member, Message, MessageRef, SourceEvent},
     time::UnixMillis,
 };
+use teamctx_store::Store;
 
 fn text<'a>(value: &'a Value, key: &str) -> &'a str {
     value[key].as_str().expect("string field")
@@ -190,6 +193,17 @@ fn demo_loads_into_core_types_with_valid_cross_references() {
         superseded, reversals,
         "every superseded decision is replaced once"
     );
+
+    // The library importer, which tests/demo_import.rs covers in depth, accepts the
+    // same dataset this walk just validated.
+    let mut store = Store::in_memory().expect("in-memory store");
+    let map = teamctx_store::demo::import(
+        &mut store,
+        include_str!("../../../fixtures/demo/dataset.json"),
+    )
+    .expect("import");
+    assert_eq!(map.message_count(), messages.len());
+    assert_eq!(map.entry_count(), entries.len());
 }
 
 fn load_demo() -> Value {

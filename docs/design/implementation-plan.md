@@ -230,6 +230,11 @@ including `/ask`. `Connector`, `EventSink` and `CursorStore` live in `teamctx-di
 The `record` tool's `since` filters on last update. Member data comes from message
 authors and interaction users rather than a privileged member gateway intent.
 
+Schema version 2 (migration `0002_record_edits.sql`, 2026-11-09) adds `record_requests`
+(request key to entry, for retry-safe creation), an index on `record_events (entry_id,
+at, id)` and triggers that make `record_events` append-only. It is a new migration because
+databases created by `0001` exist.
+
 Migrations are plain SQL files in `crates/teamctx-store/migrations/NNNN_name.sql`. They
 are applied in order, tracked with `PRAGMA user_version`, and each runs in a transaction.
 Pragmas: `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=5000`,
@@ -421,6 +426,21 @@ Responses: Discord embeds, at most 10 items each, with a "more in web view" link
 the web view is configured. Every item ends with a jump link
 `https://discord.com/channels/{guild}/{channel}/{message}`.
 
+Implementation notes (M5, 2026-11-10; `docs/research/M5.md`):
+
+- Commands are registered as guild commands on the first `READY`. Global registration
+  is not built: section 12 names no configuration field for it (open question).
+- `/catchup` without a previous catch-up covers the last 14 days. The last catch-up is
+  `user_state.last_catchup_at` (no new migration).
+- Any member who can run a command may close or edit any entry; section 8 limits
+  changes by lifecycle only, and the audit log records who did it.
+- Replies show chat-derived items (messages, titles copied from messages) only from
+  channels the person can read in Discord; a `public:true` reply only from channels
+  `@everyone` can read. Entries typed with a slash command are visible to all.
+- The task modal uses Label components (Discord deprecated action rows with text inputs
+  in modals) with a user picker for the owner. No follow-up messages are sent.
+- The "more in web view" link is not added yet: the web view is M7.
+
 ---
 
 ## 8. The record
@@ -436,6 +456,10 @@ the web view is configured. Every item ends with a jump link
 - **Dates.** Free-text due dates ("friday", "nov 20") are parsed against the host's
   configured timezone into an absolute date, then echoed back for confirmation. A
   small parser in `core`, no dependency; unparseable input is rejected with examples.
+  Ambiguous input (`11/20`, or a bare weekday on that same weekday) is rejected too, never
+  guessed; see `core::when` and `docs/design/contracts.md`.
+- **Edits.** Owner and due date can change while an entry is live (`active` or `open`);
+  only tasks have a due date. Repeating a change is a no-op without an audit event.
 - **v0.2: suggestions.** An optional LLM job proposes candidates into a review queue
   that people accept or reject with buttons. Never auto-added.
 
@@ -445,7 +469,11 @@ the web view is configured. Every item ends with a jump link
 
 - **Query syntax:** plain words, `"phrase"`, `from:name`, `in:#channel`,
   `before:/after:YYYY-MM-DD`. Parsed in `core`, compiled to parameterised SQL. User
-  text is never concatenated into SQL; FTS terms are escaped.
+  text is never concatenated into SQL; FTS terms are escaped. Bare words match any
+  term (OR, after dropping a fixed list of stopwords) and rank higher the more of them
+  match; quoted phrases and filters are required (AND). A query is at most 2,000 bytes
+  and 32 clauses (words, phrases and filters), and FTS expressions use at most 32 terms,
+  so hostile input cannot make a search cost unbounded CPU.
 - **Ranking:** `bm25()` combined with recency decay and a boost for record entries.
   The exact formula lives in `core::rank` with table-driven tests on the demo dataset.
 - **Filter semantics** (maintainer clarification, 2026-11-05): all clauses, including
@@ -545,7 +573,7 @@ instead of guessing:
 
 ### 10.3 CLI
 
-Host commands: `teamctx init` · `run` · `demo` · `doctor` · `token create|list|revoke` ·
+Host commands: `teamctx init` · `run` · `serve` (HTTP only, loopback, no Discord: a local trial of the record on an existing database) · `demo` · `doctor` · `token create|list|revoke` ·
 `export --format okf|md <dir>` · `purge` · `version`. The `md` layout is defined in M5
 with the OKF export (ADR 0013).
 
@@ -596,6 +624,9 @@ record/
 - Claims cite sources as footnotes keyed by source `id`.
 - Human-captured entries use the spec's `human:` actor prefix. Since every v0.1 entry
   is human-captured, this marks them as human-confirmed.
+- OKF limits `status` to `draft|stable|deprecated`, so `status` carries that value and
+  `entry_status` the exact lifecycle status (ADR 0013, implementation notes). The `md`
+  layout is one file, `record.md` (same ADR).
 - Use cases: hand in with a school project, commit to the team's repo so agents can
   grep it, back up, move to another tool.
 - `[v0.2]` Optional live mirror to a folder or git repo.
@@ -647,6 +678,14 @@ record/
 
 ## 12. Configuration
 
+Implementation note (M6 wiring, 2026-11-10): `teamctx run` now serves `/ask`, optional
+catch-up summaries and authenticated `POST /api/v1/ask` through injected backends,
+tested with a fake provider only. HTTP usage is charged per token because tokens
+have no Discord member association; member and token budgets are separate. A keyless
+OpenAI-compatible provider is allowed only on loopback. Model-based query expansion
+remains deferred until measured by the retrieval eval. M6 is not complete until one
+hosted and one local model pass live checks. See `docs/guides/llm.md`.
+
 `teamctx.toml` (secrets only via env vars or a separate `secrets.env` with 0600
 permissions; `doctor` checks):
 
@@ -681,6 +720,12 @@ max_tokens_per_day = 200000
 
 Config is loaded with precedence CLI flags > env > file > defaults, validated at
 start-up with clear errors pointing at the bad field.
+
+Implementation note (M3, 2026-11-09): the database path is not a config field. `run`,
+`token` and `mcp --stdio` take `--db PATH` and default to `teamctx.db` in the working
+directory (§4). Until a time zone database is built in, `server.timezone` accepts `UTC`
+and fixed offsets (`+02:00`) only and `run` refuses named zones rather than guessing.
+`run` refuses `reaction_capture.enabled = true` until reaction capture is built.
 
 ---
 

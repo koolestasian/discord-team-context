@@ -3,9 +3,29 @@ use crate::time::DateError;
 use std::str::FromStr;
 use thiserror::Error;
 
+/// Longest query [`parse`] accepts, in bytes (UTF-8), counted before any trimming.
+///
+/// Why 2,000: a typed search or a pasted question is a few hundred bytes (the `/ask`
+/// question limit is 500 characters), and a Discord message is at most 2,000 characters,
+/// so a pasted message usually fits. Counting bytes rather than characters bounds the
+/// work the parser does, whatever the script.
+pub const MAX_QUERY_BYTES: usize = 2_000;
+
+/// Most clauses (words, phrases and filters together) [`parse`] accepts. It is also the
+/// most terms [`fts_expression`](super::fts_expression),
+/// [`fts_expression_all`](super::fts_expression_all) and
+/// [`context_query`](super::context_query) use, so a hand-built [`Query`] stays bounded.
+pub const MAX_CLAUSES: usize = 32;
+
 /// Invalid query syntax. Messages never interpolate untrusted query text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub enum ParseQueryError {
+    /// More than [`MAX_QUERY_BYTES`] bytes.
+    #[error("query too long: at most {MAX_QUERY_BYTES} bytes")]
+    TooLong,
+    /// More than [`MAX_CLAUSES`] clauses.
+    #[error("too many terms: at most {MAX_CLAUSES} words, phrases and filters")]
+    TooManyClauses,
     /// No clauses supplied.
     #[error("query must contain a word, phrase or filter")]
     Empty,
@@ -27,12 +47,23 @@ pub enum ParseQueryError {
 /// Unknown `name:value` prefixes remain plain words. Repeated filters remain AND
 /// clauses in order, never silently overwritten.
 ///
+/// Size limits come first, so hostile input costs little: more than
+/// [`MAX_QUERY_BYTES`] bytes is rejected before anything is read, and parsing stops
+/// before clause number [`MAX_CLAUSES`] + 1, without reading it.
+///
 /// # Errors
-/// Returns [`ParseQueryError`] for empty input, malformed quotes, empty values or dates.
+/// Returns [`ParseQueryError`] for oversized input, too many clauses, empty input,
+/// malformed quotes, empty values or dates.
 pub fn parse(input: &str) -> Result<Query, ParseQueryError> {
+    if input.len() > MAX_QUERY_BYTES {
+        return Err(ParseQueryError::TooLong);
+    }
     let mut remaining = input.trim_start();
     let mut clauses = Vec::new();
     while !remaining.is_empty() {
+        if clauses.len() == MAX_CLAUSES {
+            return Err(ParseQueryError::TooManyClauses);
+        }
         let prefix = ["from:", "in:", "before:", "after:"]
             .into_iter()
             .find(|prefix| remaining.starts_with(prefix));
@@ -159,5 +190,105 @@ mod tests {
         ] {
             assert_eq!(parse(input), Err(expected), "{input:?}");
         }
+    }
+
+    #[test]
+    fn length_limit_counts_bytes_and_is_inclusive() {
+        let at_limit = "a".repeat(MAX_QUERY_BYTES);
+        assert_eq!(parse(&at_limit).map(|q| q.clauses.len()), Ok(1));
+        let over = "a".repeat(MAX_QUERY_BYTES + 1);
+        assert_eq!(parse(&over), Err(ParseQueryError::TooLong));
+
+        // `é` is two bytes: half as many characters reach the same byte limit.
+        let wide = "é".repeat(MAX_QUERY_BYTES / 2);
+        assert_eq!(wide.len(), MAX_QUERY_BYTES);
+        assert!(parse(&wide).is_ok());
+        let wide_over = format!("{wide}a");
+        assert!(wide_over.chars().count() < MAX_QUERY_BYTES);
+        assert_eq!(parse(&wide_over), Err(ParseQueryError::TooLong));
+
+        // Whitespace counts too: the check runs before any trimming or splitting.
+        let padded = format!("{}sqlite", " ".repeat(MAX_QUERY_BYTES));
+        assert_eq!(parse(&padded), Err(ParseQueryError::TooLong));
+        assert_eq!(
+            parse(&" ".repeat(MAX_QUERY_BYTES + 1)),
+            Err(ParseQueryError::TooLong)
+        );
+        // A huge input is rejected without being parsed, even when it is malformed.
+        let hostile = format!("\"{}", "x ".repeat(500_000));
+        assert_eq!(parse(&hostile), Err(ParseQueryError::TooLong));
+    }
+
+    #[test]
+    fn clause_limit_counts_words_phrases_and_filters() {
+        let words = |n: usize| {
+            (0..n)
+                .map(|i| format!("w{i}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        assert_eq!(
+            parse(&words(MAX_CLAUSES)).map(|q| q.clauses.len()),
+            Ok(MAX_CLAUSES)
+        );
+        assert_eq!(
+            parse(&words(MAX_CLAUSES + 1)),
+            Err(ParseQueryError::TooManyClauses)
+        );
+
+        // A mix: 8 of each kind of clause is exactly the limit.
+        let mut mixed = Vec::new();
+        for i in 0..8 {
+            mixed.push(format!("word{i}"));
+            mixed.push(format!("\"phrase {i}\""));
+            mixed.push(format!("from:member{i}"));
+            mixed.push(format!("after:2026-01-{:02}", i + 1));
+        }
+        let mixed = mixed.join(" ");
+        assert_eq!(parse(&mixed).map(|q| q.clauses.len()), Ok(MAX_CLAUSES));
+        for extra in ["\"one more\"", "in:#dev", "before:2026-02-01", "more"] {
+            assert_eq!(
+                parse(&format!("{mixed} {extra}")),
+                Err(ParseQueryError::TooManyClauses),
+                "{extra:?}"
+            );
+        }
+        // Trailing whitespace is not a clause.
+        assert!(parse(&format!("{mixed}   ")).is_ok());
+        // The clause past the limit is never parsed: a malformed one still reports the
+        // limit, so no per-clause work happens beyond it.
+        assert_eq!(
+            parse(&format!("{} \"unclosed", words(MAX_CLAUSES))),
+            Err(ParseQueryError::TooManyClauses)
+        );
+        // Single-letter words: the most clauses that fit in the byte limit.
+        assert_eq!(
+            parse(&"a ".repeat(MAX_QUERY_BYTES / 2)),
+            Err(ParseQueryError::TooManyClauses)
+        );
+    }
+
+    #[test]
+    fn limit_errors_never_echo_the_query() {
+        let marker = "not-a-real-secret-marker";
+        for input in [
+            format!("{marker} {}", "x".repeat(MAX_QUERY_BYTES)),
+            format!("{marker} {}", "y ".repeat(MAX_CLAUSES)),
+        ] {
+            let error = parse(&input).unwrap_err();
+            for message in [error.to_string(), format!("{error:?}")] {
+                assert!(!message.contains(marker), "{message}");
+                assert!(!message.contains("xx"), "{message}");
+                assert!(!message.contains("y y"), "{message}");
+            }
+        }
+        assert_eq!(
+            ParseQueryError::TooLong.to_string(),
+            "query too long: at most 2000 bytes"
+        );
+        assert_eq!(
+            ParseQueryError::TooManyClauses.to_string(),
+            "too many terms: at most 32 words, phrases and filters"
+        );
     }
 }

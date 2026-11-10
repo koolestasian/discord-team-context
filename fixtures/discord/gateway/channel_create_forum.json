@@ -1,0 +1,25 @@
+{
+  "op": 0,
+  "s": 14,
+  "t": "CHANNEL_CREATE",
+  "d": {
+    "id": "1100000000000000103",
+    "guild_id": "1100000000000000001",
+    "type": 15,
+    "name": "ideas",
+    "position": 3,
+    "nsfw": false,
+    "permission_overwrites": [],
+    "flags": 0,
+    "topic": "One post per idea.",
+    "available_tags": [
+      {
+        "id": "1100000000000000401",
+        "name": "accepted",
+        "moderated": false,
+        "emoji_id": null,
+        "emoji_name": null
+      }
+    ]
+  }
+}

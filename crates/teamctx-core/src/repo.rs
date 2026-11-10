@@ -20,8 +20,8 @@ use thiserror::Error;
 use crate::id::{ChannelId, EntryId, MemberId, MessageId, Snowflake, SourceId, TokenId};
 use crate::query::Query;
 use crate::record::{
-    EntryKind, EntryStatus, NewEntry, RecordEntry, RecordEvent, RecordRuleError, ShortId,
-    StatusChange,
+    CreatedVia, EntryKind, EntryStatus, NewEntry, RecordEntry, RecordEvent, RecordRuleError,
+    RequestKey, ShortId, StatusChange,
 };
 use crate::source::{ChannelKind, MessageRef, SourceEvent, SourceKind};
 use crate::time::UnixMillis;
@@ -168,6 +168,26 @@ pub struct StoredMessage {
     pub created_at: UnixMillis,
     /// Last edit time.
     pub edited_at: Option<UnixMillis>,
+}
+
+/// Where a page of [`MessageRead::channel_messages_since`] stopped: the position of the
+/// last message returned. The next page starts strictly after it, so paging stays stable
+/// while messages are added or deleted between calls.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MessageCursor {
+    /// Creation time of the last message of the previous page.
+    pub created_at: UnixMillis,
+    /// External id of the last message of the previous page.
+    pub external_id: Snowflake,
+}
+
+impl From<&StoredMessage> for MessageCursor {
+    fn from(message: &StoredMessage) -> Self {
+        Self {
+            created_at: message.created_at,
+            external_id: message.external_id,
+        }
+    }
 }
 
 /// A full-text match on a message, before ranking.
@@ -360,6 +380,108 @@ pub trait RecordWrite {
     fn set_last_catchup(&mut self, member: MemberId, at: UnixMillis) -> RepoResult<()>;
 }
 
+/// What a retry-safe record write did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EntryOutcome {
+    /// The entry as it is now.
+    pub entry: RecordEntry,
+    /// `false` when the request had already been applied (a retry, or the same state
+    /// asked for twice) and nothing was written. For creating methods, `true` means the
+    /// entry was created by this call.
+    pub changed: bool,
+}
+
+/// Retry-safe record writes from people (plan sections 6.1, 7.3 and 8): capture from a
+/// message, owner and due-date changes, and status changes that tolerate a repeat.
+///
+/// A separate trait from [`RecordWrite`] so existing implementations keep compiling.
+/// Every method is one transaction, takes the acting member and the time as parameters,
+/// and appends the audit event of its change with that actor (plan section 8: "Capture
+/// records who did it"). Asking for a state the entry already has changes nothing and
+/// appends no event.
+pub trait RecordEdit {
+    /// Captures a stored message as a new entry of `kind` (context menu, slash command or
+    /// reaction). The title is copied from the message text
+    /// ([`NewEntry::from_message`](crate::record::NewEntry::from_message)). At most one
+    /// entry exists per message and kind: when one does, it is returned with
+    /// `changed = false` and nothing is written, so a double click or a retry is safe.
+    ///
+    /// # Errors
+    ///
+    /// - [`RepoError::NotFound`] if the message is missing or in an excluded channel, or
+    ///   `actor` does not exist;
+    /// - [`RepoError::Rule`] with `EmptyTitle` when the message has no text;
+    /// - [`RepoError::Backend`].
+    fn capture_message(
+        &mut self,
+        kind: EntryKind,
+        message: MessageId,
+        actor: MemberId,
+        via: CreatedVia,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome>;
+
+    /// Like [`RecordWrite::create_entry`] but safe to retry: the first call with a `key`
+    /// creates the entry and remembers the key, later calls with the same key return that
+    /// entry with `changed = false`. Use the interaction id as the key.
+    ///
+    /// # Errors
+    ///
+    /// - everything [`RecordWrite::create_entry`] returns;
+    /// - [`RepoError::Conflict`] if the key was used for an entry of another kind.
+    fn create_entry_once(&mut self, key: &RequestKey, entry: &NewEntry)
+    -> RepoResult<EntryOutcome>;
+
+    /// [`RecordWrite::change_status`] that treats a repeat as success: when the entry is
+    /// already in the target status and carries the same data (the same replacing
+    /// decision for `Supersede`, the same message for `Answer`), it returns the entry
+    /// with `changed = false` and appends nothing.
+    ///
+    /// # Errors
+    ///
+    /// As [`RecordWrite::change_status`]; a repeat with different data (superseded by
+    /// another decision, answered by another message) is still a lifecycle error.
+    fn change_status_once(
+        &mut self,
+        id: ShortId,
+        change: StatusChange,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome>;
+
+    /// Sets or clears (`None`) the owner of a live entry and appends
+    /// [`RecordAction::OwnerChanged`](crate::record::RecordAction::OwnerChanged).
+    ///
+    /// # Errors
+    ///
+    /// - [`RepoError::NotFound`] if `id` matches no entry of that kind, or `owner` or
+    ///   `actor` does not exist;
+    /// - [`RepoError::Rule`] with `NotEditable` if the entry is finished;
+    /// - [`RepoError::Backend`].
+    fn set_owner(
+        &mut self,
+        id: ShortId,
+        owner: Option<MemberId>,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome>;
+
+    /// Sets or clears (`None`) the due date of an open task and appends
+    /// [`RecordAction::DueChanged`](crate::record::RecordAction::DueChanged).
+    ///
+    /// # Errors
+    ///
+    /// As [`RecordEdit::set_owner`], plus [`RepoError::Rule`] with `DueOnNonTask` for a
+    /// decision or question.
+    fn set_due(
+        &mut self,
+        id: ShortId,
+        due: Option<UnixMillis>,
+        actor: MemberId,
+        at: UnixMillis,
+    ) -> RepoResult<EntryOutcome>;
+}
+
 /// Writes for access tokens (plan sections 6, 10.1, 13).
 pub trait TokenWrite {
     /// Stores a new token hash under a unique name.
@@ -375,11 +497,14 @@ pub trait TokenWrite {
         at: UnixMillis,
     ) -> RepoResult<AccessToken>;
 
-    /// Sets `last_used_at = at`.
+    /// Sets `last_used_at = at` if the token is not revoked, checking and writing in one
+    /// atomic step. Authentication treats success as the moment a token is accepted, so
+    /// a revocation that commits before it always wins (US-10).
     ///
     /// # Errors
     ///
-    /// [`RepoError::NotFound`] if the token does not exist; [`RepoError::Backend`].
+    /// [`RepoError::NotFound`] if the token does not exist or is revoked;
+    /// [`RepoError::Backend`].
     fn touch_token(&mut self, id: TokenId, at: UnixMillis) -> RepoResult<()>;
 
     /// Sets `revoked_at = at` on the named token. Revoking twice keeps the first time.
@@ -494,6 +619,31 @@ pub trait MessageRead {
     /// [`RepoError::Backend`] only. Query validity is the parser's concern.
     fn search_messages(&self, query: &Query, limit: u32) -> RepoResult<Vec<MessageHit>>;
 
+    /// Messages of one channel, thread or forum post created at or after `since`, oldest
+    /// first (by `created_at`, then numeric external id), at most `limit` of them.
+    ///
+    /// `cursor` makes it a keyset page: `None` starts at `since`, `Some` returns only
+    /// messages strictly after that position, normally the last message of the previous
+    /// page (`MessageCursor::from(&last)`). A page shorter than `limit` is the last one.
+    /// Because the position is a value, not an offset, messages deleted or added between
+    /// calls never make a page skip or repeat a message that was stored throughout.
+    ///
+    /// A thread is a channel of its own: the messages of a thread are not returned for
+    /// its parent channel. A channel that is excluded (directly or through its parent),
+    /// unknown or empty returns an empty list, so callers cannot tell them apart and
+    /// excluded content never leaks. A `limit` of 0 returns an empty list.
+    ///
+    /// # Errors
+    ///
+    /// [`RepoError::Backend`] only.
+    fn channel_messages_since(
+        &self,
+        channel: ChannelId,
+        since: UnixMillis,
+        limit: u32,
+        cursor: Option<MessageCursor>,
+    ) -> RepoResult<Vec<StoredMessage>>;
+
     /// Channels and threads with messages created at or after `since`, most messages
     /// first (ties by channel row id), at most `limit`.
     ///
@@ -583,6 +733,7 @@ mod tests {
 
     #[test]
     fn traits_are_object_safe() {
+        fn _edit(_: &dyn RecordEdit) {}
         fn _assert(
             _: &dyn IngestWrite,
             _: &dyn RecordWrite,

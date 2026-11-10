@@ -1,9 +1,18 @@
 //! teamctx command-line program: CLI, configuration and wiring.
 //!
-//! Pre-alpha: init/doctor currently validate configuration offline; live Discord
-//! validation and sync are gated on a throwaway test server.
+//! Pre-alpha: `run` hosts the record and syncs Discord; `doctor --live` checks the bot.
+//! Live behaviour is not yet verified against a real Discord server (spikes S1/S2).
 
+mod ask;
 mod config;
+mod demo;
+mod eval;
+mod export;
+mod q;
+mod run;
+mod search;
+mod skill;
+mod token;
 
 use std::ffi::OsString;
 use std::fmt;
@@ -19,17 +28,48 @@ const HELP: &str = concat!(
     "\n",
     "Turns a team's Discord into a searchable team record.\n",
     "\n",
-    "Offline init and doctor; live Discord support is not available yet.\n",
+    "Pre-alpha: live Discord sync is not yet verified against a real server.\n",
     "\n",
-    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS]\n",
+    "Usage: teamctx [OPTIONS] | init|doctor|run [CONFIG OPTIONS] | demo|search|q|skill|serve|mcp [ARGS]\n",
     "\n",
     "Options:\n",
     "  -h, --help     Print this help\n",
     "  -V, --version  Print the version\n",
+    "\nHost commands:\n",
+    "  run           Sync Discord and serve /mcp, /api/v1 and /healthz until Ctrl-C or SIGTERM\n",
+    "                (run [CONFIG OPTIONS] [--db PATH]; --db defaults to teamctx.db). The bot\n",
+    "                token is read from the variable named by discord.token_env\n",
+    "  doctor --live Also check the bot on Discord: guild access, per-channel permissions and\n",
+    "                the Message Content intent (read-only requests; prints no secret)\n",
+    "  serve         Serve /mcp and /api/v1 from a local database on loopback, with no Discord
+",
+    "                connection, to try the record and `teamctx q` (serve [--db PATH]
+",
+    "                [--bind 127.0.0.1:PORT] [--timezone TZ]; make a token with `token create`)
+",
+    "  mcp --stdio   Serve the MCP tools on stdin/stdout from a local database, without a token
+",
+    "                (mcp --stdio [--db PATH] [--timezone TZ]; --db defaults to teamctx.db)\n",
     "\nOffline commands:\n",
     "  init          Print a config template and optional bot invite; writes no files\n",
     "  doctor        Validate config and token presence; makes no network calls\n",
-    "\nOffline options:\n",
+    "  token         create|list|revoke access tokens (see 'teamctx token --help')\n",
+    "  demo          Load a fictional team into a SQLite file (demo [--db PATH])\n",
+    "  search        Search a database (search QUERY [--db PATH] [--limit N] [--timezone TZ])\n",
+    "  export        Write the record as files (export --format okf|md DIR [--db PATH] [--force])\n",
+    "  q             Ask a running host (see below; same results as the MCP tools)\n",
+    "  skill         Install the Agent Skill for coding agents (skill install [--dir PATH] [--force])\n",
+    "\nClient commands (read TEAMCTX_URL; the token comes from TEAMCTX_TOKEN or a token file):\n",
+    "  q context TEXT [--limit N]        Ranked decisions, tasks, questions and chat for a branch\n",
+    "  q whats-new SINCE                 Changes since a date (2026-04-01) or window (24h, 7d)\n",
+    "  q record [--kind K] [--status S] [--topic TEXT] [--owner NAME] [--since S] [--cursor C]\n",
+    "  q search QUERY [--cursor C]       Search chat (query syntax as for 'search')\n",
+    "  q read ID [--before N] [--after N]   One message (m:123) or entry (D-12) with its source\n",
+    "  --json                Print the host's JSON instead of the framed text\n",
+    "  --url URL             Host URL (default: TEAMCTX_URL)\n",
+    "  --token-file PATH     Token file (default: TEAMCTX_TOKEN_FILE, else teamctx/token in the\n",
+    "                        OS data directory). It must be mode 0600 on Unix; Windows is not checked\n",
+    "\nConfig options (init, doctor, run):\n",
     "  --config PATH         TOML file (default teamctx.toml if present)\n",
     "  --guild-id ID         Discord server id (required unless in file/environment)\n",
     "  --application-id ID   Print an invite in init\n",
@@ -39,6 +79,13 @@ const HELP: &str = concat!(
     "  --token-env NAME      Environment variable containing bot token\n",
     "  --include-channels LIST / --exclude-channels LIST (comma-separated)\n",
     "  --backfill-days N / --recheck-window-hours N\n",
+    "\nDemo and search (no network; --db defaults to teamctx/demo.db in the OS data directory):\n",
+    "  QUERY syntax: words, \"a phrase\", from:NAME, in:#channel, before:/after:YYYY-MM-DD\n",
+    "  --timezone TZ         Midnight for before:/after:, default UTC. Only UTC and fixed\n",
+    "                        offsets such as +02:00 work; named zones (America/Toronto) are\n",
+    "                        rejected because no time zone database is built in\n",
+    "  --limit N             Results to print, 1 to 50 (default 5)\n",
+    "  Chat text is printed framed as data, so the output is safe to paste into an agent.\n",
 );
 
 /// Exit code for a command-line usage error (the same code `clap` will use later).
@@ -50,6 +97,17 @@ enum Command {
     Version,
     Init(config::OfflineOptions),
     Doctor(config::OfflineOptions),
+    DoctorLive(config::OfflineOptions),
+    Run(run::RunOptions),
+    Mcp(run::McpOptions),
+    Serve(run::ServeOptions),
+    Token(token::Command),
+    Skill(skill::Command),
+    Eval(eval::Options),
+    Demo(demo::DemoOptions),
+    Export(export::Options),
+    Search(search::SearchOptions),
+    Q(q::QOptions),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -57,6 +115,12 @@ enum UsageError {
     Unknown(OsString),
     Extra(OsString),
     Config(config::ConfigError),
+    Token(token::UsageError),
+    Skill(skill::UsageError),
+    Eval(eval::ArgError),
+    Args(demo::ArgError),
+    Export(export::ArgError),
+    Q(q::QArgError),
 }
 
 impl fmt::Display for UsageError {
@@ -66,6 +130,12 @@ impl fmt::Display for UsageError {
             Self::Unknown(arg) => write!(f, "unrecognised argument {arg:?}"),
             Self::Extra(arg) => write!(f, "unexpected extra argument {arg:?}"),
             Self::Config(error) => fmt::Display::fmt(error, f),
+            Self::Token(error) => fmt::Display::fmt(error, f),
+            Self::Skill(error) => fmt::Display::fmt(error, f),
+            Self::Eval(error) => fmt::Display::fmt(error, f),
+            Self::Args(error) => fmt::Display::fmt(error, f),
+            Self::Export(error) => fmt::Display::fmt(error, f),
+            Self::Q(error) => fmt::Display::fmt(error, f),
         }
     }
 }
@@ -84,9 +154,63 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, UsageError
                     .map_err(UsageError::Config);
             }
             Some("doctor") => {
-                return config::parse_cli(args)
-                    .map(Command::Doctor)
+                let mut rest: Vec<OsString> = args.collect();
+                let live = run::take_flag(&mut rest, "--live");
+                return config::parse_cli(rest)
+                    .map(if live {
+                        Command::DoctorLive
+                    } else {
+                        Command::Doctor
+                    })
                     .map_err(UsageError::Config);
+            }
+            Some("run") => {
+                return run::parse_run(args)
+                    .map(Command::Run)
+                    .map_err(UsageError::Config);
+            }
+            Some("serve") => {
+                return run::parse_serve(args)
+                    .map(Command::Serve)
+                    .map_err(UsageError::Config);
+            }
+            Some("mcp") => {
+                return run::parse_mcp(args)
+                    .map(Command::Mcp)
+                    .map_err(UsageError::Config);
+            }
+            Some("token") => {
+                return token::parse(args)
+                    .map(Command::Token)
+                    .map_err(UsageError::Token);
+            }
+            Some("skill") => {
+                return skill::parse(args)
+                    .map(Command::Skill)
+                    .map_err(UsageError::Skill);
+            }
+            Some("eval") => {
+                return eval::parse_args(args)
+                    .map(Command::Eval)
+                    .map_err(UsageError::Eval);
+            }
+            Some("demo") => {
+                return demo::parse_args(args)
+                    .map(Command::Demo)
+                    .map_err(UsageError::Args);
+            }
+            Some("export") => {
+                return export::parse_args(args)
+                    .map(Command::Export)
+                    .map_err(UsageError::Export);
+            }
+            Some("search") => {
+                return search::parse_args(args)
+                    .map(Command::Search)
+                    .map_err(UsageError::Args);
+            }
+            Some("q") => {
+                return q::parse_args(args).map(Command::Q).map_err(UsageError::Q);
             }
             _ => return Err(UsageError::Unknown(arg)),
         },
@@ -104,6 +228,17 @@ fn run(args: impl IntoIterator<Item = OsString>, out: &mut impl Write, err: &mut
         Ok(Command::Version) => out.write_all(VERSION.as_bytes()),
         Ok(Command::Init(options)) => return run_offline(true, &options, out, err),
         Ok(Command::Doctor(options)) => return run_offline(false, &options, out, err),
+        Ok(Command::DoctorLive(options)) => return run::doctor_live(&options, out, err),
+        Ok(Command::Run(options)) => return run::run(&options, out, err),
+        Ok(Command::Mcp(options)) => return run::mcp_stdio(&options, err),
+        Ok(Command::Serve(options)) => return run::serve_only(&options, out, err),
+        Ok(Command::Token(command)) => return token::run(&command, out, err),
+        Ok(Command::Skill(command)) => return skill::run(&command, out, err),
+        Ok(Command::Eval(options)) => return run_eval(&options, out, err),
+        Ok(Command::Demo(options)) => return demo::run(&options, out, err),
+        Ok(Command::Export(options)) => return export::run(&options, out, err),
+        Ok(Command::Search(options)) => return search::run(&options, out, err),
+        Ok(Command::Q(options)) => return q::run(&options, out, err),
         Err(error) => {
             // If stderr is gone there is nowhere left to report that, so the error is dropped.
             let _ = writeln!(err, "error: {error}\nTry 'teamctx --help'.");
@@ -128,11 +263,23 @@ fn run_offline(
     }
 }
 
+fn run_eval(options: &eval::Options, out: &mut impl Write, err: &mut impl Write) -> u8 {
+    match eval::execute(options, out) {
+        Ok(success) => u8::from(!success),
+        Err(error) => {
+            let _ = writeln!(err, "error: {error}");
+            1
+        }
+    }
+}
+
 fn main() -> ExitCode {
+    // Unlocked handles: `run` and `mcp --stdio` write from other threads (logs to stderr,
+    // MCP replies to stdout), which would block forever on a lock held here.
     let code = run(
         std::env::args_os().skip(1),
-        &mut io::stdout().lock(),
-        &mut io::stderr().lock(),
+        &mut io::stdout(),
+        &mut io::stderr(),
     );
     ExitCode::from(code)
 }
@@ -161,8 +308,8 @@ mod tests {
     #[test]
     fn unknown_and_extra_arguments_are_errors() {
         assert_eq!(
-            parse_strs(&["serve"]),
-            Err(UsageError::Unknown(OsString::from("serve")))
+            parse_strs(&["frobnicate"]),
+            Err(UsageError::Unknown(OsString::from("frobnicate")))
         );
         assert_eq!(
             parse_strs(&["--version", "--help"]),

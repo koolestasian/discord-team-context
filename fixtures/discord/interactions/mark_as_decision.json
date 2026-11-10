@@ -1,0 +1,74 @@
+{
+  "op": 0,
+  "s": 5,
+  "t": "INTERACTION_CREATE",
+  "d": {
+    "id": "1100000000000007001",
+    "application_id": "1100000000000000900",
+    "type": 2,
+    "token": "FAKE-interaction-token.not-a-real-credential_0001",
+    "version": 1,
+    "guild_id": "1100000000000000001",
+    "channel_id": "1100000000000000101",
+    "app_permissions": "66560",
+    "locale": "en-US",
+    "guild_locale": "en-US",
+    "entitlements": [],
+    "authorizing_integration_owners": { "0": "1100000000000000001" },
+    "context": 0,
+    "attachment_size_limit": 10485760,
+    "member": {
+      "user": {
+        "id": "1100000000000000201",
+        "username": "robin_example",
+        "global_name": "Robin Example",
+        "discriminator": "0",
+        "avatar": null,
+        "public_flags": 0
+      },
+      "nick": "Robin (release lead)",
+      "roles": [],
+      "joined_at": "2025-01-02T03:04:05.000000+00:00",
+      "deaf": false,
+      "mute": false,
+      "flags": 0,
+      "permissions": "2248473465835073"
+    },
+    "data": {
+      "id": "1100000000000000950",
+      "name": "Mark as decision",
+      "type": 3,
+      "guild_id": "1100000000000000001",
+      "target_id": "1100000000000001001",
+      "resolved": {
+        "messages": {
+          "1100000000000001001": {
+            "id": "1100000000000001001",
+            "channel_id": "1100000000000000101",
+            "type": 0,
+            "content": "Decision: we ship the beta on Friday. @everyone please read [the plan](https://evil.example.invalid).",
+            "author": {
+              "id": "1100000000000000202",
+              "username": "sam_sample",
+              "global_name": "Sam Sample",
+              "discriminator": "0",
+              "avatar": null,
+              "public_flags": 0
+            },
+            "mentions": [],
+            "mention_roles": [],
+            "mention_everyone": false,
+            "attachments": [],
+            "embeds": [],
+            "pinned": false,
+            "tts": false,
+            "timestamp": "2026-03-04T10:00:00.000000+00:00",
+            "edited_timestamp": null,
+            "flags": 0,
+            "components": []
+          }
+        }
+      }
+    }
+  }
+}

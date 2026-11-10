@@ -1,0 +1,47 @@
+[
+  {
+    "id": "1100000000000000100",
+    "guild_id": "1100000000000000001",
+    "type": 4,
+    "name": "Text",
+    "position": 0,
+    "nsfw": false,
+    "permission_overwrites": [],
+    "flags": 0
+  },
+  {
+    "id": "1100000000000000101",
+    "guild_id": "1100000000000000001",
+    "type": 0,
+    "name": "general",
+    "position": 1,
+    "nsfw": false,
+    "permission_overwrites": [],
+    "flags": 0,
+    "topic": "Team chat and decisions",
+    "parent_id": "1100000000000000100"
+  },
+  {
+    "id": "1100000000000000103",
+    "guild_id": "1100000000000000001",
+    "type": 15,
+    "name": "ideas",
+    "position": 3,
+    "nsfw": false,
+    "permission_overwrites": [],
+    "flags": 0,
+    "topic": "One post per idea."
+  },
+  {
+    "id": "1100000000000000104",
+    "guild_id": "1100000000000000001",
+    "type": 2,
+    "name": "Standup room",
+    "position": 4,
+    "nsfw": false,
+    "permission_overwrites": [],
+    "flags": 0,
+    "bitrate": 64000,
+    "user_limit": 0
+  }
+]

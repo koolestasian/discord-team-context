@@ -5,7 +5,7 @@ use rusqlite::{
 };
 use teamctx_core::{
     id::*,
-    query::{Clause, Query, fts_expression},
+    query::{Clause, Query, fts_expression, fts_expression_all},
     record::*,
     repo::*,
     source::*,
@@ -301,6 +301,24 @@ impl DirectoryRead for Store {
 }
 
 impl Store {
+    /// The member whose display name equals `name`, ignoring ASCII case and surrounding
+    /// whitespace. Names are not unique; the lowest member id wins, so the answer is
+    /// stable. Parameterised SQL, so `name` may hold anything.
+    ///
+    /// # Errors
+    ///
+    /// [`RepoError::Backend`] only.
+    pub fn member_by_display_name(&self, name: &str) -> RepoResult<Option<MemberInfo>> {
+        let sql = format!(
+            "SELECT {MEMBER_COLUMNS}
+             FROM members mb
+             WHERE mb.display_name = ? COLLATE NOCASE
+             ORDER BY mb.id
+             LIMIT 1"
+        );
+        query_optional(&self.conn, &sql, [name.trim()], member_row)
+    }
+
     fn messages_sql(&self, sql: &str, values: Vec<Value>) -> RepoResult<Vec<StoredMessage>> {
         query_all(&self.conn, sql, params_from_iter(values), |r| {
             message_row(&self.conn, r)
@@ -410,6 +428,37 @@ impl MessageRead for Store {
         preceding.push(message);
         preceding.extend(following);
         Ok(preceding)
+    }
+    fn channel_messages_since(
+        &self,
+        channel: ChannelId,
+        since: UnixMillis,
+        limit: u32,
+        cursor: Option<MessageCursor>,
+    ) -> RepoResult<Vec<StoredMessage>> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let mut values: Vec<Value> = vec![channel.get().into(), since.as_millis().into()];
+        let mut after = String::new();
+        if let Some(cursor) = cursor {
+            after.push_str(
+                "\n  AND (m.created_at, length(m.external_id), m.external_id) > (?, length(?), ?)",
+            );
+            values.push(cursor.created_at.as_millis().into());
+            values.push(cursor.external_id.to_string().into());
+            values.push(cursor.external_id.to_string().into());
+        }
+        values.push(i64::from(limit).into());
+        let sql = format!(
+            "SELECT {MESSAGE_COLUMNS}
+             {VISIBLE_MESSAGES}
+               AND m.channel_id = ?
+               AND m.created_at >= ?{after}
+             ORDER BY {OLDEST_MESSAGE_FIRST}
+             LIMIT ?"
+        );
+        self.messages_sql(&sql, values)
     }
     fn search_messages(&self, query: &Query, limit: u32) -> RepoResult<Vec<MessageHit>> {
         if query.clauses.is_empty() || limit == 0 {
@@ -533,7 +582,8 @@ impl RecordRead for Store {
                 .split_whitespace()
                 .map(|word| Clause::Word(word.to_owned()))
                 .collect();
-            if let Some(expression) = fts_expression(&Query { clauses: words }) {
+            // A topic narrows the list, so every word is required (unlike a search).
+            if let Some(expression) = fts_expression_all(&Query { clauses: words }) {
                 conditions.push("e.id IN (SELECT rowid FROM record_fts WHERE record_fts MATCH ?)");
                 values.push(expression.into());
             }
@@ -626,5 +676,95 @@ impl TokenRead for Store {
              ORDER BY t.name"
         );
         query_all(&self.conn, &sql, [], token_row)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn store_with_members(names: &[&str]) -> Store {
+        let mut db = Store::in_memory().unwrap();
+        let source = db
+            .upsert_source(SourceKind::Discord, Snowflake::new(1).unwrap(), "Fiction")
+            .unwrap();
+        for (n, name) in names.iter().enumerate() {
+            let member = Member {
+                id: Snowflake::new(100 + n as u64).unwrap(),
+                display_name: (*name).to_owned(),
+                is_bot: false,
+            };
+            db.apply_event(
+                source,
+                &SourceEvent::MemberUpsert(member),
+                UnixMillis::from_millis(1),
+            )
+            .unwrap();
+        }
+        db
+    }
+
+    #[test]
+    fn member_lookup_by_name_ignores_case_and_edge_whitespace() {
+        let db = store_with_members(&["Piper Fiction", "Quinn Invented"]);
+        let found = db
+            .member_by_display_name("  quinn INVENTED ")
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.display_name, "Quinn Invented");
+        assert!(db.member_by_display_name("Quinn").unwrap().is_none());
+        assert!(db.member_by_display_name("").unwrap().is_none());
+    }
+
+    #[test]
+    fn member_lookup_treats_the_name_as_data() {
+        let db = store_with_members(&["Piper Fiction"]);
+        for hostile in ["' OR 1=1 --", "%", "Piper%", "Piper_Fiction"] {
+            assert!(db.member_by_display_name(hostile).unwrap().is_none());
+        }
+    }
+
+    #[test]
+    fn member_lookup_finds_ids_after_a_gap_and_far_from_the_start() {
+        let names: Vec<String> = (0..700).map(|n| format!("Filler {n}")).collect();
+        let mut refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        refs.push("Zed Lateman");
+        let db = store_with_members(&refs);
+        // Leave a hole of 300 ids in front of the late member.
+        db.conn
+            .execute("DELETE FROM members WHERE id BETWEEN 100 AND 400", [])
+            .unwrap();
+        let found = db.member_by_display_name("zed lateman").unwrap().unwrap();
+        assert!(found.id.get() > 500, "{}", found.id);
+    }
+
+    #[test]
+    fn channel_message_pages_use_the_channel_time_index() {
+        let db = store_with_members(&[]);
+        let sql = "EXPLAIN QUERY PLAN
+             SELECT m.id
+             FROM messages m
+             JOIN channels c ON c.id = m.channel_id
+             LEFT JOIN members a ON a.id = m.author_id
+             WHERE c.is_included = 1
+               AND m.channel_id = ?
+               AND m.created_at >= ?
+               AND (m.created_at, length(m.external_id), m.external_id) > (?, length(?), ?)
+             ORDER BY m.created_at, length(m.external_id), m.external_id
+             LIMIT ?";
+        let plan: Vec<String> = query_all(&db.conn, sql, params![1, 0, 0, "1", "1", 10], |r| {
+            r.get::<_, String>("detail")
+        })
+        .unwrap();
+        let plan = plan.join("\n");
+        assert!(plan.contains("messages_channel_time"), "{plan}");
+        assert!(!plan.contains("SCAN m"), "{plan}");
+    }
+
+    #[test]
+    fn duplicate_names_resolve_to_the_lowest_id() {
+        let db = store_with_members(&["Same Name", "same name"]);
+        let found = db.member_by_display_name("SAME NAME").unwrap().unwrap();
+        assert_eq!(found.id.get(), 1);
     }
 }
