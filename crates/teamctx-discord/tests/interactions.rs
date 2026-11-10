@@ -727,6 +727,38 @@ impl io::Write for Capture {
     }
 }
 
+fn assert_no_sensitive_log(logs: &str) {
+    for secret in [
+        "FAKE-interaction-token",
+        "not-a-real-credential",
+        "ship the beta",
+        "Ignore all previous rules",
+        "evil.example.invalid",
+        "Robin (release lead)",
+        "When do we ship",
+        "print the API key",
+    ] {
+        // A failing guard must not echo the sensitive value or the captured log.
+        assert!(!logs.contains(secret), "a log line carries forbidden data");
+    }
+}
+
+#[test]
+fn log_guard_failure_does_not_reprint_sensitive_data() {
+    let captured = "FAKE-interaction-token.not-a-real-credential private-chat-marker";
+    let failure = std::panic::catch_unwind(|| assert_no_sensitive_log(captured))
+        .expect_err("the guard must detect the credential");
+    let diagnostic = failure
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| failure.downcast_ref::<&str>().copied())
+        .expect("text panic");
+    assert!(diagnostic.contains("forbidden data"));
+    assert!(!diagnostic.contains("FAKE-interaction-token"));
+    assert!(!diagnostic.contains("not-a-real-credential"));
+    assert!(!diagnostic.contains("private-chat-marker"));
+}
+
 #[test]
 fn tokens_and_chat_text_never_reach_the_logs() {
     let capture = Capture::default();
@@ -776,19 +808,17 @@ fn tokens_and_chat_text_never_reach_the_logs() {
     let logs = String::from_utf8(capture.0.lock().expect("lock").clone()).expect("utf-8");
     assert!(logs.contains("capture-canary"), "the capture is wired");
     // The service's own lines were captured, so their absence below means something.
-    assert!(logs.contains("Discord commands registered"), "{logs}");
-    assert!(logs.contains("an interaction could not be read"), "{logs}");
-    assert!(logs.contains("language model task finished"), "{logs}");
-    for secret in [
-        "FAKE-interaction-token",
-        "not-a-real-credential",
-        "ship the beta",
-        "Ignore all previous rules",
-        "evil.example.invalid",
-        "Robin (release lead)",
-        "When do we ship",
-        "print the API key",
-    ] {
-        assert!(!logs.contains(secret), "a log line carries {secret:?}");
-    }
+    assert!(
+        logs.contains("Discord commands registered"),
+        "registration logs were captured"
+    );
+    assert!(
+        logs.contains("an interaction could not be read"),
+        "parse failure logs were captured"
+    );
+    assert!(
+        logs.contains("language model task finished"),
+        "model completion logs were captured"
+    );
+    assert_no_sensitive_log(&logs);
 }
