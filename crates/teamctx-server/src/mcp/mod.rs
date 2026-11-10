@@ -32,6 +32,8 @@ use serde::Deserialize;
 use teamctx_core::time::UnixMillis;
 use teamctx_store::Store;
 
+use crate::status::StatusProvider;
+
 use self::{
     retrieve::{Ctx, Done, Failure},
     view::{failure, output_schema, respond},
@@ -47,6 +49,7 @@ pub struct McpConfig {
     store: Store,
     clock: Clock,
     utc_offset_seconds: i32,
+    status: Option<StatusProvider>,
 }
 
 impl McpConfig {
@@ -58,7 +61,15 @@ impl McpConfig {
             store,
             clock: Arc::new(system_now),
             utc_offset_seconds: 0,
+            status: None,
         }
+    }
+
+    /// Adds the connector state to `GET /api/v1/status` (see [`crate::status`]).
+    #[must_use]
+    pub fn with_status(mut self, status: StatusProvider) -> Self {
+        self.status = Some(status);
+        self
     }
 
     /// Replaces the clock (tests, or a host with its own time source).
@@ -84,6 +95,7 @@ impl McpConfig {
             store: Mutex::new(self.store),
             clock: self.clock,
             utc_offset_seconds: offset,
+            status: self.status,
         }
     }
 }
@@ -108,6 +120,7 @@ pub(crate) struct McpState {
     pub(crate) store: Mutex<Store>,
     pub(crate) clock: Clock,
     pub(crate) utc_offset_seconds: i32,
+    pub(crate) status: Option<StatusProvider>,
 }
 
 impl fmt::Debug for McpState {

@@ -169,15 +169,17 @@ async fn read(State(state): State<Shared>, RawQuery(raw): RawQuery) -> Response 
     .await
 }
 
-/// A cheap read proves the record is reachable. Sync state per channel, last event, LLM
-/// usage and tokens belong to the web view's status screen and are not reported yet.
+/// A cheap read proves the record is reachable. When the host runs a connector, `sync`
+/// adds its state and each stored channel's cursor ([`crate::status`]). LLM usage and
+/// tokens belong to the web view's status screen and are not reported yet.
 async fn status(State(state): State<Shared>, RawQuery(raw): RawQuery) -> Response {
     if let Err(error) = Params::parse(raw.as_deref(), &[]) {
         return error_response(StatusCode::BAD_REQUEST, &error.message());
     }
+    let host = state.status.as_ref().map(|provider| provider());
     let joined = tokio::task::spawn_blocking(move || {
         let store = state.store.lock().map_err(|_| ())?;
-        store
+        let read = store
             .list_entries(
                 &EntryFilter::default(),
                 PageRequest {
@@ -185,17 +187,27 @@ async fn status(State(state): State<Shared>, RawQuery(raw): RawQuery) -> Respons
                     limit: 1,
                 },
             )
-            .map(|_| ())
-            .map_err(|error| {
-                tracing::error!(%error, "API status could not read the record");
-            })
+            .and_then(|_| {
+                host.map(|host| crate::status::sync_json(&host, &*store))
+                    .transpose()
+            });
+        read.map_err(|error| {
+            tracing::error!(%error, "API status could not read the record");
+        })
     })
     .await;
     match joined {
-        Ok(Ok(())) => json_response(
-            StatusCode::OK,
-            &json!({ "status": "ok", "version": env!("CARGO_PKG_VERSION"), "record": "readable" }),
-        ),
+        Ok(Ok(sync)) => {
+            let mut body = json!({
+                "status": "ok",
+                "version": env!("CARGO_PKG_VERSION"),
+                "record": "readable",
+            });
+            if let (Some(sync), Some(object)) = (sync, body.as_object_mut()) {
+                object.insert("sync".to_owned(), sync);
+            }
+            json_response(StatusCode::OK, &body)
+        }
         _ => error_response(StatusCode::SERVICE_UNAVAILABLE, READ_FAILED),
     }
 }
