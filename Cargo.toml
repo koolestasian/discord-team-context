@@ -33,8 +33,14 @@ serde_json = "1"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json"] }
 serde = { version = "1.0.229", features = ["derive"] }
 toml = "1.2.0"
-# Discord payload models (D2, ADR 0002). Models only: no gateway or HTTP client yet.
+# Discord (D2, ADR 0002): payload models, plus the gateway and REST client used by
+# `teamctx run` and `doctor --live`. Default features are off: TLS through rustls with
+# the platform verifier only. Left out: zstd/zlib transport compression (a C library, and
+# one guild's traffic is small), the gateway's own HTTP client (one shard, so no
+# recommended-shard lookup), brotli response decompression and simd-json.
 twilight-model = "0.18.0"
+twilight-gateway = { version = "0.18.0", default-features = false, features = ["rustls-platform-verifier"] }
+twilight-http = { version = "0.18.0", default-features = false, features = ["rustls-platform-verifier"] }
 # Access tokens (plan section 13): SHA-256 of each token is stored, never the token, and
 # the 32 random bytes come from the operating system. Default features are off: no
 # OID tables or alloc helpers are needed.
