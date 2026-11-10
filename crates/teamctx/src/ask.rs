@@ -203,7 +203,7 @@ impl Backend {
             .map_err(|_| Refusal::Host)?;
         let this = Arc::clone(self);
         let runtime = tokio::runtime::Handle::current();
-        // ponytail: at most 16 blocking workers wait on model I/O. Split ledger calls
+        // Limit: at most 16 blocking workers wait on model I/O. Split ledger calls
         // into async operations if sustained throughput warrants a different design.
         tokio::task::spawn_blocking(move || {
             let _permit = permit;
