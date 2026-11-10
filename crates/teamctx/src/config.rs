@@ -573,13 +573,12 @@ pub(crate) fn parse_cli(
     Ok(options)
 }
 
-/// Prints a configuration template or an explicitly offline diagnostic. No network
-/// calls, token values, API responses, environment dumps or file writes occur here.
-pub(crate) fn execute(
-    init: bool,
+/// Reads the file chosen by `--config` (or `teamctx.toml` if present) and applies the
+/// environment and CLI overrides. A missing explicit file is an error.
+pub(crate) fn load_options(
     options: &OfflineOptions,
-    out: &mut impl std::io::Write,
-) -> Result<bool, Box<dyn std::error::Error>> {
+    env: impl Fn(&str) -> Option<String>,
+) -> Result<Config, ConfigError> {
     let path = options
         .config_path
         .as_deref()
@@ -592,10 +591,23 @@ pub(crate) fn execute(
             String::new()
         }
         Err(_) => {
-            return Err(invalid("--config", "cannot read the configuration file as UTF-8").into());
+            return Err(invalid(
+                "--config",
+                "cannot read the configuration file as UTF-8",
+            ));
         }
     };
-    let config = load(&text, |key| std::env::var(key).ok(), &options.overrides)?;
+    load(&text, env, &options.overrides)
+}
+
+/// Prints a configuration template or an explicitly offline diagnostic. No network
+/// calls, token values, API responses, environment dumps or file writes occur here.
+pub(crate) fn execute(
+    init: bool,
+    options: &OfflineOptions,
+    out: &mut impl std::io::Write,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let config = load_options(options, |key| std::env::var(key).ok())?;
     if init {
         let rendered = toml::to_string_pretty(&config)
             .map_err(|_| invalid("configuration", "cannot render the configuration template"))?;
@@ -681,12 +693,12 @@ pub(crate) fn execute(
     )?;
     writeln!(
         out,
-        "This build does not load secrets.env automatically. Use process environment variables. Live init/doctor checks arrive with Discord sync (milestone M3)."
+        "This build does not load secrets.env automatically. Use process environment variables. Add --live for read-only checks against Discord."
     )?;
     Ok(token_set && permissions_ok)
 }
 
-fn check_secrets_file(path: &std::path::Path) -> Result<bool, ConfigError> {
+pub(crate) fn check_secrets_file(path: &std::path::Path) -> Result<bool, ConfigError> {
     let metadata = match std::fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(true),

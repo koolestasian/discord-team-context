@@ -8,6 +8,8 @@ mod api;
 pub mod auth;
 pub mod mcp;
 pub mod secret;
+pub mod status;
+pub mod stdio;
 
 use std::{net::SocketAddr, sync::Arc};
 

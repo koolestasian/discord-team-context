@@ -23,10 +23,11 @@ toml.workspace = true
 # The `q` client: one HTTPS request on a current-thread runtime.
 reqwest.workspace = true
 tokio.workspace = true
-
-[dev-dependencies]
-tempfile.workspace = true
-# `tests/q.rs` serves the demo record in-process and compares `q` with MCP.
+# `teamctx run`: the shutdown token, and logs to stderr (plan section 17). The fmt layer
+# has no ANSI, env filter, JSON or `log` bridge features.
 tokio-util.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

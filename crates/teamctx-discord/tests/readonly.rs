@@ -769,6 +769,14 @@ fn product_code_has_no_discord_write_calls() {
     for expected in [
         "crates/teamctx-discord/src/sync/rest.rs",
         "crates/teamctx-discord/src/lib.rs",
+        // The live connector (`teamctx run`): the twilight-http client, the gateway, the
+        // ingest and sync loop, and the live doctor.
+        "crates/teamctx-discord/src/http.rs",
+        "crates/teamctx-discord/src/gateway.rs",
+        "crates/teamctx-discord/src/connector.rs",
+        "crates/teamctx-discord/src/live.rs",
+        "crates/teamctx-discord/src/doctor.rs",
+        "crates/teamctx/src/run.rs",
         "crates/teamctx-llm/src/http.rs",
         "crates/teamctx-server/src/lib.rs",
         "crates/teamctx/src/main.rs",
@@ -1085,4 +1093,119 @@ fn allow_list_is_only_the_interaction_surface() {
     for name in DENIED_METHODS.iter().chain(DENIED_TYPES) {
         assert!(write_shaped(name), "{name}");
     }
+}
+
+// ---------------------------------------------------------------------------------------
+// The live connector: the REST client is the only twilight-http user, it reaches only the
+// reviewed GET endpoints, and the gateway sends nothing but its own protocol frames.
+// ---------------------------------------------------------------------------------------
+
+fn product_file(relative: &str) -> String {
+    fs::read_to_string(workspace_root().join(relative)).expect("read product file")
+}
+
+/// Product files that name `crate_name` as an identifier (code, not comments).
+fn files_naming(crate_name: &str) -> Vec<String> {
+    let root = workspace_root();
+    product_sources(&root)
+        .into_iter()
+        .filter(|path| {
+            let source = fs::read_to_string(path).expect("read source");
+            lex(&source)
+                .iter()
+                .any(|t| matches!(&t.tok, Tok::Ident(name) if name == crate_name))
+        })
+        .map(|path| {
+            path.strip_prefix(&root)
+                .expect("inside the workspace")
+                .to_string_lossy()
+                .replace('\\', "/")
+        })
+        .collect()
+}
+
+#[test]
+fn only_the_reviewed_rest_client_uses_twilight_http() {
+    // R3 applies to every file naming twilight_http, so keeping that set to one reviewed
+    // file keeps the whole HTTP surface in one place.
+    assert_eq!(
+        files_naming("twilight_http"),
+        ["crates/teamctx-discord/src/http.rs"]
+    );
+}
+
+#[test]
+fn the_doctor_reads_only_reviewed_get_endpoints() {
+    // Adding a variant adds an endpoint; it must be a GET and reviewed here.
+    let source = product_file("crates/teamctx-discord/src/http.rs");
+    let start = source.find("pub enum Read {").expect("Read is declared");
+    let body = &source[start..];
+    let end = body.find("\n}\n").expect("enum body ends");
+    let variants: Vec<&str> = body[..end]
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with(|c: char| c.is_ascii_uppercase()))
+        .map(|line| line.split(['(', ',']).next().unwrap_or(line))
+        .collect();
+    assert_eq!(
+        variants,
+        ["CurrentUser", "Application", "Guild", "Member", "Channels"]
+    );
+    for line in body[..end]
+        .lines()
+        .filter(|l| l.trim_start().starts_with("///"))
+    {
+        let line = line.to_ascii_uppercase();
+        for verb in WRITE_HTTP_METHODS {
+            assert!(!line.contains(&format!("`{verb} ")), "{line}");
+        }
+    }
+}
+
+/// Gateway-side sends: a shard can send commands (presence, voice state, member requests)
+/// through these. The connector needs none of them; twilight sends identify, heartbeats
+/// and resumes itself, and `close` is the only call allowed.
+const GATEWAY_SENDS: &[&str] = &["send", "command", "sender"];
+
+fn gateway_sends(source: &str) -> Vec<String> {
+    let tokens = lex(source);
+    if !tokens
+        .iter()
+        .any(|t| matches!(&t.tok, Tok::Ident(name) if name == "twilight_gateway"))
+    {
+        return Vec::new();
+    }
+    tokens
+        .iter()
+        .enumerate()
+        .filter_map(|(i, token)| {
+            let name = ident(Some(token))?;
+            (GATEWAY_SENDS.contains(&name) && in_call_or_path(&tokens, i))
+                .then(|| format!("line {}: .{name}(", token.line))
+        })
+        .collect()
+}
+
+#[test]
+fn the_gateway_sends_nothing_but_its_close_frame() {
+    let mut found = Vec::new();
+    for file in files_naming("twilight_gateway") {
+        found.extend(
+            gateway_sends(&product_file(&file))
+                .into_iter()
+                .map(|hit| format!("{file}: {hit}")),
+        );
+    }
+    assert!(found.is_empty(), "gateway sends: {found:?}");
+    // Self-test: a presence update or a raw send is flagged; close and others are not.
+    let bad =
+        "use twilight_gateway::Shard; fn f(s: &Shard) { s.command(&UpdatePresence); s.send(x); }";
+    assert_eq!(gateway_sends(bad).len(), 2);
+    let fine = "use twilight_gateway::Shard; fn f(s: &Shard) { s.close(CloseFrame::NORMAL); }";
+    assert!(gateway_sends(fine).is_empty());
+    let other = "fn f(tx: &Sender) { tx.send(1); }";
+    assert!(
+        gateway_sends(other).is_empty(),
+        "files without twilight_gateway are out of scope"
+    );
 }

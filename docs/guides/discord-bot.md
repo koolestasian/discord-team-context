@@ -1,8 +1,8 @@
 # Discord test bot setup
 
-Use a throwaway server with fictional messages for the live spikes S1 and S2. This build's
-`init` and `doctor` commands run **offline**. They do not connect the bot, register
-commands, validate a token with Discord, or establish that US-1 is complete.
+Use a throwaway server with fictional messages for the live spikes S1 and S2. `init` and
+`doctor` run **offline**; `doctor --live` and `run` talk to Discord (read-only). None of
+the live paths has been verified against a real server yet, so US-1 is not established.
 
 ## 1. Create a private test application
 
@@ -108,6 +108,36 @@ not performed. No server permissions or bot settings are changed by this command
 The live S1/S2 spikes still need to verify token validity, guild/channel/thread access,
 edits/deletes and ephemeral interaction replies. Do not use this build with real team
 history before those tests and the team privacy agreement.
+
+## 5. Live checks and the host (not yet verified on a real server)
+
+```text
+cargo run -p teamctx -- doctor --live --config <path-to-teamctx.toml>
+```
+
+After the offline checks it makes five read-only requests: the bot user, the
+application (Message Content intent flag), the guild, the bot's member object and the
+channel list. It prints which text, announcement and forum channels the bot can read
+after channel overwrites, warns about permissions beyond 66560 or Administrator, and
+exits 0 only when the intent is enabled and at least one channel is readable. Channel
+names are printed escaped. It cannot see private-thread membership.
+
+```text
+cargo run -p teamctx -- run --config <path-to-teamctx.toml> --db <path-to-teamctx.db>
+```
+
+`run` refuses to start, before any network call, when the token variable is empty,
+`server.timezone` is a named zone (use `UTC` or an offset such as `-05:00` for now),
+reaction capture is enabled, or `secrets.env` is not owner-only. Then it serves `/mcp`,
+`/api/v1` and `/healthz` on `server.bind`, connects one gateway shard with GUILDS,
+GUILD_MESSAGES and MESSAGE_CONTENT, and syncs: discovery and catch-up on start and after
+every reconnect, backfill in the background. `GET /api/v1/status` shows the gateway state,
+the last event, sync runs and each channel's cursor. A gateway close 4014 means the
+Message Content intent is off in the Developer Portal; `run` keeps serving the stored
+record and reports the problem in the status. Stop it with Ctrl-C (or SIGTERM): it
+finishes HTTP requests, closes the gateway, writes queued events and checkpoints the
+database before exiting 0. Create access tokens with `teamctx token create NAME --db`
+pointing at the same database.
 
 If a token leaks, reset it on the Bot page, replace the process environment value and
 restart the process using it. Remove the token from any local files; resetting it is

@@ -5,6 +5,13 @@
 //! interactions. Everything it learns goes through `teamctx-store`; it never talks to the
 //! server or LLM crates.
 
+pub mod connector;
+pub mod doctor;
+pub mod gateway;
+pub mod http;
+pub mod live;
 pub mod mapping;
 pub mod permissions;
+pub mod secret;
+pub mod store;
 pub mod sync;

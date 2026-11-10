@@ -1,13 +1,14 @@
 //! teamctx command-line program: CLI, configuration and wiring.
 //!
-//! Pre-alpha: init/doctor currently validate configuration offline; live Discord
-//! validation and sync are gated on a throwaway test server.
+//! Pre-alpha: `run` hosts the record and syncs Discord; `doctor --live` checks the bot.
+//! Live behaviour is not yet verified against a real Discord server (spikes S1/S2).
 
 mod config;
 mod demo;
 mod eval;
 mod export;
 mod q;
+mod run;
 mod search;
 mod skill;
 mod token;
@@ -26,13 +27,21 @@ const HELP: &str = concat!(
     "\n",
     "Turns a team's Discord into a searchable team record.\n",
     "\n",
-    "Offline init and doctor; live Discord support is not available yet.\n",
+    "Pre-alpha: live Discord sync is not yet verified against a real server.\n",
     "\n",
-    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS] | demo|search|q|skill [ARGS]\n",
+    "Usage: teamctx [OPTIONS] | init|doctor|run [CONFIG OPTIONS] | demo|search|q|skill|mcp [ARGS]\n",
     "\n",
     "Options:\n",
     "  -h, --help     Print this help\n",
     "  -V, --version  Print the version\n",
+    "\nHost commands:\n",
+    "  run           Sync Discord and serve /mcp, /api/v1 and /healthz until Ctrl-C or SIGTERM\n",
+    "                (run [CONFIG OPTIONS] [--db PATH]; --db defaults to teamctx.db). The bot\n",
+    "                token is read from the variable named by discord.token_env\n",
+    "  doctor --live Also check the bot on Discord: guild access, per-channel permissions and\n",
+    "                the Message Content intent (read-only requests; prints no secret)\n",
+    "  mcp --stdio   Serve the MCP tools on stdin/stdout from a local database, without a token\n",
+    "                (mcp --stdio [--db PATH] [--timezone TZ]; --db defaults to teamctx.db)\n",
     "\nOffline commands:\n",
     "  init          Print a config template and optional bot invite; writes no files\n",
     "  doctor        Validate config and token presence; makes no network calls\n",
@@ -52,7 +61,7 @@ const HELP: &str = concat!(
     "  --url URL             Host URL (default: TEAMCTX_URL)\n",
     "  --token-file PATH     Token file (default: TEAMCTX_TOKEN_FILE, else teamctx/token in the\n",
     "                        OS data directory). It must be mode 0600 on Unix; Windows is not checked\n",
-    "\nOffline options:\n",
+    "\nConfig options (init, doctor, run):\n",
     "  --config PATH         TOML file (default teamctx.toml if present)\n",
     "  --guild-id ID         Discord server id (required unless in file/environment)\n",
     "  --application-id ID   Print an invite in init\n",
@@ -80,6 +89,9 @@ enum Command {
     Version,
     Init(config::OfflineOptions),
     Doctor(config::OfflineOptions),
+    DoctorLive(config::OfflineOptions),
+    Run(run::RunOptions),
+    Mcp(run::McpOptions),
     Token(token::Command),
     Skill(skill::Command),
     Eval(eval::Options),
@@ -133,8 +145,24 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, UsageError
                     .map_err(UsageError::Config);
             }
             Some("doctor") => {
-                return config::parse_cli(args)
-                    .map(Command::Doctor)
+                let mut rest: Vec<OsString> = args.collect();
+                let live = run::take_flag(&mut rest, "--live");
+                return config::parse_cli(rest)
+                    .map(if live {
+                        Command::DoctorLive
+                    } else {
+                        Command::Doctor
+                    })
+                    .map_err(UsageError::Config);
+            }
+            Some("run") => {
+                return run::parse_run(args)
+                    .map(Command::Run)
+                    .map_err(UsageError::Config);
+            }
+            Some("mcp") => {
+                return run::parse_mcp(args)
+                    .map(Command::Mcp)
                     .map_err(UsageError::Config);
             }
             Some("token") => {
@@ -186,6 +214,9 @@ fn run(args: impl IntoIterator<Item = OsString>, out: &mut impl Write, err: &mut
         Ok(Command::Version) => out.write_all(VERSION.as_bytes()),
         Ok(Command::Init(options)) => return run_offline(true, &options, out, err),
         Ok(Command::Doctor(options)) => return run_offline(false, &options, out, err),
+        Ok(Command::DoctorLive(options)) => return run::doctor_live(&options, out, err),
+        Ok(Command::Run(options)) => return run::run(&options, out, err),
+        Ok(Command::Mcp(options)) => return run::mcp_stdio(&options, err),
         Ok(Command::Token(command)) => return token::run(&command, out, err),
         Ok(Command::Skill(command)) => return skill::run(&command, out, err),
         Ok(Command::Eval(options)) => return run_eval(&options, out, err),
@@ -228,10 +259,12 @@ fn run_eval(options: &eval::Options, out: &mut impl Write, err: &mut impl Write)
 }
 
 fn main() -> ExitCode {
+    // Unlocked handles: `run` and `mcp --stdio` write from other threads (logs to stderr,
+    // MCP replies to stdout), which would block forever on a lock held here.
     let code = run(
         std::env::args_os().skip(1),
-        &mut io::stdout().lock(),
-        &mut io::stderr().lock(),
+        &mut io::stdout(),
+        &mut io::stderr(),
     );
     ExitCode::from(code)
 }

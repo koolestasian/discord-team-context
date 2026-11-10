@@ -21,6 +21,22 @@ or milestone builds on it. Rust doc comments hold the full contract of every ite
 | Repository traits and their row types, `RepoError` | `src/repo.rs` | §5.2, §6, §6.1, §8, §9, §10.1 | `teamctx-store` implements; server, Discord connector and the binary call |
 | `ParseEnumError` and the `text_enum!` macro | `src/text_enum.rs` | §6 (text columns) | internal |
 
+Live connector contracts (in `crates/teamctx-discord`, not core):
+
+| Contract | File | Plan | Notes |
+|---|---|---|---|
+| `Gateway`, `GatewayEvent`, `INTENTS`, `fatal_close_reason` | `src/gateway.rs` | §7.1, §7.2 | raw JSON frames; `TwilightGateway` is the production shard |
+| `TwilightRest`, `Read` | `src/http.rs` | §7.2, §7.3 | the only `twilight_http` user; `GET` only |
+| `live::ingest` | `src/live.rs` | §7.2 step 4 | configured guild only; unknown channel means "run a sync" |
+| `Connector`, `ConnectorStatus`, `Timing` | `src/connector.rs` | §5.2, §7.2 | sync on `GUILD_CREATE` and `RESUMED`; drains on shutdown |
+| `HostStore` | `src/store.rs` | §5.2 | writer client for writes, own read-only connection for reads |
+| `doctor::diagnose`, `doctor::check` | `src/doctor.rs` | §7.1 | pure on payloads; five `GET`s |
+| `status::HostStatus`, `StatusProvider` | `crates/teamctx-server/src/status.rs` | §10.2 | ids, times, counts, fixed text |
+
+The §5.3 `Connector` trait with `EventSink` and `CursorStore` is not introduced yet:
+with one connector, `Connector` is a concrete type over a `Gateway`, a `DiscordRest` and
+a store factory. The trait follows when a second source (Slack, v0.2) needs it.
+
 ## Invariants (pinned by unit tests in each file)
 
 - **Snowflake:** never zero; text form is canonical decimal (no sign, no leading zero,

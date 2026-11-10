@@ -49,6 +49,11 @@ pub(crate) struct FixedOffset {
 const UTC: FixedOffset = FixedOffset { seconds: 0 };
 
 impl FixedOffset {
+    /// The offset in seconds east of UTC.
+    pub(crate) const fn seconds(self) -> i32 {
+        self.seconds
+    }
+
     fn millis(self) -> i64 {
         i64::from(self.seconds) * 1000
     }
@@ -56,7 +61,7 @@ impl FixedOffset {
 
 /// Parses `UTC`, `Z` or `+HH:MM` / `-HH:MM` (at most 14:00). A named zone such as
 /// `America/Toronto` needs a timezone database, so it gets its own error.
-fn parse_timezone(text: &str) -> Result<FixedOffset, ArgError> {
+pub(crate) fn parse_timezone(text: &str) -> Result<FixedOffset, ArgError> {
     const OPTION: &str = "--timezone";
     if text.eq_ignore_ascii_case("utc") || text == "Z" {
         return Ok(UTC);

@@ -60,9 +60,18 @@ asserts that its own canary event was captured, so an unwired capture cannot pas
   serde's message, which quotes the offending value, so a malformed Discord payload puts
   its text into `SyncError`'s source chain.
 
-**Not covered.** The live gateway and twilight adapters do not exist yet; when they land,
-their errors must not carry headers or the token, and these tests must run them.
-`teamctx init` echoes free-form config values back as a template, so a secret pasted into
+| live connector | `crates/teamctx-discord/tests/connector_logs.rs` | The gateway loop, ingest thread and sync worker at TRACE, fed frames whose content, author, guild and channel names carry a chat marker and a token-shaped value: malformed payloads, unknown event types, non-JSON frames, receive failures, a fatal close and a REST client that fails with the value in its error source. It asserts its own error and sync log lines were captured first. |
+| `run`, `doctor --live` | `crates/teamctx/tests/run_cli.rs` | The binary refusing bad settings (no token, named time zone, reaction capture, bad guild id, a token pasted as `--bind`) before any network call, without echoing the fake token. |
+
+The live connector adds three read-only checks in `tests/readonly.rs`: `twilight_http`
+may be named in `crates/teamctx-discord/src/http.rs` only (so R3 sees the whole HTTP
+surface), the doctor's extra endpoints are pinned (the `Read` enum, all `GET`), and
+files naming `twilight_gateway` may not call `send`, `command` or `sender`, so the
+gateway sends nothing but its own protocol frames and the close frame.
+
+**Not covered.** The real twilight shard and HTTP client are not exercised by tests (no
+network in CI); their errors are reduced to fixed text and status codes by construction
+(`src/http.rs`, `src/gateway.rs`). `teamctx init` echoes free-form config values back as a template, so a secret pasted into
 `model`, `base_url` or `timezone` is printed to the operator's own terminal. Memory is
 not zeroed (plan section 17 has no `zeroize`). Usage errors echo a stray command-line
 argument, as most CLIs do.

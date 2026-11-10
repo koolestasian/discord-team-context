@@ -698,6 +698,12 @@ max_tokens_per_day = 200000
 Config is loaded with precedence CLI flags > env > file > defaults, validated at
 start-up with clear errors pointing at the bad field.
 
+Implementation note (M3, 2026-11-09): the database path is not a config field. `run`,
+`token` and `mcp --stdio` take `--db PATH` and default to `teamctx.db` in the working
+directory (§4). Until a time zone database is built in, `server.timezone` accepts `UTC`
+and fixed offsets (`+02:00`) only and `run` refuses named zones rather than guessing.
+`run` refuses `reaction_capture.enabled = true` until reaction capture is built.
+
 ---
 
 ## 13. Security and privacy
