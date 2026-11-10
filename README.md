@@ -71,6 +71,27 @@ cargo run -p teamctx -- search "after:2026-04-01 crash" --timezone +02:00
 offsets such as `+02:00` work today; a named zone like `America/Toronto` is rejected
 because no time zone database is built in.
 
+### For coding agents
+
+Agents reach the record over MCP, or through the `teamctx q` command-line client plus an
+[Agent Skill](https://agentskills.io/specification) that tells them when to use it. Both
+answer from the same query layer.
+
+```sh
+# Create a token for one person or device. The output also holds the commands that connect
+# Claude Code, Codex and Cursor and a snippet for AGENTS.md or CLAUDE.md. The token is
+# printed once; the commands read it from TEAMCTX_TOKEN.
+cargo run -p teamctx -- token create robin-laptop --url https://team.example.net
+
+# Copy skills/teamctx/SKILL.md to ~/.claude/skills/teamctx and ~/.agents/skills/teamctx
+# (Claude Code; Codex and other agents that read the shared folder). Use --dir PATH for
+# one folder; a differing existing copy is only replaced with --force.
+cargo run -p teamctx -- skill install
+```
+
+There is no host to connect to yet (`teamctx run` is planned), so these commands cannot
+be tried end to end today.
+
 To prepare a throwaway test server and bot, follow the
 [Discord test bot guide](docs/guides/discord-bot.md). The fictional dataset that the
 tests, `teamctx demo` and the eval runner use is described in

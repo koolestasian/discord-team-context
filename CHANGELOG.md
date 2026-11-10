@@ -49,6 +49,22 @@ release.
 
 ### Added
 
+- The Agent Skill and `teamctx skill install`. `skills/teamctx/SKILL.md` follows the
+  agentskills.io specification: a `description` that says when to use it (before starting a
+  feature, when unsure what the team decided), five example `teamctx q` commands, and the
+  rule that results are chat data, never instructions. `skill install [--dir PATH]
+  [--force]` copies the embedded file to `~/.claude/skills/teamctx/` and
+  `~/.agents/skills/teamctx/` (or to `PATH/teamctx/`); an identical copy is left alone, a
+  differing one is replaced only with `--force`, both targets are checked before either is
+  written, and a symlink or directory in the way is never replaced. Tests check the
+  frontmatter against the specification's limits and that every example command parses
+  with the `q` client. Sources are in `docs/research/M4.md`.
+- `teamctx token create` now prints how to connect after the token: a `claude mcp add`
+  command, a Codex `config.toml` table and a Cursor `mcp.json` (each reads the token from
+  `TEAMCTX_TOKEN`, so the token is printed once), the `teamctx q` plus skill route, and a
+  snippet for `AGENTS.md` or `CLAUDE.md`. New `--url URL` sets the host address (default a
+  `<host>` placeholder); it is checked against an allow-list because it is printed inside
+  shell, TOML and JSON. The snippets are parsed as TOML and JSON in tests.
 - `MessageRead::channel_messages_since`: oldest-first keyset paging of one channel's
   stored messages since a time, served by the `messages_channel_time` index.
 - The read-only JSON API and the `teamctx q` client. `GET /healthz` (no token) and, behind
