@@ -776,6 +776,7 @@ fn product_code_has_no_discord_write_calls() {
         "crates/teamctx-discord/src/connector.rs",
         "crates/teamctx-discord/src/live.rs",
         "crates/teamctx-discord/src/doctor.rs",
+        "crates/teamctx/src/run.rs",
         "crates/teamctx-llm/src/http.rs",
         "crates/teamctx-server/src/lib.rs",
         "crates/teamctx/src/main.rs",
