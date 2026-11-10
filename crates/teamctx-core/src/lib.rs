@@ -23,5 +23,6 @@ pub mod record;
 pub mod repo;
 pub mod source;
 pub mod time;
+pub mod when;
 
 pub use text_enum::ParseEnumError;
