@@ -29,6 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         allowed_hosts: vec!["127.0.0.1".to_owned(), "localhost".to_owned()],
         shutdown: shutdown.clone(),
         mcp: McpConfig::new(Store::open_read_only(&db)?),
+        ask: None,
     });
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("MCP endpoint: http://{addr}/mcp (Ctrl+C to stop)");

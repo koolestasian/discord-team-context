@@ -1,4 +1,4 @@
-//! Per-member budgets (plan section 11, step 6), backed by the `llm_usage` table.
+//! Per-asker budgets (plan section 11, step 6), backed by the `llm_usage` table.
 //!
 //! The pipeline talks to the table through [`UsageLedger`]. [`StoreLedger`] implements
 //! it over `llm_usage` (all SQL stays in the store crate); [`InMemoryLedger`] is for
@@ -15,6 +15,9 @@
 //! 2. The provider is called.
 //! 3. [`UsageLedger::settle`] swaps the reservation for the real `llm_usage` row.
 //!
+//! Usage is charged to an [`Asker`]: a member for Discord questions, an access token for
+//! `POST /api/v1/ask` (tokens are not linked to members). Every limit is per asker.
+//!
 //! If the request is dropped while the call is in flight (a timeout, a closed
 //! interaction, a cancelled task), the provider may still do and bill the work, so the
 //! reservation is settled as a failed call at its full reserved size. Cancellation
@@ -28,9 +31,9 @@ use std::sync::{Mutex, PoisonError};
 
 use thiserror::Error;
 
-use teamctx_core::id::MemberId;
 use teamctx_core::repo::RepoError;
 use teamctx_core::time::UnixMillis;
+pub use teamctx_store::usage::Asker;
 use teamctx_store::usage::{Reservation as StoreReservation, UsageDb, UsageRecord};
 
 use crate::error::AskError;
@@ -38,7 +41,8 @@ use crate::error::AskError;
 const HOUR_MS: i64 = 3_600_000;
 const DAY_MS: i64 = 24 * HOUR_MS;
 
-/// The limits for one member. Windows are rolling: the last hour and the last 24 hours.
+/// The limits for one asker (a member or an access token). Windows are rolling: the
+/// last hour and the last 24 hours.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Budget {
     /// Most questions in the last hour (plan: `max_questions_per_member_per_hour`).
@@ -88,7 +92,7 @@ impl fmt::Display for BudgetLimit {
     }
 }
 
-/// What one member used inside a window.
+/// What one asker used inside a window.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct WindowUsage {
     /// Calls made, successful or not.
@@ -102,8 +106,8 @@ pub struct WindowUsage {
 pub struct UsageEntry {
     /// When the call was made.
     pub at: UnixMillis,
-    /// Who asked.
-    pub member: MemberId,
+    /// Who asked, and pays.
+    pub asker: Asker,
     /// The provider name, such as `"anthropic"`.
     pub provider: String,
     /// The model name.
@@ -207,13 +211,13 @@ impl Budget {
 /// See the [module docs](self) for how reservations keep concurrent and cancelled
 /// questions inside the budget.
 pub trait UsageLedger {
-    /// Calls and tokens by `member` with `at >= since`, counting outstanding
+    /// Calls and tokens charged to `asker` with `at >= since`, counting outstanding
     /// reservations at their reserved size.
     ///
     /// # Errors
     ///
     /// [`LedgerError`] if the backend fails.
-    fn usage_since(&self, member: MemberId, since: UnixMillis) -> Result<WindowUsage, LedgerError>;
+    fn usage_since(&self, asker: Asker, since: UnixMillis) -> Result<WindowUsage, LedgerError>;
 
     /// Appends one row.
     ///
@@ -223,8 +227,8 @@ pub trait UsageLedger {
     fn record(&self, entry: &UsageEntry) -> Result<(), LedgerError>;
 
     /// Atomically checks `budget` with [`Budget::admit`] and, if the question fits,
-    /// holds one question and `tokens` tokens for `member` at `now`. No other
-    /// `reserve` for the member may interleave between the check and the hold.
+    /// holds one question and `tokens` tokens for `asker` at `now`. No other
+    /// `reserve` for the asker may interleave between the check and the hold.
     ///
     /// Until it is settled, the reservation counts in [`usage_since`](Self::usage_since)
     /// exactly like a row at `now` with `tokens` tokens.
@@ -235,7 +239,7 @@ pub trait UsageLedger {
     /// [`ReserveError::Ledger`] if the backend fails.
     fn reserve(
         &self,
-        member: MemberId,
+        asker: Asker,
         now: UnixMillis,
         budget: &Budget,
         tokens: u64,
@@ -295,7 +299,7 @@ impl StoreLedger {
 fn to_record(entry: &UsageEntry) -> UsageRecord {
     UsageRecord {
         at: entry.at,
-        member: entry.member,
+        asker: entry.asker,
         provider: entry.provider.clone(),
         model: entry.model.clone(),
         input_tokens: entry.input_tokens,
@@ -305,8 +309,8 @@ fn to_record(entry: &UsageEntry) -> UsageRecord {
 }
 
 impl UsageLedger for StoreLedger {
-    fn usage_since(&self, member: MemberId, since: UnixMillis) -> Result<WindowUsage, LedgerError> {
-        let usage = self.db.usage_since(member, since)?;
+    fn usage_since(&self, asker: Asker, since: UnixMillis) -> Result<WindowUsage, LedgerError> {
+        let usage = self.db.usage_since(asker, since)?;
         Ok(WindowUsage {
             questions: usage.questions,
             tokens: usage.tokens,
@@ -319,12 +323,12 @@ impl UsageLedger for StoreLedger {
 
     fn reserve(
         &self,
-        member: MemberId,
+        asker: Asker,
         now: UnixMillis,
         budget: &Budget,
         tokens: u64,
     ) -> Result<ReservationId, ReserveError> {
-        let held = self.db.reserve(member, now, tokens, |usage_since| {
+        let held = self.db.reserve(asker, now, tokens, |usage_since| {
             budget.admit(now, tokens, |since| {
                 let usage = usage_since(since)?;
                 Ok(WindowUsage {
@@ -348,7 +352,7 @@ impl UsageLedger for StoreLedger {
 #[derive(Debug)]
 struct Held {
     id: ReservationId,
-    member: MemberId,
+    asker: Asker,
     at: UnixMillis,
     tokens: u64,
 }
@@ -361,16 +365,16 @@ struct LedgerState {
 }
 
 impl LedgerState {
-    fn usage_since(&self, member: MemberId, since: UnixMillis) -> WindowUsage {
+    fn usage_since(&self, asker: Asker, since: UnixMillis) -> WindowUsage {
         let rows = self
             .rows
             .iter()
-            .filter(|r| r.member == member && r.at >= since)
+            .filter(|r| r.asker == asker && r.at >= since)
             .map(|r| r.input_tokens.saturating_add(r.output_tokens));
         let held = self
             .held
             .iter()
-            .filter(|h| h.member == member && h.at >= since)
+            .filter(|h| h.asker == asker && h.at >= since)
             .map(|h| h.tokens);
         let mut usage = WindowUsage::default();
         for tokens in rows.chain(held) {
@@ -412,8 +416,8 @@ impl InMemoryLedger {
 }
 
 impl UsageLedger for InMemoryLedger {
-    fn usage_since(&self, member: MemberId, since: UnixMillis) -> Result<WindowUsage, LedgerError> {
-        Ok(self.state().usage_since(member, since))
+    fn usage_since(&self, asker: Asker, since: UnixMillis) -> Result<WindowUsage, LedgerError> {
+        Ok(self.state().usage_since(asker, since))
     }
 
     fn record(&self, entry: &UsageEntry) -> Result<(), LedgerError> {
@@ -423,19 +427,19 @@ impl UsageLedger for InMemoryLedger {
 
     fn reserve(
         &self,
-        member: MemberId,
+        asker: Asker,
         now: UnixMillis,
         budget: &Budget,
         tokens: u64,
     ) -> Result<ReservationId, ReserveError> {
         // One lock covers the check and the hold, so reservations cannot interleave.
         let mut state = self.state();
-        budget.admit(now, tokens, |since| Ok(state.usage_since(member, since)))?;
+        budget.admit(now, tokens, |since| Ok(state.usage_since(asker, since)))?;
         let id = ReservationId::new(state.next_id);
         state.next_id = state.next_id.wrapping_add(1);
         state.held.push(Held {
             id,
-            member,
+            asker,
             at: now,
             tokens,
         });
@@ -456,12 +460,12 @@ impl UsageLedger for InMemoryLedger {
 pub(crate) fn check<L: UsageLedger + ?Sized>(
     ledger: &L,
     budget: &Budget,
-    member: MemberId,
+    asker: Asker,
     now: UnixMillis,
     tokens: u64,
 ) -> Result<(), AskError> {
     budget
-        .admit(now, tokens, |since| ledger.usage_since(member, since))
+        .admit(now, tokens, |since| ledger.usage_since(asker, since))
         .map_err(AskError::from)
 }
 
@@ -477,7 +481,7 @@ pub(crate) struct Reservation<'l, L: UsageLedger + ?Sized> {
 }
 
 impl<'l, L: UsageLedger + ?Sized> Reservation<'l, L> {
-    /// Reserves one question and `if_dropped`'s tokens for `if_dropped.member` at
+    /// Reserves one question and `if_dropped`'s tokens for `if_dropped.asker` at
     /// `if_dropped.at`.
     pub(crate) fn take(
         ledger: &'l L,
@@ -487,7 +491,7 @@ impl<'l, L: UsageLedger + ?Sized> Reservation<'l, L> {
         let tokens = if_dropped
             .input_tokens
             .saturating_add(if_dropped.output_tokens);
-        let id = ledger.reserve(if_dropped.member, if_dropped.at, budget, tokens)?;
+        let id = ledger.reserve(if_dropped.asker, if_dropped.at, budget, tokens)?;
         Ok(Self {
             ledger,
             id: Some(id),
@@ -517,16 +521,18 @@ impl<L: UsageLedger + ?Sized> Drop for Reservation<'_, L> {
 
 #[cfg(test)]
 mod tests {
+    use teamctx_core::id::MemberId;
+
     use super::*;
 
-    fn member(id: i64) -> MemberId {
-        MemberId::new(id).unwrap()
+    fn member(id: i64) -> Asker {
+        Asker::Member(MemberId::new(id).unwrap())
     }
 
     fn row(member_id: i64, at: i64, tokens: u64) -> UsageEntry {
         UsageEntry {
             at: UnixMillis::from_millis(at),
-            member: member(member_id),
+            asker: member(member_id),
             provider: "fake".to_owned(),
             model: "m".to_owned(),
             input_tokens: tokens,
@@ -687,7 +693,7 @@ mod tests {
     }
 
     /// A temp-file database holding one fictional member (usage rows reference members).
-    fn store_ledger(path: &Path) -> (StoreLedger, MemberId) {
+    fn store_ledger(path: &Path) -> (StoreLedger, Asker) {
         use teamctx_core::id::Snowflake;
         use teamctx_core::repo::{DirectoryRead, IngestWrite};
         use teamctx_core::source::{Member, SourceEvent, SourceKind};
@@ -716,7 +722,7 @@ mod tests {
             .unwrap()
             .id;
         drop(store);
-        (StoreLedger::open(path).unwrap(), id)
+        (StoreLedger::open(path).unwrap(), Asker::Member(id))
     }
 
     #[test]
@@ -744,7 +750,15 @@ mod tests {
         assert!(ledger.reserve(who, now(), &budget(), 101).is_err());
 
         // Settling swaps it for the real usage, which frees the rest of the budget.
-        ledger.settle(id, &row(who.get(), NOW, 40)).unwrap();
+        ledger
+            .settle(
+                id,
+                &UsageEntry {
+                    asker: who,
+                    ..row(1, NOW, 40)
+                },
+            )
+            .unwrap();
         assert_eq!(
             ledger.usage_since(who, hour_ago).unwrap(),
             WindowUsage {
@@ -790,7 +804,8 @@ mod tests {
         let if_dropped = UsageEntry {
             output_tokens: 800,
             ok: false,
-            ..row(who.get(), NOW, 200)
+            asker: who,
+            ..row(1, NOW, 200)
         };
         drop(Reservation::take(&ledger, &budget(), if_dropped).unwrap());
         assert_eq!(

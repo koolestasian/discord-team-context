@@ -12,6 +12,12 @@ release.
 
 ### Added
 
+- Optional `/ask question` and `/catchup summarize:true` in `teamctx run`, enabled by
+  `[llm]`, with scoped retrieval, validated citations, escaped ephemeral replies and
+  fixed errors. `POST /api/v1/ask` uses the same pipeline behind bearer authentication.
+  Hourly question and daily token limits persist per Discord member or HTTP token;
+  access tokens have no member association. See `docs/guides/llm.md`. Tested with a fake
+  provider only; no live Discord or model claims.
 - `teamctx serve [--db PATH] [--bind 127.0.0.1:PORT] [--timezone TZ]`: serves `/mcp`, `/api/v1`
   and `/healthz` from an existing database on a loopback address, with no Discord connection,
   so `teamctx q`, MCP clients and the Agent Skill can be tried on the demo record. A process
@@ -25,8 +31,8 @@ release.
   visible only to you unless you pass `public:true`, never ping anyone, escape chat text
   and only show messages from channels you can read (a public reply only what everyone
   can read). Slow commands defer and then edit their reply. Retried interactions create
-  nothing twice; every change is in the audit log with who made it. `/ask` is not
-  registered yet. Not yet verified against a live Discord server (spike S2 is a manual
+  nothing twice; every change is in the audit log with who made it. `/ask` is registered
+  only with LLM support configured. Not yet verified against a live Discord server (spike S2 is a manual
   step in `docs/guides/discord-bot.md`).
 - `teamctx export --format okf|md DIR [--db PATH] [--force]` writes the record as an OKF
   0.2 bundle (`index.md`, `log.md`, one file per entry) or as one `record.md`. Chat text is

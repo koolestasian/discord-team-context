@@ -37,17 +37,17 @@ mod validate;
 
 pub use anthropic::{AnthropicConfig, AnthropicMessages};
 pub use budget::{
-    Budget, BudgetLimit, InMemoryLedger, LedgerError, ReservationId, ReserveError, UsageEntry,
-    UsageLedger, WindowUsage,
+    Asker, Budget, BudgetLimit, InMemoryLedger, LedgerError, ReservationId, ReserveError,
+    UsageEntry, UsageLedger, WindowUsage,
 };
-pub use bundle::{Bundle, BundleLimits, Retrieval, Source};
+pub use bundle::{Bundle, BundleLimits, Items, Retrieval, Scope, Source};
 pub use error::{AskError, LlmError};
 pub use fake::FakeProvider;
 pub use http::DEFAULT_TIMEOUT;
 pub use openai::{OpenAiCompatible, OpenAiConfig};
 pub use pipeline::{
     Answer, AskConfig, AskPipeline, AskRequest, AskResult, Citation, FoundAnswer, NOT_FOUND_TEXT,
-    NotFoundAnswer, NotFoundReason, Prepared,
+    NotFoundAnswer, NotFoundReason, Prepared, without_urls,
 };
 pub use provider::{Completion, CompletionRequest, LlmProvider, TokenUsage};
 pub use secret::ApiKey;

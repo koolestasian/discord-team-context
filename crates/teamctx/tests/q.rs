@@ -90,6 +90,7 @@ async fn start() -> Result<Harness, Box<dyn std::error::Error>> {
         allowed_hosts: vec!["127.0.0.1".to_owned()],
         shutdown: shutdown.clone(),
         mcp,
+        ask: None,
     });
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let addr: SocketAddr = listener.local_addr()?;

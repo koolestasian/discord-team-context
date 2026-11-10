@@ -6,8 +6,8 @@ a team record of decisions, tasks and open questions. Each entry links to the me
 came from. The record is served through Discord slash commands, an MCP server for AI
 coding agents, and a minimal web view. Everything except `/ask` works without an LLM.
 
-> **Status: pre-alpha, not usable yet.** The foundations are built and tested, but
-> teamctx cannot connect to Discord yet. Follow the milestones below; v0.1.0 is the
+> **Status: pre-alpha.** The host, Discord commands and optional `/ask` are built and
+> tested against fakes. Live Discord and model checks are still pending; v0.1.0 is the
 > first release meant for real teams.
 
 ## Design principles
@@ -37,7 +37,8 @@ coding agents, and a minimal web view. Everything except `/ask` works without an
 | | Live sync, backfill, live events (`teamctx run`) | Built and tested against fakes; not yet run against a real server |
 | M4 Agent surfaces | MCP tools, tokens, JSON API, `teamctx q`, Agent Skill | Done, tested in-process and over loopback |
 | M5 Record in Discord | Context menus, `/decide`, `/todo`, `/question`, `/answer`, `/catchup`, `/search`, export | Built and tested against fixtures; not yet run against a real server |
-| M6-M8 | `/ask` live, web view, v0.1.0 release | Planned |
+| M6 `/ask` | Discord `/ask`, catch-up summaries, authenticated HTTP endpoint, budgets | Built and tested with a fake provider; hosted and local model checks pending |
+| M7-M8 | Web view, v0.1.0 release | Planned |
 
 The [implementation plan](docs/design/implementation-plan.md) defines each milestone and
 its "done when" criteria. [CHANGELOG.md](CHANGELOG.md) lists what has landed.

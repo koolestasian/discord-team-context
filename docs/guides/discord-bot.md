@@ -161,8 +161,9 @@ the bot again with the URL from `init`. Global registration is not available yet
 Replies are visible only to the person who ran the command unless they pass
 `public:true`. A reply only shows messages and copied titles from channels that person can
 read in Discord; a public reply only shows what `@everyone` can read. Due and "since"
-dates use `server.timezone`. `/ask` is not registered: it needs the `[llm]` pipeline,
-which this build does not have.
+dates use `server.timezone`. With `[llm]` configured, `/ask question` and
+`/catchup summarize:true` use the optional model pipeline; see [LLM setup](llm.md).
+Without it neither `/ask` nor the summary option is registered.
 
 ### Spike S2: replies without Send Messages (manual)
 
@@ -214,4 +215,5 @@ an error. Without it, `teamctx.toml` is read only if present. Unknown fields are
 channel names without `#`, and the denylist wins over the allowlist. An empty allowlist
 includes every supported channel the bot can read. LLM support is off when `[llm]` is
 absent; enabling it sends retrieved chat excerpts to the configured provider and requires
-explicit model/base URL configuration. No actual LLM calls are made by these commands.
+explicit model/base URL configuration. `init` and `doctor` never call the model;
+`run` calls it only for `/ask`, `/catchup summarize:true` or `POST /api/v1/ask`.

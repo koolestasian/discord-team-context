@@ -138,6 +138,7 @@ pub(crate) async fn start_with(db: &TestDb, extend: impl FnOnce(Router) -> Route
         allowed_hosts: vec!["127.0.0.1".to_owned(), "localhost".to_owned()],
         shutdown: shutdown.clone(),
         mcp,
+        ask: None,
     }));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await

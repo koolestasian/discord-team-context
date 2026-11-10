@@ -105,6 +105,7 @@ async fn status_reports_connector_state_and_cursors_without_names() {
         allowed_hosts: vec!["127.0.0.1".to_owned()],
         shutdown: shutdown.clone(),
         mcp,
+        ask: None,
     });
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await

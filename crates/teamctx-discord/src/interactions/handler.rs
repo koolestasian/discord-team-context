@@ -20,8 +20,11 @@
 //!   typed with a slash command have no source channel and are shown to everyone.
 //! - **Text:** everything chat-derived goes through [`render::inline`]; errors are fixed
 //!   text or our own ids, never echoed input.
+//! - **Language model:** `/ask` and `/catchup summarize:true` end in an
+//!   [`Outcome::Llm`] task carrying the channels the person may read; the service runs
+//!   it through the host's [`super::ask::AskBackend`] (see [`super::ask`]).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use teamctx_core::citation::DiscordMessageLink;
 use teamctx_core::id::{ChannelId, MemberId, Snowflake, SourceId};
@@ -41,6 +44,7 @@ use teamctx_core::when::{DueDate, FixedOffset, Zone, parse_due, parse_since};
 use twilight_model::channel::message::embed::Embed;
 
 use super::access::{AccessSnapshot, Viewer};
+use super::ask::{ASK_DISABLED, LlmJob, LlmRequest, LlmTask, SUMMARY_DISABLED};
 use super::payload::{Interaction, Person, Request};
 use super::render::{self, EXCERPT_CHARS, MAX_ITEMS, NAME_CHARS, TITLE_CHARS};
 use crate::connector::StatusSnapshot;
@@ -81,6 +85,8 @@ pub struct Context<'a> {
     pub access: Option<&'a AccessSnapshot>,
     /// The connector's state, for `/teamctx status`.
     pub status: &'a StatusSnapshot,
+    /// A language model is configured: `/ask` and `/catchup summarize` are available.
+    pub llm: bool,
 }
 
 /// What to answer.
@@ -90,6 +96,9 @@ pub enum Outcome {
     Reply(Reply),
     /// The task modal for this message.
     Modal(MessageRef),
+    /// A language-model step the service runs before it replies (`/ask`,
+    /// `/catchup summarize:true`).
+    Llm(Box<LlmTask>),
 }
 
 /// A message reply. `content` and the embeds are fixed text plus escaped chat text.
@@ -261,7 +270,8 @@ impl<S: InteractionStore + ?Sized> Run<'_, '_, S> {
             Request::TodoDone { id } => self.todo_done(id),
             Request::Question { text } => self.question(text),
             Request::Answer { id, link } => self.answer(id, link),
-            Request::Catchup { since } => self.catchup(since.as_deref()),
+            Request::Catchup { since, summarize } => self.catchup(since.as_deref(), *summarize),
+            Request::Ask { question } => self.ask(question),
             Request::Search {
                 query,
                 channel,
@@ -814,7 +824,47 @@ impl<S: InteractionStore + ?Sized> Run<'_, '_, S> {
         self.reply(String::new(), vec![embed])
     }
 
-    fn catchup(&mut self, since: Option<&str>) -> Done {
+    /// The channels (store ids, threads included) this person may see in this reply.
+    fn scope(&mut self) -> Result<HashSet<ChannelId>, Fail> {
+        let mut visible = HashSet::new();
+        for channel in self.store.channels(self.source)? {
+            if self.channel_visible(channel.id)? {
+                visible.insert(channel.id);
+            }
+        }
+        Ok(visible)
+    }
+
+    fn llm_task(&mut self, job: LlmJob, base: Option<Reply>) -> Done {
+        let member = self.actor()?;
+        let scope = self.scope()?;
+        let footer = self.ctx.access.is_none().then(|| ACCESS_UNKNOWN.to_owned());
+        Ok(Outcome::Llm(Box::new(LlmTask {
+            request: LlmRequest {
+                member,
+                now: self.ctx.now,
+                scope,
+                job,
+            },
+            public: self.public,
+            base,
+            footer,
+        })))
+    }
+
+    fn ask(&mut self, question: &str) -> Done {
+        if !self.ctx.llm {
+            return Err(user(ASK_DISABLED));
+        }
+        self.llm_task(
+            LlmJob::Ask {
+                question: question.to_owned(),
+            },
+            None,
+        )
+    }
+
+    fn catchup(&mut self, since: Option<&str>, summarize: bool) -> Done {
         let now = self.ctx.now;
         let floor = UnixMillis::from_millis(now.as_millis().saturating_sub(CATCHUP_MAX_MS));
         let actor = self.actor()?;
@@ -858,6 +908,7 @@ impl<S: InteractionStore + ?Sized> Run<'_, '_, S> {
         };
 
         let mut mentions = Vec::new();
+        let mut mention_ids = Vec::new();
         let mut extra = 0;
         for message in self.store.mentions_since(actor, since, 40)? {
             if !self.message_visible(&message)? {
@@ -869,6 +920,7 @@ impl<S: InteractionStore + ?Sized> Run<'_, '_, S> {
                 continue;
             }
             mentions.push(self.message_line(&message)?);
+            mention_ids.push(message.id);
         }
         let mentions_text = if mentions.is_empty() {
             "Nobody mentioned you.".to_owned()
@@ -887,7 +939,25 @@ impl<S: InteractionStore + ?Sized> Run<'_, '_, S> {
             render::embed("Most active channels", &channels_text, None),
             render::embed("Mentions of you", &mentions_text, footer),
         ];
-        self.reply(content, embeds)
+        if summarize && !self.ctx.llm {
+            content.push_str(&format!(
+                "
+{SUMMARY_DISABLED}"
+            ));
+        }
+        if !(summarize && self.ctx.llm) {
+            return self.reply(content, embeds);
+        }
+        let base = Reply {
+            content,
+            embeds,
+            public: self.public,
+        };
+        let job = LlmJob::Summarize {
+            entries: entries.iter().map(RecordEntry::short_id).collect(),
+            messages: mention_ids,
+        };
+        self.llm_task(job, Some(base))
     }
 
     fn message_line(&mut self, message: &StoredMessage) -> Result<String, Fail> {

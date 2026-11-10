@@ -5,14 +5,14 @@ use std::path::Path;
 use std::sync::Arc;
 
 use teamctx_core::{
-    id::{MemberId, Snowflake},
-    repo::{DirectoryRead, IngestWrite, RepoError},
+    id::{MemberId, Snowflake, TokenId},
+    repo::{DirectoryRead, IngestWrite, RepoError, TokenHash, TokenWrite},
     source::{Member, SourceEvent, SourceKind},
     time::UnixMillis,
 };
 use teamctx_store::{
     Store,
-    usage::{UsageDb, UsageRecord, UsageWindow},
+    usage::{Asker, UsageDb, UsageRecord, UsageWindow},
 };
 
 const HOUR: i64 = 3_600_000;
@@ -67,7 +67,7 @@ fn database(path: &Path) -> MemberId {
 fn row(member: MemberId, when: i64, input: u64, output: u64, ok: bool) -> UsageRecord {
     UsageRecord {
         at: at(when),
-        member,
+        asker: member.into(),
         provider: "fake".to_owned(),
         model: "m".to_owned(),
         input_tokens: input,
@@ -271,4 +271,101 @@ fn reservations_and_rows_survive_a_restart() {
             tokens: 120
         }
     );
+}
+
+/// Adds a fictional access token and returns its id.
+fn token(path: &Path) -> TokenId {
+    let mut store = Store::open(path).unwrap();
+    store
+        .create_token("robin-laptop", &TokenHash([7; 32]), "read", at(1))
+        .unwrap()
+        .id
+}
+
+#[test]
+fn tokens_and_members_have_separate_budgets() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("t.db");
+    let member = database(&path);
+    let token = token(&path);
+    let db = UsageDb::open(&path).unwrap();
+    // The member's hour is used up ...
+    db.reserve(member, at(NOW), 1_000, admit_with(NOW, 1_000, 10, 1_000))
+        .unwrap();
+    assert!(matches!(
+        db.reserve(member, at(NOW), 1, admit_with(NOW, 1, 10, 1_000)),
+        Err(Denied::Refused)
+    ));
+    // ... but a token is its own asker, even one whose row id equals the member's.
+    assert_eq!(token.get(), member.get());
+    let held = db
+        .reserve(token, at(NOW), 900, admit_with(NOW, 900, 10, 1_000))
+        .unwrap();
+    db.settle(
+        held,
+        &UsageRecord {
+            asker: Asker::Token(token),
+            ..row(member, NOW, 30, 10, true)
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        db.usage_since(token, at(NOW - HOUR)).unwrap(),
+        UsageWindow {
+            questions: 1,
+            tokens: 40
+        }
+    );
+    assert_eq!(
+        db.usage_since(member, at(NOW - HOUR)).unwrap(),
+        UsageWindow {
+            questions: 1,
+            tokens: 1_000
+        }
+    );
+    // Exactly one of the two columns is set on every row.
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    let mixed: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM llm_usage WHERE (member_id IS NULL) = (token_id IS NULL)",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(mixed, 0);
+}
+
+#[test]
+fn a_version_two_database_keeps_its_usage_rows() {
+    let file = tempfile::NamedTempFile::new().unwrap();
+    {
+        let conn = rusqlite::Connection::open(file.path()).unwrap();
+        conn.execute_batch(include_str!("../migrations/0001_init.sql"))
+            .unwrap();
+        conn.execute_batch(include_str!("../migrations/0002_record_edits.sql"))
+            .unwrap();
+        conn.pragma_update(None, "user_version", 2).unwrap();
+        conn.execute_batch(
+            "INSERT INTO sources (kind, external_id, name) VALUES ('discord', '1', 'Kept');
+             INSERT INTO members (source_id, external_id, display_name, is_bot)
+                 VALUES (1, '100', 'Piper Fiction', 0);
+             INSERT INTO llm_usage (at, member_id, provider, model, input_tokens, output_tokens, ok)
+                 VALUES (864000000, 1, 'fake', 'm', 30, 10, 1);",
+        )
+        .unwrap();
+    }
+    let db = UsageDb::open(file.path()).unwrap();
+    let member = MemberId::new(1).unwrap();
+    assert_eq!(
+        db.usage_since(member, at(NOW - HOUR)).unwrap(),
+        UsageWindow {
+            questions: 1,
+            tokens: 40
+        }
+    );
+    let conn = rusqlite::Connection::open(file.path()).unwrap();
+    let version: i64 = conn
+        .pragma_query_value(None, "user_version", |r| r.get(0))
+        .unwrap();
+    assert_eq!(version, 3);
 }

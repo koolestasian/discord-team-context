@@ -72,6 +72,67 @@ fn run_refuses_bad_settings_before_any_network_call() {
     }
 }
 
+#[test]
+fn run_refuses_unusable_llm_config_before_network_or_database_access() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("teamctx.toml");
+    let llm_key = "FAKE-llm-key-not-a-real-credential";
+    let cases = [
+        (
+            "https://api.example",
+            "<set me>",
+            "TEAMCTX_LLM_KEY",
+            "llm.model",
+        ),
+        (
+            "https://api.example",
+            "example-model",
+            "TEAMCTX_LLM_KEY",
+            "llm.api_key_env",
+        ),
+        (
+            "https://api.example",
+            "example-model",
+            "ABCDEF0123456789ABCDEF0123456789",
+            "llm.api_key_env",
+        ),
+        (
+            "https://api.example/?secret=value",
+            "example-model",
+            "TEAMCTX_LLM_KEY",
+            "llm.base_url",
+        ),
+    ];
+    for (url, model, key_env, field) in cases {
+        std::fs::write(&path, format!("[discord]\nguild_id='123'\n[llm]\nprovider='anthropic'\nbase_url='{url}'\nmodel='{model}'\napi_key_env='{key_env}'\n")).expect("config");
+        let output = teamctx(
+            dir.path(),
+            &["run"],
+            &[("TEAMCTX_DISCORD_TOKEN", BOT_TOKEN)],
+        );
+        assert_eq!(output.status.code(), Some(1));
+        let text = all(&output);
+        assert!(text.contains(field), "{text}");
+        assert!(!text.contains(llm_key));
+        assert!(!text.contains(BOT_TOKEN));
+        assert!(!text.contains("ABCDEF0123456789ABCDEF0123456789"));
+        assert!(!dir.path().join("teamctx.db").exists());
+    }
+    std::fs::write(&path, "[discord]\nguild_id='123'\n[llm]\nprovider='openai_compatible'\nbase_url='http://192.0.2.1/v1'\nmodel='example-model'\n").expect("config");
+    let output = teamctx(
+        dir.path(),
+        &["run"],
+        &[
+            ("TEAMCTX_DISCORD_TOKEN", BOT_TOKEN),
+            ("TEAMCTX_LLM_KEY", llm_key),
+        ],
+    );
+    assert_eq!(output.status.code(), Some(1));
+    assert!(all(&output).contains("llm.base_url"));
+    assert!(!all(&output).contains(llm_key));
+    assert!(!dir.path().join("teamctx.db").exists());
+}
+
 #[cfg(unix)]
 #[test]
 fn run_refuses_a_group_readable_secrets_file() {

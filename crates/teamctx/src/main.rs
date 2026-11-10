@@ -3,6 +3,7 @@
 //! Pre-alpha: `run` hosts the record and syncs Discord; `doctor --live` checks the bot.
 //! Live behaviour is not yet verified against a real Discord server (spikes S1/S2).
 
+mod ask;
 mod config;
 mod demo;
 mod eval;

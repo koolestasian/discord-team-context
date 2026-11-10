@@ -802,7 +802,7 @@ fn a_database_from_schema_version_one_upgrades_in_place() {
     let version: i64 = conn
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 2);
+    assert_eq!(version, 3);
 }
 
 #[test]

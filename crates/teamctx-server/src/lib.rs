@@ -5,6 +5,7 @@
 //! LLM provider directly.
 
 mod api;
+pub mod ask;
 pub mod auth;
 pub mod mcp;
 pub mod secret;
@@ -37,6 +38,8 @@ pub struct HttpConfig {
     pub shutdown: CancellationToken,
     /// The record the MCP tools read.
     pub mcp: McpConfig,
+    /// Optional model backend, supplied by the binary.
+    pub ask: Option<Arc<dyn ask::AskBackend>>,
 }
 
 impl std::fmt::Debug for HttpConfig {
@@ -69,7 +72,7 @@ pub fn router(config: HttpConfig) -> Router {
         // browsers always do, so an empty allow-list means "no browser origin is welcome".
         .enforce_origin_validation()
         .with_cancellation_token(config.shutdown);
-    let api = api::routes(Arc::clone(&state));
+    let api = api::routes(Arc::clone(&state)).merge(ask::routes(config.ask));
     let mcp = StreamableHttpService::new(
         move || Ok(McpServer::new(Arc::clone(&state))),
         Arc::new(LocalSessionManager::default()),

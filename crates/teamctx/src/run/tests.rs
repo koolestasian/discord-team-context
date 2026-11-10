@@ -62,7 +62,8 @@ impl InteractionApi for FakeRest {
         commands: &[twilight_model::application::command::Command],
     ) -> Result<(), RestError> {
         self.1.lock().unwrap().push(json!({
-            "install": [application.to_string(), guild.to_string(), commands.len()]
+            "install": [application.to_string(), guild.to_string(), commands.len()],
+            "commands": serde_json::to_value(commands).unwrap(),
         }));
         Ok(())
     }
@@ -186,6 +187,10 @@ fn test_settings() -> Settings {
 }
 
 async fn start(history: &[(u64, &str)]) -> Running {
+    start_with_ask(history, None).await
+}
+
+async fn start_with_ask(history: &[(u64, &str)], ask: Option<crate::ask::Setup>) -> Running {
     let dir = tempfile::tempdir().unwrap();
     let db = dir.path().join("teamctx.db");
     // A token created the way `teamctx token create` does, before the host starts.
@@ -212,6 +217,7 @@ async fn start(history: &[(u64, &str)]) -> Running {
                 closed: false,
             },
             rest: Arc::clone(&rest),
+            ask,
             settings: test_settings(),
             clock: Arc::new(|| UnixMillis::from_millis(NOW_MS)),
             timing: Timing {
@@ -494,6 +500,441 @@ async fn run_registers_commands_and_answers_interactions() {
         .unwrap()
         .map_err(|e| e.to_string())
         .unwrap();
+}
+
+fn fake_ask(provider: teamctx_llm::FakeProvider, questions: u32) -> crate::ask::Setup {
+    crate::ask::Setup {
+        provider: crate::ask::Provider::Fake(provider),
+        config: teamctx_llm::AskConfig {
+            budget: teamctx_llm::Budget {
+                max_questions_per_hour: questions,
+                max_tokens_per_hour: u64::MAX,
+                max_tokens_per_day: 1_000_000_000,
+            },
+            ..teamctx_llm::AskConfig::default()
+        },
+    }
+}
+
+async fn sync_for_ask(r: &Running, client: &reqwest::Client) {
+    r.frames
+        .send(dispatch(
+            "READY",
+            &json!({
+                "v": 10, "application": { "id": "1100000000000000900", "flags": 0 }
+            }),
+        ))
+        .unwrap();
+    r.frames
+        .send(dispatch(
+            "GUILD_CREATE",
+            &json!({
+                "id": GUILD.to_string(), "name": "Example Team"
+            }),
+        ))
+        .unwrap();
+    wait_for("model sources", async || {
+        get_json(client, r, "/api/v1/status").await["sync"]["sync_runs"]
+            .as_u64()
+            .is_some_and(|n| n > 0)
+            && !r.rest.1.lock().unwrap().is_empty()
+    })
+    .await;
+}
+
+async fn post_ask(client: &reqwest::Client, r: &Running, question: &str) -> reqwest::Response {
+    client
+        .post(format!("{}/api/v1/ask", r.base))
+        .bearer_auth(&r.token)
+        .json(&json!({ "question": question }))
+        .send()
+        .await
+        .unwrap()
+}
+
+async fn discord_ask(r: &Running, question: &str) -> Value {
+    let before = r.rest.1.lock().unwrap().len();
+    let mut fixture: Value = serde_json::from_str(include_str!(
+        "../../../../fixtures/discord/interactions/ask.json"
+    ))
+    .unwrap();
+    fixture["d"]["id"] = json!((1_100_000_000_000_008_000 + before as u64).to_string());
+    fixture["d"]["data"]["options"][0]["value"] = json!(question);
+    r.frames
+        .send(dispatch("INTERACTION_CREATE", &fixture["d"]))
+        .unwrap();
+    wait_for("deferred model answer", async || {
+        r.rest.1.lock().unwrap().len() >= before + 2
+    })
+    .await;
+    let calls = r.rest.1.lock().unwrap();
+    assert_eq!(calls[before]["type"], 5);
+    assert_eq!(calls[before]["data"]["flags"], 64);
+    let reply = calls[before + 1]["fill"].clone();
+    assert_eq!(reply["allowed_mentions"]["parse"], json!([]));
+    reply
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn host_ask_uses_auth_and_persistent_per_asker_budgets() {
+    let setup = fake_ask(
+        teamctx_llm::FakeProvider::fixed(
+            "Budgetprobe ships Friday [m:1] [D-9999] https://evil.example",
+        ),
+        1,
+    );
+    let r = start_with_ask(&[(id_at(1000), "Budgetprobe ships Friday.")], Some(setup)).await;
+    let client = reqwest::Client::new();
+    sync_for_ask(&r, &client).await;
+    let calls = r.rest.1.lock().unwrap().clone();
+    assert!(
+        calls[0]["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["name"] == "ask")
+    );
+    let url = format!("{}/api/v1/ask", r.base);
+    assert_eq!(
+        client
+            .post(&url)
+            .json(&json!({"question":"budgetprobe"}))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        401
+    );
+    for body in [
+        json!({"question":"budgetprobe", "member":1}),
+        json!({"question":""}),
+        json!({"question":"x".repeat(501)}),
+    ] {
+        assert_eq!(
+            client
+                .post(&url)
+                .bearer_auth(&r.token)
+                .json(&body)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            400
+        );
+    }
+    assert_eq!(
+        client
+            .post(&url)
+            .bearer_auth(&r.token)
+            .header("content-type", "application/json")
+            .body("x".repeat(5000))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        413
+    );
+    let answer = post_ask(&client, &r, "budgetprobe").await;
+    assert_eq!(answer.status(), 200);
+    assert_eq!(answer.headers()["cache-control"], "no-store");
+    let answer: Value = answer.json().await.unwrap();
+    assert_eq!(answer["found"], true);
+    assert_eq!(answer["citations"][0]["id"], "m:1");
+    assert!(!answer.to_string().contains("evil.example"));
+    assert!(!answer.to_string().contains("D-9999"));
+    assert_eq!(post_ask(&client, &r, "budgetprobe").await.status(), 429);
+    // Discord member and HTTP token ids are distinct budget namespaces.
+    let reply = discord_ask(&r, "budgetprobe").await;
+    assert!(reply["content"].as_str().unwrap().contains("Friday"));
+    assert!(!reply.to_string().contains("evil.example"));
+    let refused = discord_ask(&r, "budgetprobe").await;
+    assert_eq!(
+        refused["content"],
+        teamctx_discord::interactions::Refusal::QuestionsPerHour.text()
+    );
+    use teamctx_core::repo::{DirectoryRead, TokenRead};
+    use teamctx_llm::budget::{Asker, StoreLedger, UsageLedger};
+    let reader = Store::open_read_only(&r.db).unwrap();
+    let token = reader
+        .active_token(&teamctx_server::auth::token::hash(r.token.as_bytes()))
+        .unwrap()
+        .unwrap();
+    let ledger = StoreLedger::open(&r.db).unwrap();
+    assert_eq!(
+        ledger
+            .usage_since(Asker::Token(token.id), UnixMillis::from_millis(0))
+            .unwrap()
+            .questions,
+        1
+    );
+    let member = reader
+        .member_by_external(
+            teamctx_core::id::SourceId::new(1).unwrap(),
+            Snowflake::new(1_100_000_000_000_000_201).unwrap(),
+        )
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        ledger
+            .usage_since(Asker::Member(member.id), UnixMillis::from_millis(0))
+            .unwrap()
+            .questions,
+        1
+    );
+    r.shutdown.cancel();
+    r.host.await.unwrap().map_err(|e| e.to_string()).unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn host_ask_provider_failure_is_fixed_and_charged_and_disabled_is_explicit() {
+    let r = start_with_ask(
+        &[(id_at(1000), "Failureprobe Friday")],
+        Some(fake_ask(
+            teamctx_llm::FakeProvider::failing(teamctx_llm::LlmError::Http { status: 401 }),
+            1,
+        )),
+    )
+    .await;
+    let client = reqwest::Client::new();
+    sync_for_ask(&r, &client).await;
+    let response = post_ask(&client, &r, "failureprobe").await;
+    assert_eq!(response.status(), 502);
+    assert_eq!(
+        response.json::<Value>().await.unwrap(),
+        json!({"error":"The language model could not answer right now."})
+    );
+    assert_eq!(post_ask(&client, &r, "failureprobe").await.status(), 429);
+    let reply = discord_ask(&r, "failureprobe").await;
+    assert_eq!(
+        reply["content"],
+        teamctx_discord::interactions::Refusal::Provider.text()
+    );
+    r.shutdown.cancel();
+    r.host.await.unwrap().map_err(|e| e.to_string()).unwrap();
+    let r = start(&[]).await;
+    sync_for_ask(&r, &client).await;
+    let calls = r.rest.1.lock().unwrap().clone();
+    assert!(
+        !calls[0]["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["name"] == "ask")
+    );
+    assert_eq!(post_ask(&client, &r, "failureprobe").await.status(), 503);
+    r.shutdown.cancel();
+    r.host.await.unwrap().map_err(|e| e.to_string()).unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn host_catchup_summary_runs_the_same_pipeline_on_its_listed_entries() {
+    let provider = teamctx_llm::FakeProvider::new(|request| {
+        assert_eq!(request.system, teamctx_llm::prompt::SUMMARY_SYSTEM_PROMPT);
+        assert!(request.user.contains("Friday"));
+        assert!(request.user.contains("[D-1]"));
+        Ok("Friday is the release date [D-1] https://evil.example".to_owned())
+    });
+    let r = start_with_ask(&[], Some(fake_ask(provider, 10))).await;
+    let client = reqwest::Client::new();
+    sync_for_ask(&r, &client).await;
+    let mut fixture: Value = serde_json::from_str(include_str!(
+        "../../../../fixtures/discord/interactions/ask.json"
+    ))
+    .unwrap();
+    fixture["d"]["data"]["name"] = json!("decide");
+    fixture["d"]["data"]["options"] = json!([{ "name":"text", "type":3, "value":"Ship Friday" }]);
+    r.frames
+        .send(dispatch("INTERACTION_CREATE", &fixture["d"]))
+        .unwrap();
+    wait_for("the decision", async || r.rest.1.lock().unwrap().len() >= 2).await;
+    fixture["d"]["id"] = json!("1100000000000009000");
+    fixture["d"]["data"]["name"] = json!("catchup");
+    fixture["d"]["data"]["options"] = json!([{ "name":"summarize", "type":5, "value":true }]);
+    r.frames
+        .send(dispatch("INTERACTION_CREATE", &fixture["d"]))
+        .unwrap();
+    wait_for("the summary", async || r.rest.1.lock().unwrap().len() >= 4).await;
+    let calls = r.rest.1.lock().unwrap().clone();
+    assert_eq!(calls[2]["type"], 5);
+    let reply = &calls[3]["fill"];
+    assert_eq!(reply["embeds"].as_array().unwrap().len(), 4);
+    assert!(
+        reply["embeds"][3]["description"]
+            .as_str()
+            .unwrap()
+            .contains("Friday")
+    );
+    assert!(!reply.to_string().contains("evil.example"));
+    r.shutdown.cancel();
+    r.host.await.unwrap().map_err(|e| e.to_string()).unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn shutdown_finishes_an_in_flight_model_call_and_its_reply() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let started = Arc::new(AtomicBool::new(false));
+    let called = Arc::clone(&started);
+    let provider = teamctx_llm::FakeProvider::new(move |_| {
+        called.store(true, Ordering::SeqCst);
+        // Longer than the old five-second interaction drain deadline.
+        std::thread::sleep(Duration::from_secs(6));
+        Ok("Friday [m:1]".to_owned())
+    });
+    let r = start_with_ask(
+        &[(id_at(1000), "Shutdownprobe Friday")],
+        Some(fake_ask(provider, 10)),
+    )
+    .await;
+    let client = reqwest::Client::new();
+    sync_for_ask(&r, &client).await;
+    let mut fixture: Value = serde_json::from_str(include_str!(
+        "../../../../fixtures/discord/interactions/ask.json"
+    ))
+    .unwrap();
+    fixture["d"]["data"]["options"][0]["value"] = json!("shutdownprobe");
+    r.frames
+        .send(dispatch("INTERACTION_CREATE", &fixture["d"]))
+        .unwrap();
+    wait_for("model call started", async || {
+        started.load(Ordering::SeqCst)
+    })
+    .await;
+    r.shutdown.cancel();
+    tokio::time::timeout(Duration::from_secs(20), r.host)
+        .await
+        .unwrap()
+        .unwrap()
+        .map_err(|e| e.to_string())
+        .unwrap();
+    let calls = r.rest.1.lock().unwrap().clone();
+    assert!(calls.iter().any(|c| {
+        c["fill"]["content"]
+            .as_str()
+            .is_some_and(|text| text.contains("Friday"))
+    }));
+    assert_eq!(wal_len(&r.db), 0);
+}
+
+#[derive(Clone)]
+struct AskLog(Arc<Mutex<Vec<u8>>>);
+
+impl std::io::Write for AskLog {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn injection_corpus_crosses_both_host_transports_without_escaping_or_logging() {
+    use teamctx_core::framing::{BLOCK_END, BLOCK_START};
+    let logs = AskLog(Arc::new(Mutex::new(Vec::new())));
+    let sink = logs.clone();
+    tracing::subscriber::set_global_default(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_ansi(false)
+            .with_writer(move || sink.clone())
+            .finish(),
+    )
+    .unwrap();
+    tracing::info!("ask-host-log-canary");
+    let corpus: Value =
+        serde_json::from_str(include_str!("../../../../fixtures/injection/corpus.json")).unwrap();
+    let mut probes = Vec::new();
+    let mut payloads = Vec::new();
+    for (key, field) in [("messages", "content"), ("entries", "title")] {
+        for row in corpus[key].as_array().unwrap() {
+            probes.push(row["probe"].as_str().unwrap().to_owned());
+            payloads.push(row[field].as_str().unwrap().to_owned());
+        }
+    }
+    let observed = Arc::new(Mutex::new(Vec::new()));
+    let calls = Arc::clone(&observed);
+    let provider = teamctx_llm::FakeProvider::new(move |request| {
+        assert_eq!(request.system, teamctx_llm::prompt::SYSTEM_PROMPT);
+        assert_eq!(request.user.matches(BLOCK_START).count(), 1);
+        assert_eq!(request.user.matches(BLOCK_END).count(), 1);
+        let encoded = request
+            .user
+            .split_once(BLOCK_START)
+            .unwrap()
+            .1
+            .lines()
+            .nth(1)
+            .unwrap();
+        let sources: String = serde_json::from_str(encoded).unwrap();
+        let citation = sources
+            .lines()
+            .next()
+            .unwrap()
+            .split(']')
+            .next()
+            .unwrap()
+            .to_owned()
+            + "]";
+        assert!(citation.starts_with("[m:"));
+        calls.lock().unwrap().push(sources.clone());
+        // A model that follows an attack and echoes its sources still cannot smuggle
+        // a delimiter, fabricated citation or arbitrary URL through the transport.
+        Ok(format!(
+            "{citation} {sources}\n[D-999999] https://untrusted.example/key"
+        ))
+    });
+    let history: Vec<_> = payloads
+        .iter()
+        .enumerate()
+        .map(|(n, text)| (id_at(1000 + n as i64 * 1000), text.as_str()))
+        .collect();
+    let r = start_with_ask(&history, Some(fake_ask(provider, 1000))).await;
+    let client = reqwest::Client::new();
+    sync_for_ask(&r, &client).await;
+    for probe in &probes {
+        let response = post_ask(&client, &r, probe).await;
+        assert_eq!(response.status(), 200, "{probe}");
+        let body: Value = response.json().await.unwrap();
+        assert_eq!(body["found"], true, "{probe}");
+        let text = body["text"].as_str().unwrap();
+        assert_eq!(text.matches(BLOCK_START).count(), 1);
+        assert_eq!(text.matches(BLOCK_END).count(), 1);
+        assert!(!text.contains("untrusted.example"));
+        assert!(!text.contains("D-999999"));
+        assert!(
+            observed.lock().unwrap().last().unwrap().contains(probe),
+            "{probe} actually retrieved"
+        );
+        let reply = discord_ask(&r, probe).await;
+        assert!(!reply.to_string().contains("untrusted.example"));
+        assert!(!reply["content"].as_str().unwrap().contains("@everyone"));
+        assert!(
+            observed.lock().unwrap().last().unwrap().contains(probe),
+            "{probe} actually retrieved for Discord"
+        );
+    }
+    assert_eq!(observed.lock().unwrap().len(), probes.len() * 2);
+    r.shutdown.cancel();
+    r.host.await.unwrap().map_err(|e| e.to_string()).unwrap();
+    let text = String::from_utf8(logs.0.lock().unwrap().clone()).unwrap();
+    assert!(text.contains("ask-host-log-canary"));
+    assert!(
+        text.contains("model"),
+        "the real host emitted model request events"
+    );
+    for secret in [
+        &r.token,
+        "FAKE-interaction-token.not-a-real-credential_0004",
+        "injprobe",
+        "injentry",
+        "untrusted.example",
+    ] {
+        assert!(
+            !text.contains(secret),
+            "logs contained a credential or chat marker"
+        );
+    }
 }
 
 #[test]

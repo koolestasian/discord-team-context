@@ -134,14 +134,14 @@ fn migrations_reopen_readonly_and_reject_newer_schema() {
     assert_eq!(
         conn.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
             .unwrap(),
-        2
+        3
     );
     assert_eq!(
         conn.pragma_query_value(None, "journal_mode", |r| r.get::<_, String>(0))
             .unwrap(),
         "wal"
     );
-    conn.pragma_update(None, "user_version", 3).unwrap();
+    conn.pragma_update(None, "user_version", 4).unwrap();
     drop(conn);
     assert!(Store::open(file.path()).is_err());
     assert!(Store::open_read_only(file.path()).is_err());

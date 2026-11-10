@@ -377,10 +377,10 @@ impl Config {
                     "must be an absolute HTTP(S) URL without credentials or whitespace",
                 ));
             }
-            if llm.model.trim().is_empty() {
+            if llm.model.trim().is_empty() || llm.model.contains(['<', '>']) {
                 return Err(invalid(
                     "llm.model",
-                    "must be set when LLM support is enabled",
+                    "must be a model name, with no placeholder brackets",
                 ));
             }
             if !env_name(&llm.api_key_env) {

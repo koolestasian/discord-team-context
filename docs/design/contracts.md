@@ -32,7 +32,7 @@ Live connector contracts (in `crates/teamctx-discord`, not core):
 | `HostStore` | `src/store.rs` | §5.2 | writer client for writes, own read-only connection for reads |
 | `doctor::diagnose`, `doctor::check` | `src/doctor.rs` | §7.1 | pure on payloads; five `GET`s |
 | `status::HostStatus`, `StatusProvider` | `crates/teamctx-server/src/status.rs` | §10.2 | ids, times, counts, fixed text |
-| `interactions::commands::commands` | `src/interactions/commands.rs` | §7.3 | the registered set; no `/ask` until M6 |
+| `interactions::commands::commands` | `src/interactions/commands.rs` | §7.3 | the registered set; `/ask` and `summarize` only with an injected backend |
 | `interactions::payload::{parse, Request, InteractionToken}` | `src/interactions/payload.rs` | §7.3 | raw JSON in; the token's `Debug` is `***` |
 | `interactions::handler::{handle, Context, Outcome, Reply, InteractionStore}` | `src/interactions/handler.rs` | §7.3, §8, §9 | pure; never fails, errors become fixed-text ephemeral replies |
 | `interactions::access::AccessSnapshot` | `src/interactions/access.rs` | §7.3, §13 | per-member channel visibility; fail closed |
@@ -171,3 +171,29 @@ All thirteen draft questions were answered in the build continuation:
 
 Message contracts carry mention IDs separately; mapping populates them and storage
 persists them. Contract types alone do not implement ingestion or retrieval.
+
+### Optional model host (M6)
+
+The binary injects `interactions::ask::AskBackend` and `server::ask::AskBackend`;
+neither interface depends on the LLM crate. `[llm]` enables Discord `/ask` and
+`/catchup summarize:true`, and authenticated `POST /api/v1/ask` on `teamctx run`.
+Absent configuration disables registration and returns a fixed HTTP 503. `serve`
+and stdio MCP do not enable a model.
+
+One shared provider and SQLite usage ledger charge Discord members or HTTP tokens
+as separate asker namespaces. Access tokens have no Discord member link; their
+budgets and read scope are per token. Schema version 3 adds `llm_usage.token_id`
+without discarding existing member usage. Configured limits are hourly questions
+and rolling 24-hour input plus output tokens, per asker. There is no additional
+hourly token limit in the public configuration.
+
+Discord sources are restricted to the request's visible channel ids, including
+neighbours and cited messages. Catch-up summarises only the listed entries and
+mentions. HTTP tokens read the whole included record, as in MCP. Both paths use
+the existing single-call pipeline, atomic budget reservation, citation validation
+and URL removal. HTTP model text is framed as untrusted data; Discord text is
+escaped and citations use numeric jump links. Model calls time out at 60 seconds;
+host shutdown allows 65 seconds for each transport to finish in-flight calls and
+accounting before draining the writer. Query expansion remains deferred until
+an eval demonstrates a retrieval gain. See `docs/guides/llm.md` for setup and the
+live acceptance checks still required.

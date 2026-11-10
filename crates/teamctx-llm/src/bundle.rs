@@ -3,6 +3,9 @@
 //!
 //! What never goes in: messages from excluded channels (the store never returns them),
 //! messages written by bots, and entries whose title was copied from such a message.
+//! With a [`Scope::Channels`] (a Discord member's question) nothing from a channel outside
+//! the scope goes in either, and neither does an entry that cites such a message, exactly
+//! as the Discord replies hide them.
 //!
 //! Every [`Source`] line contains chat-derived text (titles, names, channel names,
 //! message content). [`Bundle::framed`] encodes all of it with
@@ -30,6 +33,36 @@ impl<T: RecordRead + MessageRead + DirectoryRead + ?Sized> Retrieval for T {}
 
 /// The most single-word queries run after the all-terms query.
 const MAX_TERM_QUERIES: usize = 6;
+
+/// Which channels a bundle may take chat-derived text from.
+#[derive(Debug, Clone, Copy)]
+pub enum Scope<'a> {
+    /// Every included channel. An access token reads the whole record over MCP and the
+    /// API, so its questions may draw on all of it.
+    All,
+    /// Only these channels (store ids, threads and forum posts listed themselves): the
+    /// channels a Discord member may read. Entries citing a message outside them, or a
+    /// message that is no longer stored, are left out.
+    Channels(&'a HashSet<ChannelId>),
+}
+
+impl Scope<'_> {
+    fn allows(self, channel: ChannelId) -> bool {
+        match self {
+            Self::All => true,
+            Self::Channels(allowed) => allowed.contains(&channel),
+        }
+    }
+}
+
+/// Record entries and messages to summarise, such as the items a `/catchup` shows.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Items {
+    /// Entries, in the order given.
+    pub entries: Vec<ShortId>,
+    /// Messages; they are put in conversation order.
+    pub messages: Vec<MessageId>,
+}
 
 /// Bounds for one bundle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -144,12 +177,27 @@ impl Bundle {
         now: UnixMillis,
         limits: &BundleLimits,
     ) -> RepoResult<Self> {
+        Self::retrieve_in(reader, question, now, limits, Scope::All)
+    }
+
+    /// [`Bundle::retrieve`] limited to `scope`.
+    ///
+    /// # Errors
+    ///
+    /// [`RepoError`] if the store fails.
+    pub fn retrieve_in<R: Retrieval + ?Sized>(
+        reader: &R,
+        question: &str,
+        now: UnixMillis,
+        limits: &BundleLimits,
+        scope: Scope<'_>,
+    ) -> RepoResult<Self> {
         let queries = search_plan(question);
         let mut builder = Builder::new(limits);
         if queries.is_empty() {
             return Ok(builder.finish());
         }
-        let mut lookup = Lookup::new(reader);
+        let mut lookup = Lookup::new(reader, scope);
 
         for entry in ranked_entries(reader, &queries, now, limits)? {
             if builder.is_full() {
@@ -189,6 +237,44 @@ impl Bundle {
                 if let Some((key, source)) = lookup.message_source(message, limits)? {
                     builder.add_message(key, source);
                 }
+            }
+        }
+        Ok(builder.finish())
+    }
+
+    /// A bundle of exactly these items (those that still exist and are in `scope`),
+    /// within the same bounds. Used for summaries, where the caller already chose what
+    /// to show.
+    ///
+    /// # Errors
+    ///
+    /// [`RepoError`] if the store fails.
+    pub fn of_items<R: Retrieval + ?Sized>(
+        reader: &R,
+        items: &Items,
+        limits: &BundleLimits,
+        scope: Scope<'_>,
+    ) -> RepoResult<Self> {
+        let mut builder = Builder::new(limits);
+        let mut lookup = Lookup::new(reader, scope);
+        for short in &items.entries {
+            if builder.is_full() {
+                break;
+            }
+            if let Some(entry) = reader.entry(*short)?
+                && let Some(source) = lookup.entry_source(&entry, limits)?
+            {
+                builder.add_entry(source);
+            }
+        }
+        for id in &items.messages {
+            if builder.is_full() {
+                break;
+            }
+            if let Some(message) = reader.message(*id)?
+                && let Some((key, source)) = lookup.message_source(&message, limits)?
+            {
+                builder.add_message(key, source);
             }
         }
         Ok(builder.finish())
@@ -348,15 +434,17 @@ struct ChannelContext {
 /// Cached lookups of members, channels and guilds while building one bundle.
 struct Lookup<'a, R: ?Sized> {
     reader: &'a R,
+    scope: Scope<'a>,
     members: HashMap<MemberId, Option<MemberInfo>>,
     channels: HashMap<ChannelId, Option<ChannelContext>>,
     guilds: HashMap<SourceId, Option<Snowflake>>,
 }
 
 impl<'a, R: Retrieval + ?Sized> Lookup<'a, R> {
-    fn new(reader: &'a R) -> Self {
+    fn new(reader: &'a R, scope: Scope<'a>) -> Self {
         Self {
             reader,
+            scope,
             members: HashMap::new(),
             channels: HashMap::new(),
             guilds: HashMap::new(),
@@ -372,11 +460,11 @@ impl<'a, R: Retrieval + ?Sized> Lookup<'a, R> {
         Ok(member)
     }
 
-    /// The channel if it exists and is included.
+    /// The channel if it exists, is included and is in scope.
     fn channel(&mut self, id: ChannelId) -> RepoResult<Option<&ChannelContext>> {
         if !self.channels.contains_key(&id) {
             let context = match self.reader.channel(id)? {
-                Some(info) if info.included => {
+                Some(info) if info.included && self.scope.allows(id) => {
                     let guild = self.guild(info.source)?;
                     Some(ChannelContext {
                         name: info.name,
@@ -446,8 +534,13 @@ impl<'a, R: Retrieval + ?Sized> Lookup<'a, R> {
         limits: &BundleLimits,
     ) -> RepoResult<Option<Source>> {
         let mut link = None;
+        let scoped = matches!(self.scope, Scope::Channels(_));
         if let Some(message_id) = entry.source_message {
             match self.reader.message(message_id)? {
+                // Out of scope: hidden whole, as Discord replies hide it.
+                Some(message) if scoped && !self.scope.allows(message.channel) => {
+                    return Ok(None);
+                }
                 Some(message) => {
                     let author = match message.author {
                         Some(id) => self.member(id)?,
@@ -466,7 +559,7 @@ impl<'a, R: Retrieval + ?Sized> Lookup<'a, R> {
                 }
                 // The cited message is not visible (excluded channel or gone). A copied
                 // title would leak its text.
-                None if entry.title_is_copied => return Ok(None),
+                None if entry.title_is_copied || scoped => return Ok(None),
                 None => {}
             }
         }

@@ -678,6 +678,14 @@ record/
 
 ## 12. Configuration
 
+Implementation note (M6 wiring, 2026-11-10): `teamctx run` now serves `/ask`, optional
+catch-up summaries and authenticated `POST /api/v1/ask` through injected backends,
+tested with a fake provider only. HTTP usage is charged per token because tokens
+have no Discord member association; member and token budgets are separate. A keyless
+OpenAI-compatible provider is allowed only on loopback. Model-based query expansion
+remains deferred until measured by the retrieval eval. M6 is not complete until one
+hosted and one local model pass live checks. See `docs/guides/llm.md`.
+
 `teamctx.toml` (secrets only via env vars or a separate `secrets.env` with 0600
 permissions; `doctor` checks):
 

@@ -262,13 +262,13 @@ fn success_body(result: &rmcp::model::CallToolResult) -> Option<Value> {
     Some(Value::Object(body))
 }
 
-fn error_response(status: StatusCode, message: &str) -> Response {
+pub(crate) fn error_response(status: StatusCode, message: &str) -> Response {
     let mut body = Map::new();
     body.insert("error".to_owned(), Value::String(message.to_owned()));
     json_response(status, &Value::Object(body))
 }
 
-fn json_response(status: StatusCode, body: &Value) -> Response {
+pub(crate) fn json_response(status: StatusCode, body: &Value) -> Response {
     let Ok(text) = serde_json::to_string(body) else {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };

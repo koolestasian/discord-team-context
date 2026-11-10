@@ -44,6 +44,7 @@ impl fmt::Debug for Store {
 const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0001_init.sql"),
     include_str!("../migrations/0002_record_edits.sql"),
+    include_str!("../migrations/0003_llm_usage_tokens.sql"),
 ];
 
 /// Reads `PRAGMA user_version`, which counts the migrations already applied.

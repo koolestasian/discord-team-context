@@ -51,7 +51,8 @@ use crate::search::parse_timezone;
 const DEFAULT_DB: &str = "teamctx.db";
 
 /// How long HTTP may take to finish in-flight requests at shutdown.
-const HTTP_STOP: Duration = Duration::from_secs(10);
+// Model calls may take 60 seconds; allow their accounting and replies to finish.
+const HTTP_STOP: Duration = Duration::from_secs(65);
 
 /// How long the connector may take to close the gateway and drain at shutdown.
 const CONNECTOR_STOP: Duration = Duration::from_secs(30);
@@ -285,7 +286,7 @@ pub(crate) struct Settings {
     pub(crate) sync: SyncConfig,
     pub(crate) retention_days: u32,
     pub(crate) public_bind_without_url: bool,
-    pub(crate) llm_configured: bool,
+    pub(crate) llm: Option<config::Llm>,
 }
 
 /// Checks the parts of the configuration only `run` needs.
@@ -321,7 +322,7 @@ pub(crate) fn settings(config: &Config) -> Result<Settings, ConfigError> {
         sync,
         retention_days: config.retention.max_age_days,
         public_bind_without_url: !bind.ip().is_loopback() && config.server.public_url.is_none(),
-        llm_configured: config.llm.is_some(),
+        llm: config.llm.clone(),
     })
 }
 
@@ -377,6 +378,7 @@ pub(crate) struct HostParts<G, R> {
     pub(crate) settings: Settings,
     pub(crate) clock: Clock,
     pub(crate) timing: Timing,
+    pub(crate) ask: Option<crate::ask::Setup>,
 }
 
 fn host_status(snapshot: &StatusSnapshot) -> HostStatus {
@@ -412,12 +414,22 @@ where
         settings,
         clock,
         timing,
+        ask,
     } = parts;
     let read_only = || Store::open_read_only(&db).map_err(|_| RunError::Store);
     let writer = Writer::spawn(Store::open(&db).map_err(|_| RunError::Store)?)
         .map_err(|_| RunError::Store)?;
     let zone = FixedOffset::from_seconds(settings.utc_offset_seconds)
         .ok_or_else(|| usage("server.timezone", TIMEZONE_HELP))?;
+    let ask = ask
+        .map(|setup| setup.open(&db, zone))
+        .transpose()?
+        .map(|backend| {
+            Arc::new(crate::ask::Service {
+                backend,
+                clock: Arc::clone(&clock),
+            })
+        });
     let (interactions, interaction_events) = tokio::sync::mpsc::channel(INTERACTION_QUEUE);
 
     let connector = {
@@ -445,7 +457,7 @@ where
     let service = {
         let mut reader = read_only()?;
         reader.set_date_resolver(midnight_in(zone));
-        InteractionService::new(
+        let service = InteractionService::new(
             Arc::clone(&rest),
             HostStore::new(writer.client(), reader),
             InteractionConfig {
@@ -454,7 +466,11 @@ where
             },
             status.clone(),
             Arc::clone(&clock),
-        )
+        );
+        match &ask {
+            Some(backend) => service.with_ask(backend.clone()),
+            None => service,
+        }
     };
     let provider: StatusProvider = Arc::new(move || host_status(&status.snapshot()));
     let mcp = McpConfig::new(read_only()?)
@@ -467,6 +483,7 @@ where
         allowed_hosts: settings.allowed_hosts.clone(),
         shutdown: http_stop.clone(),
         mcp,
+        ask: ask.map(|backend| backend as Arc<dyn teamctx_server::ask::AskBackend>),
     });
     let mut http = tokio::spawn(serve(listener, app, http_stop.clone()));
     let connector_stop = CancellationToken::new();
@@ -546,7 +563,7 @@ where
 }
 
 /// Midnight of a calendar date in `zone`, for `before:`/`after:` in `/search`.
-fn midnight_in(zone: FixedOffset) -> DateResolver {
+pub(crate) fn midnight_in(zone: FixedOffset) -> DateResolver {
     Arc::new(move |date| {
         zone.start_of_day(date)
             .map_err(|_| RepoError::NotFound { what: "date" })
@@ -642,12 +659,6 @@ pub(crate) fn run(options: &RunOptions, out: &mut impl Write, err: &mut impl Wri
              TLS (Tailscale, a tunnel or a reverse proxy) in front before teammates connect"
         );
     }
-    if settings.llm_configured {
-        let _ = writeln!(
-            err,
-            "note: [llm] is configured, but /ask is not served by this build yet"
-        );
-    }
     let db = options
         .db
         .clone()
@@ -669,6 +680,7 @@ pub(crate) fn run(options: &RunOptions, out: &mut impl Write, err: &mut impl Wri
     };
     let shutdown = CancellationToken::new();
     let result = runtime.block_on(async {
+        let ask = crate::ask::configure(settings.llm.as_ref(), |key| std::env::var(key).ok())?;
         let gateway = TwilightGateway::new(&token).map_err(|_| RunError::Tls)?;
         let rest = TwilightRest::new(&token, tokio::runtime::Handle::current(), shutdown.clone())
             .map_err(|_| RunError::Tls)?;
@@ -690,6 +702,7 @@ pub(crate) fn run(options: &RunOptions, out: &mut impl Write, err: &mut impl Wri
                 settings,
                 clock: Arc::new(system_now),
                 timing: Timing::default(),
+                ask,
             },
             shutdown,
         )
@@ -867,6 +880,7 @@ pub(crate) fn serve_only(options: &ServeOptions, out: &mut impl Write, err: &mut
             allowed_hosts: allowed_hosts(options.bind, None),
             shutdown: stop.clone(),
             mcp,
+            ask: None,
         });
         let listener = TcpListener::bind(options.bind)
             .await

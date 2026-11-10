@@ -626,6 +626,18 @@ fn http_write_marker(tokens: &[Token], i: usize) -> Option<String> {
     }
 }
 
+/// `include_str!` and `include_bytes!` take a filesystem path, not an HTTP route.
+/// Only the path literal is excluded; writes elsewhere in the file are still scanned.
+fn embedded_file_path(tokens: &[Token], i: usize) -> bool {
+    i >= 3
+        && matches!(
+            ident(tokens.get(i - 3)),
+            Some("include_str" | "include_bytes")
+        )
+        && punct(tokens.get(i - 2), '!')
+        && punct(tokens.get(i - 1), '(')
+}
+
 fn scan(file: &str, source: &str) -> Vec<Violation> {
     let tokens = lex(source);
     let mut found = Vec::new();
@@ -665,7 +677,12 @@ fn scan(file: &str, source: &str) -> Vec<Violation> {
     // R4: a Discord route that is not an interaction route, plus any write method.
     let routes: Vec<&Token> = tokens
         .iter()
-        .filter(|t| matches!(&t.tok, Tok::Str(text) if discord_route(text)))
+        .enumerate()
+        .filter(|(i, t)| {
+            !embedded_file_path(&tokens, *i)
+                && matches!(&t.tok, Tok::Str(text) if discord_route(text))
+        })
+        .map(|(_, t)| t)
         .collect();
     let unlisted = routes
         .iter()
@@ -932,6 +949,11 @@ fn bad_snippets_are_flagged() {
             "fn f(c: &C) { c.post(\"https://discord.com/api/v10/webhooks/1/tok\"); }",
             Rule::RestWrite,
         ),
+        // An embedded fixture does not hide a real REST write in the same file.
+        (
+            "const F: &str = include_str!(\"fixtures/discord/interactions/ask.json\"); fn f(c: &C) { c.post(\"/channels/1/messages\"); }",
+            Rule::RestWrite,
+        ),
     ];
     for (snippet, expected) in cases {
         let found = rules(snippet);
@@ -966,6 +988,8 @@ fn interaction_replies_and_reads_pass() {
         "fn f(c: &C) { c.post(\"https://api.example.com/v1/messages\");\n\
              let link = \"https://discord.com/channels/1/2/3\"; }",
         // The store's own local functions share names with Discord calls.
+        "const F: &str = include_str!(\"../../fixtures/discord/interactions/ask.json\"); fn f(c: &C) { c.post(\"http://127.0.0.1/api/v1/ask\"); }",
+        "const F: &[u8] = include_bytes!(\"../../fixtures/discord/interactions/ask.json\"); fn f(c: &C) { c.post(\"http://127.0.0.1/api/v1/ask\"); }",
         "fn delete_message(conn: &Connection) {}\n\
          fn apply(conn: &Connection) { delete_message(conn); update_message(conn); }",
         // Local helpers in a twilight file that are not called as methods.

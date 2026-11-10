@@ -19,8 +19,8 @@ use teamctx_core::source::MessageRef;
 use thiserror::Error;
 
 use super::commands::{
-    ANSWER, CATCHUP, DECIDE, DECISIONS, MARK_DECISION, MARK_QUESTION, MARK_TASK, QUESTION, SEARCH,
-    TEAMCTX, TODO, TODO_ADD, TODO_DONE, TODO_LIST,
+    ANSWER, ASK, CATCHUP, DECIDE, DECISIONS, MARK_DECISION, MARK_QUESTION, MARK_TASK, QUESTION,
+    SEARCH, TEAMCTX, TODO, TODO_ADD, TODO_DONE, TODO_LIST,
 };
 use crate::mapping::display_name;
 
@@ -144,10 +144,17 @@ pub enum Request {
         /// A jump link to the answering message.
         link: String,
     },
-    /// `/catchup [since]`.
+    /// `/catchup [since] [summarize]`.
     Catchup {
         /// A "since" phrase.
         since: Option<String>,
+        /// Add a language-model summary (only registered when one is configured).
+        summarize: bool,
+    },
+    /// `/ask question` (only registered when a language model is configured).
+    Ask {
+        /// The question (untrusted; never logged or echoed).
+        question: String,
     },
     /// `/search query [channel] [author]`.
     Search {
@@ -180,6 +187,7 @@ impl Request {
             Self::Answer { .. } => "answer",
             Self::Catchup { .. } => "catchup",
             Self::Search { .. } => "search",
+            Self::Ask { .. } => "ask",
             Self::Status => "status",
             Self::Unsupported => "unsupported",
         }
@@ -369,6 +377,10 @@ fn command(data: &Map<String, Value>) -> Result<(Request, bool), PayloadError> {
                 },
                 (CATCHUP, None) => Request::Catchup {
                     since: options.string("since")?,
+                    summarize: options.boolean("summarize")?.unwrap_or(false),
+                },
+                (ASK, None) => Request::Ask {
+                    question: options.required_string("question")?,
                 },
                 (SEARCH, None) => Request::Search {
                     query: options.required_string("query")?,
@@ -743,11 +755,45 @@ mod tests {
     }
 
     #[test]
+    fn ask_and_catchup_summarize_are_read() {
+        let ask = json!({ "name": "ask", "type": 1, "options": [
+            { "name": "question", "type": 3, "value": "Which typeface?" },
+            { "name": "public", "type": 5, "value": true }
+        ]});
+        let parsed = parse(&base(2, ask)).unwrap();
+        assert!(parsed.public);
+        assert_eq!(
+            parsed.request,
+            Request::Ask {
+                question: "Which typeface?".to_owned()
+            }
+        );
+        let catchup = json!({ "name": "catchup", "type": 1, "options": [
+            { "name": "summarize", "type": 5, "value": true }
+        ]});
+        assert_eq!(
+            parse(&base(2, catchup)).unwrap().request,
+            Request::Catchup {
+                since: None,
+                summarize: true
+            }
+        );
+        // A missing or non-string question is malformed, and the error says nothing of it.
+        for options in [
+            json!([]),
+            json!([{ "name": "question", "type": 3, "value": 7 }]),
+        ] {
+            let data = json!({ "name": "ask", "type": 1, "options": options });
+            assert!(parse(&base(2, data)).is_err());
+        }
+    }
+
+    #[test]
     fn unknown_commands_and_other_types_are_unsupported() {
         for (kind, data) in [
             (
                 2,
-                json!({ "name": "ask", "type": 1, "options": [{ "name": "question", "type": 3, "value": "?" }] }),
+                json!({ "name": "summarise", "type": 1, "options": [{ "name": "question", "type": 3, "value": "?" }] }),
             ),
             (2, json!({ "name": "Mark as spam", "type": 3 })),
             (
