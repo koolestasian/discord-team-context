@@ -369,6 +369,8 @@ enum ClientError {
     Status(u16),
     BadBody,
     TooLarge,
+    /// The result could not be written to standard output (other than a closed pipe).
+    Output,
 }
 
 #[derive(Debug)]
@@ -427,6 +429,7 @@ impl fmt::Display for ClientError {
             Self::Status(code) => write!(f, "the host answered HTTP {code}"),
             Self::BadBody => f.write_str("the host's answer was not the expected JSON"),
             Self::TooLarge => f.write_str("the host's answer was unexpectedly large"),
+            Self::Output => f.write_str("the result could not be written to standard output"),
         }
     }
 }
@@ -669,9 +672,13 @@ fn execute(
             .ok_or(ClientError::BadBody)?;
         Ok(format!("{}\n", printable(text)))
     }?;
-    // A closed pipe (such as `| head`) is not an error worth reporting.
-    let _ = out.write_all(written.as_bytes());
-    Ok(())
+    // A closed pipe (such as `| head`) is not an error worth reporting; any other failure
+    // (a full disk, a closed descriptor) means the output was lost and must not exit 0.
+    match out.write_all(written.as_bytes()).and_then(|()| out.flush()) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
+        Err(_) => Err(ClientError::Output),
+    }
 }
 
 /// Runs `teamctx q` and returns the exit code.

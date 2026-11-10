@@ -32,8 +32,7 @@ impl ApiKey {
     /// Reads the key from the environment variable `var`.
     ///
     /// A mistake in `llm.api_key_env` can put the key itself where the variable name
-    /// belongs. Errors therefore name the variable only when it looks like a conventional
-    /// one (upper-case letters, digits and `_`); anything else is not echoed.
+    /// belongs, and no check can tell the two apart, so errors never repeat the name.
     ///
     /// # Errors
     ///
@@ -55,30 +54,12 @@ impl ApiKey {
     ) -> Result<Self, LlmError> {
         match lookup(var) {
             Some(value) if !value.trim().is_empty() => Self::new(value),
-            _ => Err(LlmError::MissingApiKey {
-                var: displayable_variable_name(var),
-            }),
+            _ => Err(LlmError::MissingApiKey),
         }
     }
 
     pub(crate) fn expose(&self) -> &str {
         &self.0
-    }
-}
-
-/// The variable name as written, if it looks like an environment variable name; otherwise a
-/// fixed phrase, because the text may be a pasted key.
-fn displayable_variable_name(var: &str) -> String {
-    let conventional = !var.is_empty()
-        && var.len() <= 64
-        && !var.starts_with(|c: char| c.is_ascii_digit())
-        && var
-            .chars()
-            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_');
-    if conventional {
-        var.to_owned()
-    } else {
-        "(the name in llm.api_key_env, not shown)".to_owned()
     }
 }
 
@@ -101,17 +82,16 @@ mod tests {
     }
 
     #[test]
-    fn lookup_names_the_variable_but_never_a_value() {
+    fn lookup_never_echoes_the_name_or_a_value() {
         let missing = ApiKey::from_lookup("TEAMCTX_LLM_KEY", |_| None).unwrap_err();
-        assert_eq!(
-            missing,
-            LlmError::MissingApiKey {
-                var: "TEAMCTX_LLM_KEY".to_owned()
-            }
-        );
-        assert!(missing.to_string().contains("TEAMCTX_LLM_KEY"));
+        assert_eq!(missing, LlmError::MissingApiKey);
+        assert!(!missing.to_string().contains("TEAMCTX_LLM_KEY"));
+        // An upper-case hex "name" is as likely a pasted key as a variable.
+        let pasted = "ABCDEF0123456789ABCDEF0123456789";
+        let error = ApiKey::from_lookup(pasted, |_| None).unwrap_err();
+        assert!(!format!("{error} {error:?}").contains(pasted));
         let blank = ApiKey::from_lookup("K", |_| Some("  \n".to_owned())).unwrap_err();
-        assert!(matches!(blank, LlmError::MissingApiKey { .. }));
+        assert_eq!(blank, LlmError::MissingApiKey);
         let key = ApiKey::from_lookup("K", |_| Some(" secret-value\n".to_owned())).unwrap();
         assert_eq!(key.expose(), "secret-value");
     }
@@ -126,6 +106,6 @@ mod tests {
     #[test]
     fn from_env_reports_an_unset_variable() {
         let error = ApiKey::from_env("TEAMCTX_TEST_SURELY_UNSET_VARIABLE").unwrap_err();
-        assert!(matches!(error, LlmError::MissingApiKey { .. }));
+        assert!(matches!(error, LlmError::MissingApiKey));
     }
 }

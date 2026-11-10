@@ -10,12 +10,11 @@ use crate::budget::{BudgetLimit, LedgerError};
 /// A failure talking to a language model provider.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum LlmError {
-    /// The environment variable that should hold the API key is unset or empty.
-    #[error("environment variable {var} is not set or is empty")]
-    MissingApiKey {
-        /// The variable's name, as written in the configuration (never its value).
-        var: String,
-    },
+    /// The environment variable named in `llm.api_key_env` is unset or empty. The name is
+    /// deliberately not part of the error: a key pasted there by mistake would otherwise
+    /// reach logs and terminals, and no check can tell a key from a variable name.
+    #[error("the environment variable named in llm.api_key_env is not set or is empty")]
+    MissingApiKey,
     /// The adapter's configuration is unusable.
     #[error("invalid language model configuration: {0}")]
     InvalidConfig(&'static str),

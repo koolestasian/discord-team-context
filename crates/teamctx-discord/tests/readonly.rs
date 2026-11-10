@@ -684,6 +684,23 @@ fn scan(file: &str, source: &str) -> Vec<Violation> {
             }
         }
     }
+    // Deleting is never allowed, even on an interaction route: the product must not delete
+    // its own interaction responses either (plan §7.3). The method is judged together with
+    // the route, so an allow-listed route does not excuse a DELETE.
+    if unlisted.is_none() && !routes.is_empty() {
+        for i in 0..tokens.len() {
+            let Some(marker) = http_write_marker(&tokens, i) else {
+                continue;
+            };
+            if marker.to_ascii_lowercase().contains("delete") {
+                flag(
+                    tokens[i].line,
+                    Rule::RestWrite,
+                    format!("{marker} in a file with an interaction route"),
+                );
+            }
+        }
+    }
     found
 }
 
@@ -883,6 +900,15 @@ fn bad_snippets_are_flagged() {
         // An interaction route in the same file does not excuse another route.
         (
             "fn f(c: &C) { c.post(\"/interactions/1/t/callback\"); c.post(\"/channels/1/messages\"); }",
+            Rule::RestWrite,
+        ),
+        // Deleting the original interaction response is a delete, even on an allowed route.
+        (
+            "fn f(c: &C) { c.delete(\"https://discord.com/api/v10/webhooks/123/token/messages/@original\"); }",
+            Rule::RestWrite,
+        ),
+        (
+            "fn f(c: &C) { c.request(Method::DELETE, \"/webhooks/1/tok/messages/@original\"); }",
             Rule::RestWrite,
         ),
         // A follow-up is a new message, not an edit of the original response.

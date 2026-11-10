@@ -274,11 +274,16 @@ fn keys_never_appear_in_debug_output() {
 }
 
 #[test]
-fn a_missing_key_names_only_the_variable() {
+fn a_missing_key_never_echoes_the_variable_name() {
     let error = ApiKey::from_env("TEAMCTX_TEST_SURELY_UNSET_VARIABLE").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "environment variable TEAMCTX_TEST_SURELY_UNSET_VARIABLE is not set or is empty"
+        "the environment variable named in llm.api_key_env is not set or is empty"
+    );
+    assert!(
+        !error
+            .to_string()
+            .contains("TEAMCTX_TEST_SURELY_UNSET_VARIABLE")
     );
 }
 
