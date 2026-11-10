@@ -28,7 +28,7 @@ const HELP: &str = concat!(
     "\n",
     "Offline init and doctor; live Discord support is not available yet.\n",
     "\n",
-    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS] | demo|search|export|q|skill [ARGS]\n",
+    "Usage: teamctx [OPTIONS] | init|doctor [OFFLINE OPTIONS] | demo|search|q|skill [ARGS]\n",
     "\n",
     "Options:\n",
     "  -h, --help     Print this help\n",
