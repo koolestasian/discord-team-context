@@ -1,8 +1,8 @@
 # Discord test bot setup
 
-Use a throwaway server with fictional messages for the live spikes S1 and S2. This build's
-`init` and `doctor` commands run **offline**. They do not connect the bot, register
-commands, validate a token with Discord, or establish that US-1 is complete.
+Use a throwaway server with fictional messages for the live spikes S1 and S2. `init` and
+`doctor` run **offline**; `doctor --live` and `run` talk to Discord (read-only). None of
+the live paths has been verified against a real server yet, so US-1 is not established.
 
 ## 1. Create a private test application
 
@@ -109,9 +109,85 @@ The live S1/S2 spikes still need to verify token validity, guild/channel/thread 
 edits/deletes and ephemeral interaction replies. Do not use this build with real team
 history before those tests and the team privacy agreement.
 
-If a token leaks, reset it on the Bot page, replace the process environment value and
-restart the process using it. Remove the token from any local files; resetting it is
-necessary even if a leaked copy was deleted.
+## 5. Live checks and the host (not yet verified on a real server)
+
+```text
+cargo run -p teamctx -- doctor --live --config <path-to-teamctx.toml>
+```
+
+After the offline checks it makes five read-only requests: the bot user, the
+application (Message Content intent flag), the guild, the bot's member object and the
+channel list. It prints which text, announcement and forum channels the bot can read
+after channel overwrites, warns about permissions beyond 66560 or Administrator, and
+exits 0 only when the intent is enabled and at least one channel is readable. Channel
+names are printed escaped. It cannot see private-thread membership.
+
+```text
+cargo run -p teamctx -- run --config <path-to-teamctx.toml> --db <path-to-teamctx.db>
+```
+
+`run` refuses to start, before any network call, when the token variable is empty,
+`server.timezone` is a named zone (use `UTC` or an offset such as `-05:00` for now),
+reaction capture is enabled, or `secrets.env` is not owner-only. Then it serves `/mcp`,
+`/api/v1` and `/healthz` on `server.bind`, connects one gateway shard with GUILDS,
+GUILD_MESSAGES and MESSAGE_CONTENT, and syncs: discovery and catch-up on start and after
+every reconnect, backfill in the background. `GET /api/v1/status` shows the gateway state,
+the last event, sync runs and each channel's cursor. A gateway close 4014 means the
+Message Content intent is off in the Developer Portal; `run` keeps serving the stored
+record and reports the problem in the status. Stop it with Ctrl-C (or SIGTERM): it
+finishes HTTP requests, closes the gateway, writes queued events and checkpoints the
+database before exiting 0. Create access tokens with `teamctx token create NAME --db`
+pointing at the same database.
+
+## 6. Commands in Discord (not yet verified on a real server)
+
+On `READY`, `run` registers its commands for the configured server with one bulk
+overwrite (guild commands appear at once). If the invite lacked the
+`applications.commands` scope, the log says the commands could not be registered; invite
+the bot again with the URL from `init`. Global registration is not available yet.
+
+| Where | Command | What it does |
+|---|---|---|
+| Message menu (Apps) | Mark as decision / Mark as question | Records the message; the title is copied from it |
+| Message menu (Apps) | Mark as task | Opens a form with an optional owner and due date, then records it |
+| Slash | `/decide text [replaces]` | Records a decision; `replaces:D-12` supersedes that one |
+| Slash | `/decisions [topic] [include_superseded]` | Current decisions, with author, date and jump link |
+| Slash | `/todo add text [owner] [due]` · `/todo list [owner] [status]` · `/todo done id` | Tasks |
+| Slash | `/question text` · `/answer id message_link` | Open questions and their answers |
+| Slash | `/catchup [since]` | Record changes, busiest channels and mentions of you since your last catch-up (at most 14 days) |
+| Slash | `/search query [channel] [author]` | Messages, with the query syntax of `teamctx search` |
+| Slash | `/teamctx status` | Gateway and sync state of the host |
+
+Replies are visible only to the person who ran the command unless they pass
+`public:true`. A reply only shows messages and copied titles from channels that person can
+read in Discord; a public reply only shows what `@everyone` can read. Due and "since"
+dates use `server.timezone`. With `[llm]` configured, `/ask question` and
+`/catchup summarize:true` use the optional model pipeline; see [LLM setup](llm.md).
+Without it neither `/ask` nor the summary option is registered.
+
+### Spike S2: replies without Send Messages (manual)
+
+The bot is invited without Send Messages. Discord's documentation does not say in so
+many words that interaction replies work without it, and no test here can check it, so
+check it by hand on the throwaway server before trusting the setup:
+
+1. Invite the bot with the URL from `init` (66560 only) and start `run`.
+2. In a channel where the bot's role has View Channels and Read Message History but
+   **not** Send Messages (check the channel's permission overwrites), right-click a
+   message, choose **Apps → Mark as decision**. Expected: a reply visible only to you that
+   starts "Recorded as a decision".
+3. Run `/decisions` (ephemeral) and `/decisions public:true` (visible to the channel), and
+   `/catchup` (shows "thinking", then the result: a deferred reply that is edited).
+4. Run **Apps → Mark as task**, fill in the form and submit it.
+5. Record the result in `docs/research/S2.md`: what worked, the Discord client and
+   platform, and the date. If any step fails with "Missing Permissions", stop and
+   revisit ADR 0005 with the maintainer before changing the invite.
+
+## If a token leaks
+
+Reset it on the Bot page, replace the process environment value and restart the process
+using it. Remove the token from any local files; resetting it is necessary even if a
+leaked copy was deleted.
 
 ## Configuration precedence
 
@@ -139,4 +215,5 @@ an error. Without it, `teamctx.toml` is read only if present. Unknown fields are
 channel names without `#`, and the denylist wins over the allowlist. An empty allowlist
 includes every supported channel the bot can read. LLM support is off when `[llm]` is
 absent; enabling it sends retrieved chat excerpts to the configured provider and requires
-explicit model/base URL configuration. No actual LLM calls are made by these commands.
+explicit model/base URL configuration. `init` and `doctor` never call the model;
+`run` calls it only for `/ask`, `/catchup summarize:true` or `POST /api/v1/ask`.

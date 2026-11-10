@@ -1,0 +1,17 @@
+{
+  "op": 0,
+  "s": 9,
+  "t": "MESSAGE_UPDATE",
+  "d": {
+    "id": "1100000000000001001",
+    "channel_id": "1100000000000000101",
+    "guild_id": "1100000000000000001",
+    "embeds": [
+      {
+        "type": "link",
+        "url": "https://example.invalid/page",
+        "title": "Example page"
+      }
+    ]
+  }
+}

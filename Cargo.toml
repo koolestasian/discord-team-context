@@ -24,7 +24,7 @@ teamctx-server = { path = "crates/teamctx-server" }
 rusqlite = { version = "0.41.1", default-features = false, features = ["bundled"] }
 tempfile = "3.27.0"
 # HTTP server and MCP (ADR 0006, spike S3).
-rmcp = { version = "3.8.0", default-features = false, features = ["server", "macros", "transport-streamable-http-server"] }
+rmcp = { version = "3.9.0", default-features = false, features = ["server", "macros", "transport-streamable-http-server"] }
 axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
 tokio-util = "0.7"
@@ -33,6 +33,24 @@ serde_json = "1"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json"] }
 serde = { version = "1.0.229", features = ["derive"] }
 toml = "1.2.0"
+# Discord (D2, ADR 0002): payload models, plus the gateway and REST client used by
+# `teamctx run` and `doctor --live`. Default features are off: TLS through rustls with
+# the platform verifier only. Left out: zstd/zlib transport compression (a C library, and
+# one guild's traffic is small), the gateway's own HTTP client (one shard, so no
+# recommended-shard lookup), brotli response decompression and simd-json.
+twilight-model = "0.18.0"
+twilight-gateway = { version = "0.18.0", default-features = false, features = ["rustls-platform-verifier"] }
+twilight-http = { version = "0.18.0", default-features = false, features = ["rustls-platform-verifier"] }
+# Access tokens (plan section 13): SHA-256 of each token is stored, never the token, and
+# the 32 random bytes come from the operating system. Default features are off: no
+# OID tables or alloc helpers are needed.
+sha2 = { version = "0.11.1", default-features = false }
+getrandom = "0.4.3"
+# Auth failure and rate-limit events (plan section 17); already in the tree via rmcp.
+tracing = { version = "0.1.44", default-features = false, features = ["std"] }
+# Dev-only: the log-capture guards (docs/testing/guards.md) format events at TRACE
+# through the real `fmt` layer. No ANSI, `log` bridge, env filter or JSON.
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

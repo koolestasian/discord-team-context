@@ -1,0 +1,19 @@
+{
+  "op": 0,
+  "s": 20,
+  "t": "THREAD_UPDATE",
+  "d": {
+    "id": "1100000000000000501",
+    "guild_id": "1100000000000000001",
+    "parent_id": "1100000000000000101",
+    "owner_id": "1100000000000000201",
+    "type": 11,
+    "name": "Beta checklist (done)",
+    "thread_metadata": {
+      "archived": true,
+      "archive_timestamp": "2026-03-04T10:10:00.000000+00:00",
+      "auto_archive_duration": 1440,
+      "locked": false
+    }
+  }
+}

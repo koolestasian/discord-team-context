@@ -26,7 +26,7 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace
 cargo deny check
-cargo xtask            # list dev tasks (`eval` arrives in M2)
+cargo xtask            # list dev tasks; `cargo xtask eval -- --check` runs the retrieval eval
 ```
 
 The development toolchain is pinned in `rust-toolchain.toml`. The minimum supported Rust

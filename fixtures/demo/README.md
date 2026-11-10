@@ -73,8 +73,9 @@ entries into validated core requests. It checks references, timestamp consistenc
 parent relationships, lifecycle transitions and the decision reversals, plus the
 properties listed above: message and entry counts, thread structure, author spread,
 share of short messages, links, code block, meeting-notes count, injection-style
-messages and the task and question lifecycles. It does not claim to import a database:
-The store and the M2 `teamctx demo` command supply that path.
+messages and the task and question lifecycles. `crates/teamctx-store/tests/demo_import.rs`
+imports the dataset into a store through `teamctx_store::demo::import`, which the
+`teamctx demo` command and the eval runner share.
 
 ## Evaluation set
 

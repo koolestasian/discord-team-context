@@ -66,3 +66,26 @@ Bundle structure and frontmatter are covered by snapshot tests on the demo recor
 
 - M5: implement `export --format okf` with snapshot tests.
 - Record the spec version in `index.md` so consumers can detect changes.
+
+## Implementation notes (M5, 2026-11-09)
+
+Details settled while building the export; see `docs/research/M5.md` for sources.
+
+- **`--format md` layout.** One file, `record.md`: `# Team record`, `## Decisions`,
+  `## Tasks`, `## Questions` (one `###` section per entry with a bullet list of its
+  facts), and `## History` (every audit event, oldest first). No frontmatter, footnotes
+  or directories, so it reads the same in any viewer. It is for people; the OKF bundle is
+  for agents and repositories. It holds the same facts as the bundle.
+- **`status` in OKF frontmatter.** OKF 0.2 limits `status` to `draft`, `stable` and
+  `deprecated`. The entry's `status` carries that value (open is `draft`; active, done and
+  answered are `stable`; superseded and dropped are `deprecated`) and `entry_status`
+  carries the exact lifecycle status. This departs from the plan's wording ("status") and
+  needs the maintainer's confirmation.
+- **Actors.** `generated.by` and `verified.by` are `human:discord-<user id>` of the person
+  who captured the entry; `verified` is what the spec's trust tiers read as human-reviewed.
+- **No message text.** Only titles (which may be copied from chat), names, ids, dates and
+  jump links are written. Titles and names are escaped for file names, YAML and Markdown,
+  and each file says they are data.
+- **Writing.** `export` refuses a directory that has anything in it. `--force` replaces
+  only files an export wrote (matched by exact name pattern), never follows a symbolic
+  link, and creates files with `create_new`. Times are UTC.

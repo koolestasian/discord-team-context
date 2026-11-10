@@ -12,11 +12,25 @@ publish = false
 workspace = true
 
 [dependencies]
+teamctx-core.workspace = true
+teamctx-store.workspace = true
 teamctx-discord.workspace = true
 teamctx-server.workspace = true
 teamctx-llm.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 toml.workspace = true
+# The `q` client: one HTTPS request on a current-thread runtime.
+reqwest.workspace = true
+tokio.workspace = true
+# `teamctx run`: the shutdown token, and logs to stderr (plan section 17). The fmt layer
+# has no ANSI, env filter, JSON or `log` bridge features.
+tokio-util.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+# The `run` wiring test fakes the interaction API, whose methods take twilight types.
+# Already in the tree through teamctx-discord.
+twilight-model.workspace = true

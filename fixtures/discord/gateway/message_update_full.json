@@ -1,0 +1,41 @@
+{
+  "op": 0,
+  "s": 8,
+  "t": "MESSAGE_UPDATE",
+  "d": {
+    "id": "1100000000000001001",
+    "channel_id": "1100000000000000101",
+    "guild_id": "1100000000000000001",
+    "type": 0,
+    "content": "Decision: we ship the beta on Monday. cc <@1100000000000000202>.",
+    "author": {
+      "id": "1100000000000000201",
+      "username": "robin_example",
+      "global_name": "Robin Example",
+      "discriminator": "0",
+      "avatar": null,
+      "bot": false,
+      "public_flags": 0
+    },
+    "mentions": [
+      {
+        "id": "1100000000000000202",
+        "username": "sam_sample",
+        "global_name": "Sam Sample",
+        "discriminator": "0",
+        "avatar": null,
+        "public_flags": 0
+      }
+    ],
+    "mention_roles": [],
+    "mention_everyone": false,
+    "attachments": [],
+    "embeds": [],
+    "pinned": false,
+    "tts": false,
+    "timestamp": "2026-03-04T10:00:00.000000+00:00",
+    "edited_timestamp": "2026-03-04T11:30:00.000000+00:00",
+    "flags": 0,
+    "components": []
+  }
+}
