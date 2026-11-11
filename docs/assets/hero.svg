@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 270" width="960" height="270" role="img" aria-labelledby="t d" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<title id="t">How teamctx works</title>
+<desc id="d">Team chat messages become a record entry citing its source message, which people and AI agents can then ask about.</desc>
+<rect x="1" y="1" width="958" height="268" rx="16" fill="#f6f8fa" stroke="#d0d7de"/>
+<text x="30" y="36" font-size="14" font-weight="700" fill="#59636e">1  Your team talks in Discord</text>
+<rect x="30" y="52" width="270" height="54" rx="10" fill="#ffffff" stroke="#d0d7de"/><text x="44" y="74" font-size="13" font-weight="700" fill="#0072B2">Tavish</text><text x="44" y="94" font-size="15" fill="#1f2328">serif gang</text>
+<rect x="30" y="116" width="270" height="54" rx="10" fill="#ffffff" stroke="#d0d7de"/><text x="44" y="138" font-size="13" font-weight="700" fill="#0072B2">Wren</text><text x="44" y="158" font-size="15" fill="#1f2328">ok, let's just ship the serif one</text>
+<rect x="30" y="180" width="270" height="54" rx="10" fill="#ffffff" stroke="#d0d7de"/><text x="44" y="202" font-size="13" font-weight="700" fill="#0072B2">Imke</text><text x="44" y="222" font-size="15" fill="#1f2328">same. I'll update the mockups</text>
+<line x1="312" y1="148" x2="364" y2="148" stroke="#59636e" stroke-width="2"/><polygon points="372,148 363,143 363,153" fill="#59636e"/><text x="342" y="138" font-size="12" text-anchor="middle" fill="#59636e">someone marks it</text>
+<text x="392" y="36" font-size="14" font-weight="700" fill="#59636e">2  It becomes a cited record entry</text>
+<rect x="392" y="52" width="266" height="182" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="392" y="52" width="6" height="182" rx="3" fill="#0072B2"/>
+<rect x="412" y="66" width="170" height="24" rx="12" fill="#ddf4ff"/>
+<text x="424" y="83" font-size="13" font-weight="700" fill="#0550ae">D-7 · decision · active</text>
+<text x="412" y="116" font-size="15" font-weight="700" fill="#1f2328">Default reading font is</text>
+<text x="412" y="136" font-size="15" font-weight="700" fill="#1f2328">Fenwick Serif, with Alder</text>
+<text x="412" y="156" font-size="15" font-weight="700" fill="#1f2328">Sans for the interface</text>
+<text x="412" y="184" font-size="13" fill="#59636e">Wren Calloway · #design · 2026-03-04</text>
+<text x="412" y="208" font-size="13" fill="#59636e">source: the Discord message, one click</text>
+<line x1="668" y1="148" x2="698" y2="148" stroke="#59636e" stroke-width="2"/><polygon points="706,148 697,143 697,153" fill="#59636e"/><text x="687" y="138" font-size="12" text-anchor="middle" fill="#59636e">ask</text>
+<text x="722" y="36" font-size="14" font-weight="700" fill="#59636e">3  Anyone can ask</text>
+<rect x="722" y="52" width="208" height="52" rx="10" fill="#ffffff" stroke="#d0d7de"/><text x="736" y="74" font-size="15" font-weight="700" fill="#1f2328">Discord</text><text x="736" y="93" font-size="13" fill="#59636e">/search  /decisions  /catchup</text>
+<rect x="722" y="116" width="208" height="52" rx="10" fill="#ffffff" stroke="#d0d7de"/><text x="736" y="138" font-size="15" font-weight="700" fill="#1f2328">AI agents</text><text x="736" y="157" font-size="13" fill="#59636e">MCP  ·  CLI  ·  Agent Skill</text>
+<rect x="722" y="180" width="208" height="52" rx="10" fill="#ffffff" stroke="#d0d7de"/><text x="736" y="202" font-size="15" font-weight="700" fill="#1f2328">Web view</text><text x="736" y="221" font-size="13" fill="#59636e">simple, read-only (planned)</text>
+</svg>
