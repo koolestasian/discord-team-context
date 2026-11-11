@@ -792,8 +792,7 @@ gating) elsewhere. Every bug fix gets a regression test.
 ## 16. Delivery: CI/CD and repo hygiene
 
 - **Branches:** `main` is protected by a ruleset (PRs, CI green, linear history, no
-  force push). Work happens on short branches (`m<N>-<slug>` per milestone, or `build/run-<N>` for a run of parallel tasks). A separate worktree is
-  used only when two sessions write at the same time.
+  force push). Work happens on short branches (`m<N>-<slug>` per milestone).
   Conventional Commits.
 - **CI** (`.github/workflows/ci.yml`, actions pinned by SHA, top-level
   `permissions: {}` with per-job grants such as `contents: read`):
@@ -850,12 +849,12 @@ recorded in `Cargo.lock`.
 ## 18. Milestones
 
 Each milestone ends with a demo and a short report: what changed, what was actually
-checked, what's left. Estimates assume one part-time developer working with an agent;
+checked, what's left. Estimates assume one part-time developer;
 they're rough.
 
 | M | Goal | Key deliverables | Done when | Est. |
 |---|---|---|---|---|
-| **M0** | Foundation | Rust toolchain; workspace skeleton; CI/security workflows; ADRs 0001–0014 (§17); community files; `AGENTS.md`/`CLAUDE.md`; repo settings checklist | CI green on all three OSes with an empty binary; ADRs merged | 2–3 days |
+| **M0** | Foundation | Rust toolchain; workspace skeleton; CI/security workflows; ADRs 0001–0014 (§17); community files; repo settings checklist | CI green on all three OSes with an empty binary; ADRs merged | 2–3 days |
 | **M1** | De-risk (time-boxed spikes) | S1 twilight gateway receives MESSAGE_CREATE with content on a test server · S2 interaction reply without Send Messages · S3 rmcp streamable HTTP behind bearer middleware, connected from Claude Code · S4 bundled SQLite FTS5 on all OSes in CI | Each spike has a written result (keep/change ADR); spike code thrown away or promoted deliberately | 3–4 days |
 | **M2** | Store + search + demo | migrations, repositories, FTS, ranking, query parser; fictional demo dataset (~300 messages, 4 channels, decisions with reversals, tasks, a pasted meeting-notes block); **eval set + `xtask eval` with baseline**; `teamctx demo`, `search` | US-2 (CLI part); store tests pass; migration tests pass; eval baseline recorded | 1 week |
 | **M3** | Discord sync | discovery, catch-up, backfill, live events, threads, deletes, recheck window, `init`, `doctor`, permission check | US-1, US-9 on the test server; fixture tests for every event type | 1–1.5 weeks |
@@ -882,7 +881,7 @@ they're rough.
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Rust learning curve slows delivery | medium | M1 spikes, small crates, agent pairing, clear ADRs; Go is the documented fallback: if live spikes S1 and S2 are not working within 4 working days of effort, stop and reconsider Go |
+| Rust learning curve slows delivery | medium | M1 spikes, small crates, clear ADRs; Go is the documented fallback: if live spikes S1 and S2 are not working within 4 working days of effort, stop and reconsider Go |
 | Missed edits/deletes while offline | medium | recheck window + documented limit; host should be always-on |
 | Discord policy or intent changes | low | read-only, explicit purpose, no training; track the developer changelog |
 | Teams can't host (no always-on machine) | medium | Docker image; guides for a Pi, an old laptop and a small VPS; demo mode for trying |

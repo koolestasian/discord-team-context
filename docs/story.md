@@ -2,8 +2,7 @@
 
 Why the project exists, how it was built and how it was tested. About a five-minute read.
 
-teamctx was built with AI coding agents (Claude Code and Codex) under my direction: I wrote
-the plan and the rules, agents wrote much of the code, and I reviewed, audited and tested it.
+teamctx was built with AI coding assistance. I wrote the plan, then reviewed and tested the result.
 
 - [Where it started](#where-it-started)
 - [Research before code](#research-before-code)
@@ -57,10 +56,8 @@ milestones, each with "done when" criteria.
 
 ## How the build ran
 
-Work was split into tasks with clear ownership, run in parallel by agents, and reviewed by
-an independent second model after each batch. A change merged only after the named checks
-had run: formatting, lints as errors, the full test suite, a dependency audit, a minimum
-Rust version check and the retrieval eval.
+A change merged only after these checks had run: formatting, lints as errors, the full test
+suite, a dependency audit, a minimum Rust version check and the retrieval eval.
 
 | Date (2026) | What happened |
 |---|---|
@@ -76,9 +73,9 @@ Rust version check and the retrieval eval.
 3. **Make the eval able to fail.** My first retrieval baseline was all zeros, so it could not
    catch a regression. Any-word matching took recall@10 from 0.00 to 0.61, and making the
    eval run the real code path brought the figure to 0.54.
-4. **Audit agent output like a stranger's pull request.** My audit replaced a templated demo
-   dataset with 314 realistic messages and tightened the store code. Independent review
-   caught real concurrency and input-bounding bugs, each fixed with a regression test.
+4. **Review generated code like a stranger's pull request.** Review replaced a templated demo
+   dataset with 314 realistic messages and caught real bugs, each fixed with a regression
+   test.
 5. **Read the checks, not the summary.** A passing workflow is not the same as every check
    passing.
 6. **Treat chat as hostile input**, even from your own team and in your own tests.
