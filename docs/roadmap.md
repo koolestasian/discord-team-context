@@ -4,20 +4,20 @@ What is left before `v0.1.0`, what comes after, and the ideas that are worth kee
 list but not on the critical path. The [implementation plan](design/implementation-plan.md)
 is the spec for each milestone; this page is the short version and the backlog.
 
-Status on 10 November 2026: milestones M0 to M6 are built and tested against fakes and a
-fictional demo team. Nothing has run against a real Discord server yet.
+Status on 10 November 2026: milestones M0 to M6 are built and tested against a fictional demo
+team. Live Discord testing is next.
 
 ## To v0.1.0 and the launch
 
 | M | Goal | Done when |
 |---|---|---|
-| **M1 live** | Settle spikes S1 (gateway delivers message content) and S2 (interaction replies work without Send Messages) on a throwaway server | Both have a written result in the ADRs. If they are not working within four working days of effort, reconsider Go (plan section 19) |
-| **M3b** | **End-to-end simulation.** The real `teamctx run` binary against a local Discord emulator: six scripted users, a host outage and catch-up, gateway reconnect, captures through real commands, a scored report | The scenario runs from one command, every check passes or is marked not applicable with a reason, and the report is readable by a human. Needs the loopback API address (ADR 0016) |
+| **M1 live** | Settle spikes S1 (gateway delivers message content) and S2 (interaction replies work without Send Messages) on a throwaway server | Both have a written result in the ADRs |
+| **M3b** | **End-to-end simulation.** The real `teamctx run` binary against a local Discord emulator: six scripted users, a host outage and catch-up, gateway reconnect, captures through real commands, a scored report | The scenario runs from one command, every check passes or is marked not applicable with a reason, and the report is readable by a human. |
 | **M3 to M6 live** | Run live sync, the commands and `/ask` against the test server and one hosted and one local model | The live checks in the plan's user stories pass, with evidence |
 | **M7** | **Simple web view.** The three screens in plan section 10.2: Record (decisions, tasks, questions), Ask and search, Status | Plain HTML and CSS served by `teamctx`, no JavaScript framework, works at 360 px wide, keyboard friendly, behind the same login. A Figma sketch is optional. Nothing fancy on purpose |
 | **M8** | Harden and release `v0.1.0` | Threat model and privacy guide, hosting guides, one-line installer, container image, clean install on Windows, macOS and Linux, tag `v0.1.0` |
 | **M9** | **Show it.** Final README with screenshots and a short GIF, social preview image, **a 45 to 75 second promo video**, and **a 3 to 5 minute end-to-end video** | The end-to-end video goes from a fresh install to a real question answered from a real Discord server, with captions. Both are linked from the README. Nothing in either video is staged: every output shown comes from a real run |
-| **M10** | **Launch.** LinkedIn, X, Reddit and Hacker News posts, then one week of replying and fixing | Each post follows that community's rules (including saying the project was built with AI agents). Issues from the first week are triaged and `v0.1.1` ships the quick fixes |
+| **M10** | **Launch.** LinkedIn, X, Reddit and Hacker News posts, then one week of replying and fixing | Each post follows that community's rules. Issues from the first week are triaged and `v0.1.1` ships the quick fixes |
 
 M9 and M10 come after M8 on purpose. A video of something that is not released shows
 people something they cannot try, and a launch is easiest to do once.

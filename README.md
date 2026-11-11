@@ -16,10 +16,8 @@ Every entry links back to the message it came from. People get it through Discor
 commands. AI coding agents get it over MCP. Everything except `/ask` works without an
 LLM.
 
-> **Pre-alpha, and honest about it.** Everything below is built and tested against
-> fakes and a fictional demo team (678 automated tests, CI on Linux, macOS and Windows).
-> It has **not** run against a real Discord server yet. That is the next milestone, and
-> `v0.1.0` will not ship before it does. See [Status](#status).
+> **Pre-alpha.** Built and tested against a fictional demo team (678 automated tests, CI
+> on Linux, macOS and Windows). Live Discord testing is the next milestone. See [Status](#status).
 
 ## See it work
 
@@ -54,11 +52,11 @@ ways to try it, including connecting an agent, are in the [quickstart](docs/guid
 
 | You want to | You use | State |
 |---|---|---|
-| Mark a decision, task or question from a message | Right-click menu, `/decide`, `/todo`, `/question` | Built, fakes only |
-| Find what the team decided | `/search`, `/decisions` in Discord; `teamctx search` in a terminal | Built, fakes only |
-| Catch up after time away | `/catchup`, optional AI summary | Built, fakes only |
-| Let an AI agent know what the team decided | MCP server, `teamctx q` plus an Agent Skill | Built, tested over loopback |
-| Ask a free-form question | `/ask` (your own key or a local model) | Built, fake model only |
+| Mark a decision, task or question from a message | Right-click menu, `/decide`, `/todo`, `/question` | Built |
+| Find what the team decided | `/search`, `/decisions` in Discord; `teamctx search` in a terminal | Built |
+| Catch up after time away | `/catchup`, optional AI summary | Built |
+| Let an AI agent know what the team decided | MCP server, `teamctx q` plus an Agent Skill | Built |
+| Ask a free-form question | `/ask` (your own key or a local model) | Built |
 | Keep a copy outside Discord | `teamctx export` to Markdown or the Open Knowledge Format | Built |
 | Browse it in a browser | Simple read-only web view | Planned |
 
@@ -89,13 +87,13 @@ One program, one SQLite file, on a machine you control. There is no cloud servic
   messages is part of the test suite.
 - **Self-hosted.** Your chat copy lives on your machine. The LLM is optional and only
   sees the excerpts retrieved for one question.
-- **Measured, not claimed.** Retrieval quality is scored against 62 questions on the demo
-  team, and CI fails if it drops.
+- **Measured.** Retrieval quality is scored against 62 questions on the demo team, and CI
+  fails if it drops.
 
 ![Recall@10 for search and /ask retrieval, by question type](docs/assets/eval-recall.svg)
 
-The weak spot is paraphrase: when a question shares few words with the answer, keyword
-search misses it. That is the clearest thing to improve (see the [roadmap](docs/roadmap.md)).
+Paraphrased questions, which share few words with the answer, are the next thing to improve
+(see the [roadmap](docs/roadmap.md)).
 
 ## Status
 
@@ -130,7 +128,7 @@ including stretch goals. [CHANGELOG.md](CHANGELOG.md) lists what has landed.
 
 - [Quickstart](docs/guides/quickstart.md): demo, agent setup, running for a team.
 - [Discord test bot guide](docs/guides/discord-bot.md) and [language model guide](docs/guides/llm.md).
-- [How this was built](docs/story.md): why it exists, what went wrong, how it was tested.
+- [How this was built](docs/story.md): why it exists and how it was tested.
 - [Architecture decisions](docs/adr/): the reasoning behind each big choice.
 - [Roadmap](docs/roadmap.md): milestones, goals and stretch goals.
 
@@ -158,7 +156,6 @@ Dependencies point one way: `teamctx` -> {`discord`, `server`, `llm`} -> `store`
 - [Security policy](.github/SECURITY.md): report vulnerabilities privately, never in an
   issue.
 - [Code of conduct](.github/CODE_OF_CONDUCT.md).
-- [AGENTS.md](AGENTS.md): instructions for AI coding agents working in this repository.
 
 `teamctx` is a working name and may change before v0.1.0.
 
