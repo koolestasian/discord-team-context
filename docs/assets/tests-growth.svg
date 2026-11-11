@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 330" width="700" height="330" role="img" aria-labelledby="t d" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<title id="t">Automated tests over the build</title>
+<desc id="d">Number of passing automated tests at five checkpoints, from 99 to 678.</desc>
+<rect x="1" y="1" width="698" height="328" rx="16" fill="#ffffff" stroke="#d0d7de"/>
+<text x="30" y="38" font-size="19" font-weight="700" fill="#1f2328">Tests grew with the code</text>
+<text x="30" y="60" font-size="13" fill="#59636e">Passing tests at five checkpoints, 5 to 10 November 2026.</text>
+<rect x="60" y="241.7" width="78" height="28.3" rx="4" fill="#0072B2"/>
+<text x="99.0" y="233.7" font-size="15" font-weight="700" text-anchor="middle" fill="#1f2328">99</text>
+<text x="99.0" y="292" font-size="12" text-anchor="middle" fill="#59636e">Foundation</text>
+<rect x="182" y="178.3" width="78" height="91.7" rx="4" fill="#0072B2"/>
+<text x="221.0" y="170.3" font-size="15" font-weight="700" text-anchor="middle" fill="#1f2328">321</text>
+<text x="221.0" y="292" font-size="12" text-anchor="middle" fill="#59636e">Store + eval</text>
+<rect x="304" y="156.3" width="78" height="113.7" rx="4" fill="#0072B2"/>
+<text x="343.0" y="148.3" font-size="15" font-weight="700" text-anchor="middle" fill="#1f2328">398</text>
+<text x="343.0" y="292" font-size="12" text-anchor="middle" fill="#59636e">Sync + MCP</text>
+<rect x="426" y="84.3" width="78" height="185.7" rx="4" fill="#0072B2"/>
+<text x="465.0" y="76.3" font-size="15" font-weight="700" text-anchor="middle" fill="#1f2328">650</text>
+<text x="465.0" y="292" font-size="12" text-anchor="middle" fill="#59636e">Discord + API</text>
+<rect x="548" y="76.3" width="78" height="193.7" rx="4" fill="#0072B2"/>
+<text x="587.0" y="68.3" font-size="15" font-weight="700" text-anchor="middle" fill="#1f2328">678</text>
+<text x="587.0" y="292" font-size="12" text-anchor="middle" fill="#59636e">/ask + guards</text>
+<line x1="40" y1="270" x2="670" y2="270" stroke="#d0d7de"/>
+</svg>
