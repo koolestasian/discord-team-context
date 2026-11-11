@@ -112,6 +112,30 @@ To prepare a throwaway test server and bot, follow the
 tests, `teamctx demo` and the eval runner use is described in
 [fixtures/demo/README.md](fixtures/demo/README.md).
 
+### Optional: `/ask` with a language model
+
+Only `/ask` and catch-up summaries use a model; leave the `[llm]` table out and
+everything else still works. teamctx talks to Anthropic directly (`provider =
+"anthropic"`) or to any Chat Completions endpoint (`provider = "openai_compatible"`),
+which covers aggregators such as OpenRouter and local servers such as LM Studio or
+Ollama. The key is read from an environment variable and never from the config file.
+
+```toml
+[llm]
+provider = "openai_compatible"
+base_url = "https://openrouter.ai/api/v1"   # or http://127.0.0.1:1234/v1 for LM Studio
+model = "<a model id from your provider>"
+api_key_env = "TEAMCTX_LLM_KEY"
+```
+
+```sh
+export TEAMCTX_LLM_KEY=...   # set in your shell, never in a file you commit
+```
+
+The model sees only the retrieved, framed excerpts, has no tools, and every citation in
+its answer is checked against them. Per-member and per-token budgets cap usage. Details
+and limits are in the [language model guide](docs/guides/llm.md).
+
 ## Repository layout
 
 ```text
