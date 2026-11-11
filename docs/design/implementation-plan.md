@@ -816,7 +816,7 @@ gating) elsewhere. Every bug fix gets a regression test.
   image on GHCR (distroless) with provenance. CHANGELOG in Keep a Changelog format;
   SemVer.
 - **Docs:** README (pitch, GIF, quickstart, comparison), `docs/guides/*`, ADRs,
-  `AGENTS.md` + `CLAUDE.md` (build/test commands, architecture map, rules), LICENSE-MIT,
+  LICENSE-MIT,
   LICENSE-APACHE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue and PR templates.
 
 ---

@@ -236,8 +236,6 @@ release.
   GitHub Actions are pinned by commit SHA.
 - Dependabot for Cargo, GitHub Actions and the Rust toolchain, grouped and weekly or
   monthly with a 7-day cooldown.
-- `AGENTS.md` with build commands, the architecture map and project rules; `CLAUDE.md`
-  imports it.
 
 ### Changed
 

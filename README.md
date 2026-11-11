@@ -156,7 +156,6 @@ Dependencies point one way: `teamctx` -> {`discord`, `server`, `llm`} -> `store`
 - [Security policy](.github/SECURITY.md): report vulnerabilities privately, never in an
   issue.
 - [Code of conduct](.github/CODE_OF_CONDUCT.md).
-- [AGENTS.md](AGENTS.md): instructions for AI coding agents working in this repository.
 
 `teamctx` is a working name and may change before v0.1.0.
 
