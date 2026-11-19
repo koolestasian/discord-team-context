@@ -16,8 +16,6 @@ Every entry links back to the message it came from. People get it through Discor
 commands. AI coding agents get it over MCP. Everything except `/ask` works without an
 LLM.
 
-> **Pre-alpha.** Built and tested against a fictional demo team (678 automated tests, CI
-> on Linux, macOS and Windows). Live Discord testing is the next milestone. See [Status](#status).
 
 ## See it work
 
@@ -105,24 +103,6 @@ flowchart LR
     classDef todo fill:#f6f8fa,stroke:#8c959f,color:#1f2328
 ```
 
-| | Milestone | What | State |
-|---|---|---|---|
-| ✅ | M0 Foundation | Workspace, CI on three operating systems, security workflows, ADRs | Done |
-| 🟡 | M1 Spikes | MCP over HTTP and SQLite full-text search done; Discord gateway and interaction spikes need a test server | Half done |
-| ✅ | M2 Store and search | SQLite store, query parser, ranking, demo team, retrieval eval | Done |
-| 🟡 | M3 Discord sync | Built and tested against fakes | Needs a live server |
-| ⬜ | M3b End-to-end simulation | The real binary against a local Discord emulator | Planned |
-| ✅ | M4 Agent surfaces | MCP tools, tokens, JSON API, `teamctx q`, Agent Skill | Done, tested over loopback |
-| 🟡 | M5 Record in Discord | Context menus, `/decide`, `/todo`, `/catchup`, export | Needs a live server |
-| 🟡 | M6 `/ask` | Retrieval, citation checks, budgets | Fake model only |
-| ⬜ | M7 Web view | Simple read-only pages, nothing fancy | Planned |
-| ⬜ | M8 Release | Threat model, installer, container image, `v0.1.0` | Planned |
-| ⬜ | M9 Show it | Screenshots, a short GIF, a promo video, an end-to-end video | Planned |
-| ⬜ | M10 Launch | LinkedIn, X, Reddit, Hacker News | Planned |
-
-The [implementation plan](docs/design/implementation-plan.md) defines every milestone and
-its "done when" criteria. The [roadmap](docs/roadmap.md) lists what comes after v0.1,
-including stretch goals. [CHANGELOG.md](CHANGELOG.md) lists what has landed.
 
 ## Learn more
 
