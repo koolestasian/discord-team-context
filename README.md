@@ -10,6 +10,11 @@
 
 ![A Discord conversation becomes a cited record entry that people and AI agents can search](docs/assets/hero.svg)
 
+
+
+https://github.com/user-attachments/assets/8679cab8-fdba-4715-8a37-f4aeab7958cf
+
+
 teamctx is a self-hosted, single-binary program. It keeps a searchable copy of your
 team's Discord channels and a **team record** of decisions, tasks and open questions.
 Every entry links back to the message it came from. People get it through Discord slash
